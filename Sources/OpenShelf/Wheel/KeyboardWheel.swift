@@ -22,11 +22,21 @@ enum WheelCycle {
 struct ModifierTapTracker {
     private var pressed: NSEvent.ModifierFlags = []
     private var interrupted = false
+    /// Keys that were already down when tracking began, such as the ⌃⌥ of the
+    /// shortcut that opened the wheel. Letting go of them is not a tap.
+    private var heldOver: NSEvent.ModifierFlags
+
+    init(alreadyHeld: NSEvent.ModifierFlags = []) {
+        heldOver = alreadyHeld.intersection(TriggerKey.relevantFlags)
+    }
 
     /// Feed every modifier change; returns the combination that was tapped when
     /// the last key comes up.
     mutating func flagsChanged(_ flags: NSEvent.ModifierFlags) -> NSEvent.ModifierFlags? {
         let flags = flags.intersection(TriggerKey.relevantFlags)
+        // Nothing counts until every key held over has come up.
+        heldOver.formIntersection(flags)
+        if !heldOver.isEmpty { interrupted = true }
         guard flags.isEmpty else {
             pressed.formUnion(flags)
             return nil

@@ -82,6 +82,39 @@ struct ModifierTapTrackerTests {
         #expect(tracker.flagsChanged(.capsLock) == nil)
         #expect(tracker.flagsChanged([]) == nil)
     }
+
+    /// Letting go of ⌃⌥ after ⌃⌥Space opened the wheel used to read as a ⌃ tap
+    /// and switch to the Actions wheel whenever ⌥ came up first.
+    @Test func releasingTheShortcutsModifiersIsNotATap() {
+        var optionFirst = ModifierTapTracker(alreadyHeld: [.control, .option])
+        #expect(optionFirst.flagsChanged(.control) == nil)
+        #expect(optionFirst.flagsChanged([]) == nil)
+
+        var controlFirst = ModifierTapTracker(alreadyHeld: [.control, .option])
+        #expect(controlFirst.flagsChanged(.option) == nil)
+        #expect(controlFirst.flagsChanged([]) == nil)
+    }
+
+    @Test func tapsCountOnceTheShortcutsModifiersAreUp() {
+        var tracker = ModifierTapTracker(alreadyHeld: [.control, .option])
+        _ = tracker.flagsChanged([])
+        _ = tracker.flagsChanged(.shift)
+        #expect(tracker.flagsChanged([]) == .shift)
+    }
+
+    @Test func keysPressedWhileTheShortcutIsStillHeldDontCount() {
+        var tracker = ModifierTapTracker(alreadyHeld: .control)
+        _ = tracker.flagsChanged([.control, .shift])
+        _ = tracker.flagsChanged(.shift)
+        #expect(tracker.flagsChanged([]) == nil)
+    }
+
+    @Test func modifiersLetGoBeforeTheWheelTookFocusDontSwallowATap() {
+        // ⌃ came up before the wheel could see it, so its release never arrives.
+        var tracker = ModifierTapTracker(alreadyHeld: .control)
+        _ = tracker.flagsChanged(.shift)
+        #expect(tracker.flagsChanged([]) == .shift)
+    }
 }
 
 struct FinderSelectionTests {

@@ -51,7 +51,7 @@ final class WheelController {
         let itemsByKind: [WheelKind: [WheelItem]]
         let available: [WheelKind]
         var kind: WheelKind
-        var taps = ModifierTapTracker()
+        var taps: ModifierTapTracker
     }
 
     var isInKeyboardMode: Bool { keyboardSession != nil }
@@ -160,7 +160,15 @@ final class WheelController {
         guard let first = available.first else { return false }
 
         endKeyboardMode(hidingWheel: true)
-        keyboardSession = KeyboardSession(urls: urls, itemsByKind: itemsByKind, available: available, kind: first)
+        // Always the first wheel in Tab order. The shortcut's own modifiers are
+        // usually still down; letting go of them isn't a tap that switches wheels.
+        keyboardSession = KeyboardSession(
+            urls: urls,
+            itemsByKind: itemsByKind,
+            available: available,
+            kind: first,
+            taps: ModifierTapTracker(alreadyHeld: NSEvent.modifierFlags)
+        )
         showKeyboardWheel(first, at: location)
 
         dropView.isKeyboardMode = true
