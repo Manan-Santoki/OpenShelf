@@ -56,6 +56,16 @@ final class WheelController {
 
     var isInKeyboardMode: Bool { keyboardSession != nil }
 
+    /// Builds the panel and draws it once, invisibly, so the first wheel opens
+    /// as quickly as later ones.
+    func prepare() {
+        panel.alphaValue = 0
+        panel.orderFrontRegardless()
+        panel.displayIfNeeded()
+        panel.orderOut(nil)
+        panel.alphaValue = 1
+    }
+
     /// Shows `items` around `location`, or swaps them in place if the wheel is
     /// already open (e.g. when ⌥ is added to switch from Convert to Tools).
     func present(_ items: [WheelItem], at location: NSPoint) {

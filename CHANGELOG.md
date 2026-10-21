@@ -37,8 +37,22 @@ without dragging.
     conversions, when LibreOffice is installed.
   - Archives: **TAR** and **TAR.GZ** alongside ZIP.
 
+### Fixed
+
+- **The wheel opens every time.** After OpenShelf had sat idle for a while,
+  macOS slowed it down to save energy, and a drag could go unnoticed until a
+  shelf was opened ([#1](https://github.com/Manan-Santoki/OpenShelf/issues/1)).
+  OpenShelf now wakes the moment you press the mouse button, follows the drag
+  closely, and goes back to sleep as soon as you let go, so it's both reliable
+  and lighter on battery than before.
+- **Quick taps work.** A brisk tap of ⇧ (or ⇧⌥, ⌃) used to be too short to
+  count. Now the wheel opens as soon as you let go of the key; holding the keys
+  still works as before.
+
 ### Improved
 
+- **The wheel feels snappier.** It appears in about a tenth of a second, the
+  first time too, and blooms open faster.
 - Cancelling a video or audio export never leaves a half-written file behind.
 - Tools aren't offered for MKV, WebM, AVI and other formats they can't edit;
   you're told to convert to MP4 or M4A first.

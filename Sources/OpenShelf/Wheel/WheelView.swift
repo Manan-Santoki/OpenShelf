@@ -23,10 +23,10 @@ struct WheelView: View {
                     isHighlighted: model.highlighted == item
                 )
                 // Petals bloom outward one after another.
-                .scaleEffect(model.isPresented || reduceMotion ? 1 : 0.5)
+                .scaleEffect(model.isPresented || reduceMotion ? 1 : 0.6)
                 .opacity(model.isPresented ? 1 : 0)
                 .animation(
-                    reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.42, dampingFraction: 0.68).delay(Double(index) * 0.022),
+                    reduceMotion ? .easeOut(duration: 0.12) : .spring(response: 0.3, dampingFraction: 0.74).delay(Double(index) * 0.012),
                     value: model.isPresented
                 )
             }
@@ -40,9 +40,9 @@ struct WheelView: View {
                 .offset(y: -(geometry.outerRadius + rimWidth + 20))
         }
         .frame(width: WheelGeometry.panelSide, height: WheelGeometry.panelSide)
-        .scaleEffect(model.isPresented || reduceMotion ? 1 : 0.4)
+        .scaleEffect(model.isPresented || reduceMotion ? 1 : 0.55)
         .opacity(model.isPresented ? 1 : 0)
-        .animation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.38, dampingFraction: 0.7), value: model.isPresented)
+        .animation(reduceMotion ? .easeOut(duration: 0.12) : .spring(response: 0.28, dampingFraction: 0.78), value: model.isPresented)
         .animation(.spring(response: 0.24, dampingFraction: 0.72), value: model.highlighted)
     }
 

@@ -4,9 +4,12 @@ import Carbon.HIToolbox
 /// Watches for system-wide file drags and reports when the user presses a wheel
 /// trigger during one.
 ///
-/// Polls global input state instead of tapping events, so it needs no
-/// Accessibility or Input Monitoring permission: a drag is in progress when the
-/// primary button is down and the drag pasteboard has changed since it went down.
+/// Needs no Accessibility or Input Monitoring permission. A mouse-down anywhere
+/// (mouse events can be monitored without permission) starts following the
+/// button, the modifier keys and the drag pasteboard closely until the button
+/// comes back up; a drag is in progress while the button is down and the drag
+/// pasteboard has changed since before it went down. Between drags nothing runs
+/// but a slow fallback check, so the app costs nothing while idle.
 @MainActor
 final class DragMonitor {
     /// Called with the wheel to show, the pointer location in screen coordinates
@@ -24,13 +27,17 @@ final class DragMonitor {
 
     private let preferences: Preferences
     private let dragPasteboard = NSPasteboard(name: .drag)
-    private var pollTask: Task<Void, Never>?
+    private var eventMonitors: [Any] = []
+    private var fallbackTimer: Timer?
+    private var followTask: Task<Void, Never>?
+    /// Held while following a press, so App Nap can't stretch the polling
+    /// interval of an app with no visible windows.
+    private var activity: NSObjectProtocol?
 
-    private var wasButtonDown = false
-    private var changeCountAtMouseDown = 0
+    /// The drag pasteboard's change count from before the button went down.
+    private var changeCountBeforeDrag = 0
     private var activeWheel: WheelKind?
-    private var pendingWheel: WheelKind?
-    private var pendingSince: ContinuousClock.Instant?
+    private var chord = ModifierChord(settleDelay: DragMonitor.settleDelay)
     private var clockwiseKey = KeyRepeat()
     private var counterClockwiseKey = KeyRepeat()
     private var wasReturnDown = false
@@ -38,68 +45,111 @@ final class DragMonitor {
     /// drag do nothing.
     private var didConfirm = false
 
-    /// How long a modifier combination must be held before it counts, so that
-    /// pressing ⇧ on the way to ⇧⌥ does not flash the wrong wheel.
-    private let settleDelay: Duration = .milliseconds(70)
-    private let idleInterval: Duration = .milliseconds(150)
-    private let activeInterval: Duration = .milliseconds(25)
+    /// How long a held modifier combination must stay steady before it counts,
+    /// so that pressing ⇧ on the way to ⇧⌥ does not flash the wrong wheel. A
+    /// tap counts as soon as it's released.
+    private static let settleDelay: Duration = .milliseconds(70)
+    private static let followInterval: Duration = .milliseconds(16)
+    /// Catches a press whose mouse-down event never arrived.
+    private static let fallbackInterval: TimeInterval = 1
 
     init(preferences: Preferences) {
         self.preferences = preferences
     }
 
     func start() {
-        guard pollTask == nil else { return }
-        pollTask = Task { [weak self] in
-            while !Task.isCancelled {
-                guard let interval = self?.poll() else { return }
-                try? await Task.sleep(for: interval)
+        guard eventMonitors.isEmpty else { return }
+        changeCountBeforeDrag = dragPasteboard.changeCount
+        // Presses in other apps, then presses in OpenShelf's own windows (shelves).
+        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown, handler: { [weak self] _ in
+            MainActor.assumeIsolated { self?.followPress() }
+        }) {
+            eventMonitors.append(monitor)
+        }
+        if let monitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown, handler: { [weak self] event in
+            MainActor.assumeIsolated { self?.followPress() }
+            return event
+        }) {
+            eventMonitors.append(monitor)
+        }
+        let timer = Timer(timeInterval: Self.fallbackInterval, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, NSEvent.pressedMouseButtons & 1 == 1 else { return }
+                self.followPress()
             }
         }
+        timer.tolerance = Self.fallbackInterval / 2
+        RunLoop.main.add(timer, forMode: .common)
+        fallbackTimer = timer
     }
 
     func stop() {
-        pollTask?.cancel()
-        pollTask = nil
+        eventMonitors.forEach(NSEvent.removeMonitor)
+        eventMonitors = []
+        fallbackTimer?.invalidate()
+        fallbackTimer = nil
+        followTask?.cancel()
+        endFollowing()
     }
 
-    private func poll() -> Duration {
-        let isButtonDown = NSEvent.pressedMouseButtons & 1 == 1
-        defer { wasButtonDown = isButtonDown }
-
-        if isButtonDown && !wasButtonDown {
-            changeCountAtMouseDown = dragPasteboard.changeCount
-            resetDrag()
-        } else if !isButtonDown && wasButtonDown {
-            if activeWheel != nil { onDragEnded?() }
-            resetDrag()
+    /// Polls closely until the primary button is released.
+    private func followPress() {
+        guard followTask == nil else { return }
+        resetDrag()
+        activity = ProcessInfo.processInfo.beginActivity(
+            options: [.userInitiatedAllowingIdleSystemSleep, .latencyCritical],
+            reason: "Following a drag"
+        )
+        followTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self, self.poll() else { break }
+                try? await Task.sleep(for: Self.followInterval)
+            }
+            self?.endFollowing()
         }
-        guard isButtonDown else { return idleInterval }
-        guard isDraggingFiles else { return activeInterval }
+    }
+
+    private func endFollowing() {
+        followTask = nil
+        resetDrag()
+        // Taken after the press, so the next drag is measured from here.
+        changeCountBeforeDrag = dragPasteboard.changeCount
+        if let activity { ProcessInfo.processInfo.endActivity(activity) }
+        activity = nil
+    }
+
+    /// One reading while the button is down. Returns false once it's released.
+    private func poll() -> Bool {
+        guard NSEvent.pressedMouseButtons & 1 == 1 else {
+            if activeWheel != nil { onDragEnded?() }
+            return false
+        }
+        guard isDraggingFiles else { return true }
 
         if activeWheel != nil, isKeyDown(kVK_Escape) {
+            // Keeps the modifier state, so a trigger still held doesn't reopen
+            // the wheel; a fresh tap does.
             onDragEnded?()
-            resetDrag()
-            return activeInterval
+            activeWheel = nil
+            clockwiseKey = KeyRepeat()
+            counterClockwiseKey = KeyRepeat()
+            return true
         }
-        guard !didConfirm else { return activeInterval }
+        guard !didConfirm else { return true }
         if activeWheel != nil {
             pollWheelKeys()
-            guard !didConfirm else { return activeInterval }
+            guard !didConfirm else { return true }
         }
 
-        let matcher = TriggerMatcher(triggers: preferences.triggers)
-        let wheel = matcher.wheel(for: NSEvent.modifierFlags)
-        if wheel != pendingWheel {
-            pendingWheel = wheel
-            pendingSince = .now
-        } else if let wheel, wheel != activeWheel, let pendingSince, pendingSince.duration(to: .now) >= settleDelay {
-            // A tap is enough: the wheel stays open after the keys are released.
-            // Pressing another trigger mid-drag switches to that wheel.
+        // A tap is enough: the wheel stays open after the keys are released.
+        // Pressing another trigger mid-drag switches to that wheel.
+        if let flags = chord.update(NSEvent.modifierFlags, at: .now),
+           let wheel = TriggerMatcher(triggers: preferences.triggers).wheel(for: flags),
+           wheel != activeWheel {
             activeWheel = wheel
             onTrigger?(wheel, NSEvent.mouseLocation, draggedFileURLs)
         }
-        return activeInterval
+        return true
     }
 
     /// Arrow keys step the highlight (with auto-repeat); Return runs it.
@@ -132,7 +182,7 @@ final class DragMonitor {
     }
 
     private var isDraggingFiles: Bool {
-        dragPasteboard.changeCount != changeCountAtMouseDown
+        dragPasteboard.changeCount != changeCountBeforeDrag
             && dragPasteboard.types?.contains(.fileURL) == true
     }
 
@@ -143,8 +193,7 @@ final class DragMonitor {
 
     private func resetDrag() {
         activeWheel = nil
-        pendingWheel = nil
-        pendingSince = nil
+        chord = ModifierChord(settleDelay: Self.settleDelay)
         clockwiseKey = KeyRepeat()
         counterClockwiseKey = KeyRepeat()
         wasReturnDown = false

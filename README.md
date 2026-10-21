@@ -211,7 +211,7 @@ You can also open `Package.swift` in Xcode.
 ```
 Sources/OpenShelf/
   App/            entry point, app delegate, preferences
-  DragDetection/  system-wide drag + modifier polling
+  DragDetection/  system-wide drag + modifier detection
   Wheel/          wheel items, geometry, overlay panel, SwiftUI rendering
   Convert/        format catalog, converters, progress runner
   Tools/          tool list, launcher, editor window host
@@ -226,12 +226,16 @@ Sources/OpenShelf/
 
 ## How drag detection works
 
-macOS doesn't announce drags from other apps. OpenShelf polls three pieces of
-global state that need no special permission: the primary mouse button, the
-held modifier keys, and the change count of the system drag pasteboard. When
-the button is down, the drag pasteboard has changed since it went down and holds
-file URLs, a file drag is in progress; if a wheel's modifier combination is then
-held for ~70 ms, the wheel opens. The wheel itself is an ordinary drop target.
+macOS doesn't announce drags from other apps, and OpenShelf asks for no special
+permission. Instead, a mouse-down anywhere (mouse events can be observed without
+permission) wakes it, and while the button stays down it reads three pieces of
+global state every frame: the primary mouse button, the held modifier keys, and
+the change count of the system drag pasteboard. When the button is down and the
+drag pasteboard has changed and holds file URLs, a file drag is in progress. A
+quick tap of a wheel's keys opens that wheel as soon as they're released; keys
+held down count once they've been steady for ~70 ms, so pressing ⇧ on the way to
+⇧⌥ doesn't flash the wrong wheel. Once the button is up, OpenShelf goes idle
+again. The wheel itself is an ordinary drop target.
 
 ## Releasing
 

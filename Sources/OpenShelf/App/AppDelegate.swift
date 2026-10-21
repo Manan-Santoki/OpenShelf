@@ -35,6 +35,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         dragMonitor.onConfirm = { [weak self] urls in
             self?.wheel.confirmHighlighted(with: urls) ?? false
         }
+        wheel.prepare()
         dragMonitor.start()
         Updater.shared.start()
         if Preferences.shared.restoresShelves {

@@ -55,9 +55,14 @@ enum SplitPlan {
         let count = min(max(count, 2), 20)
         guard duration > 0 else { return [] }
         let length = duration / Double(count)
-        return (0..<count).map { index in
-            SplitSegment(start: Double(index) * length, end: index == count - 1 ? duration : Double(index + 1) * length)
+        var segments: [SplitSegment] = []
+        for index in 0..<count {
+            let start = Double(index) * length
+            // The last part ends exactly at the end, whatever rounding did.
+            let end: Double = index == count - 1 ? duration : Double(index + 1) * length
+            segments.append(SplitSegment(start: start, end: end))
         }
+        return segments
     }
 
     static func every(_ interval: Double, duration: Double) throws -> [SplitSegment] {
