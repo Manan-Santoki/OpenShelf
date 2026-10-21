@@ -63,7 +63,7 @@ struct MediaTrimEditor: View {
                     Text("End").foregroundStyle(.secondary)
                     TimeField(label: "End time", seconds: model.endBinding)
                     Spacer(minLength: 0)
-                    Text("Length \(MediaTime.format(model.end - model.start))")
+                    Text("Length \(MediaTime.format(MediaTime.length(from: model.start, to: model.end)))")
                         .font(.system(size: 11).monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
@@ -159,13 +159,29 @@ final class TrimModel {
     }
 
     func setStart(_ value: Double) {
-        start = min(max(value, 0), end - 0.1)
+        start = Self.clampedStart(value, end: end)
         seek(to: start)
     }
 
     func setEnd(_ value: Double) {
-        end = max(min(value, duration), start + 0.1)
+        end = Self.clampedEnd(value, start: start, duration: duration)
         seek(to: end)
+    }
+
+    /// A start on the tenth of a second the fields show, at least a tenth
+    /// before `end`, so what's shown is exactly what's exported.
+    nonisolated static func clampedStart(_ value: Double, end: Double) -> Double {
+        let latest: Double = MediaTime.snapped(end) - MediaTime.precision
+        return max(min(MediaTime.snapped(value), latest), 0)
+    }
+
+    /// An end on a shown tenth of a second, or the very end of the file when
+    /// it shows as the last tenth: the file rarely ends on one, and its last
+    /// frames shouldn't be lost.
+    nonisolated static func clampedEnd(_ value: Double, start: Double, duration: Double) -> Double {
+        let snapped = MediaTime.snapped(value)
+        let end = snapped >= MediaTime.snapped(duration) ? duration : snapped
+        return max(end, min(start + MediaTime.precision, duration))
     }
 
     func seek(to seconds: Double) {

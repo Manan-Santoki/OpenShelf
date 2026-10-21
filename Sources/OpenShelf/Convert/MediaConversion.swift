@@ -71,6 +71,7 @@ enum MediaConversion {
         }
         let encoders = FFmpegEncoders.available(in: ffmpeg)
         let duration = await duration(of: source, tools: tools)
+        let audio = await sourceAudio(of: source, tools: tools)
 
         if format == .mkv {
             // Matroska holds almost any codec, so try copying the streams first.
@@ -87,7 +88,7 @@ enum MediaConversion {
             ffmpeg,
             source: source,
             destination: destination,
-            arguments: FFmpegArguments.arguments(for: format, encoders: encoders),
+            arguments: FFmpegArguments.arguments(for: format, encoders: encoders, audio: audio),
             duration: duration,
             progress: progress
         )
@@ -118,6 +119,13 @@ enum MediaConversion {
             return seconds
         }
         return MediaProbe.duration(of: source, ffprobe: tools.ffprobe) ?? 0
+    }
+
+    private static func sourceAudio(of source: URL, tools: ExternalTools) async -> SourceAudio? {
+        if MediaFormats.isAVFoundationReadable(source), let audio = await SourceAudio.load(from: source) {
+            return audio
+        }
+        return SourceAudio.probe(source, ffprobe: tools.ffprobe)
     }
 
     private static func requireAudio(in source: URL, isNative: Bool, tools: ExternalTools) async throws {
@@ -173,31 +181,35 @@ enum MediaConversion {
 enum FFmpegArguments {
     /// Arguments between the input and the output path. `encoders` is what the
     /// installed ffmpeg offers, so OGG can fall back when libvorbis is missing.
-    static func arguments(for format: OutputFormat, encoders: Set<String>) -> [String] {
+    /// Lossy audio bitrates follow `audio`, the source's sound (see `AudioBitRate`).
+    static func arguments(for format: OutputFormat, encoders: Set<String>, audio: SourceAudio? = nil) -> [String] {
+        func bitRate(_ codec: AudioBitRate.Codec) -> [String] {
+            ["-b:a", AudioBitRate.argument(for: codec, source: audio)]
+        }
         let h264 = ["-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p"]
-        let aac = ["-c:a", "aac", "-b:a", "192k"]
+        let aac = ["-c:a", "aac"] + bitRate(.aac)
         switch format {
         case .mp4: return h264 + aac + ["-movflags", "+faststart"]
         case .mov, .mkv: return h264 + aac
         case .m4a: return ["-vn"] + aac
-        case .mp3: return ["-vn", "-c:a", "libmp3lame", "-q:a", "2"]
+        case .mp3: return ["-vn", "-c:a", "libmp3lame"] + bitRate(.mp3)
         case .wav: return ["-vn", "-c:a", "pcm_s16le"]
         case .aiff: return ["-vn", "-c:a", "pcm_s16be"]
         case .flac: return ["-vn", "-c:a", "flac"]
-        case .opus: return ["-vn", "-c:a", "libopus", "-b:a", "128k"]
-        case .wma: return ["-vn", "-c:a", "wmav2", "-b:a", "192k"]
+        case .opus: return ["-vn", "-c:a", "libopus"] + bitRate(.opus)
+        case .wma: return ["-vn", "-c:a", "wmav2"] + bitRate(.wma)
         case .ogg:
-            if encoders.contains("libvorbis") { return ["-vn", "-c:a", "libvorbis", "-q:a", "5"] }
+            if encoders.contains("libvorbis") { return ["-vn", "-c:a", "libvorbis"] + bitRate(.vorbis) }
             // Opus in an Ogg container is a valid .ogg file.
-            if encoders.contains("libopus") { return ["-vn", "-c:a", "libopus", "-b:a", "160k"] }
-            // ffmpeg's own Vorbis encoder is experimental and stereo-only.
+            if encoders.contains("libopus") { return ["-vn", "-c:a", "libopus"] + bitRate(.opus) }
+            // ffmpeg's own Vorbis encoder is experimental, stereo-only and ignores bitrates.
             return ["-vn", "-c:a", "vorbis", "-strict", "experimental", "-ac", "2"]
         case .webm:
-            return ["-c:v", "libvpx-vp9", "-crf", "32", "-b:v", "0", "-deadline", "good", "-cpu-used", "4", "-row-mt", "1", "-c:a", "libopus", "-b:a", "128k"]
+            return ["-c:v", "libvpx-vp9", "-crf", "32", "-b:v", "0", "-deadline", "good", "-cpu-used", "4", "-row-mt", "1", "-c:a", "libopus"] + bitRate(.opus)
         case .avi:
-            return ["-c:v", "mpeg4", "-vtag", "xvid", "-q:v", "4", "-c:a", "libmp3lame", "-q:a", "3"]
+            return ["-c:v", "mpeg4", "-vtag", "xvid", "-q:v", "4", "-c:a", "libmp3lame"] + bitRate(.mp3)
         case .wmv:
-            return ["-c:v", "wmv2", "-q:v", "4", "-c:a", "wmav2", "-b:a", "192k"]
+            return ["-c:v", "wmv2", "-q:v", "4", "-c:a", "wmav2"] + bitRate(.wma)
         case .gif:
             // Two-pass palette for clean colours; capped at 720 px wide and 12 fps to keep files small.
             return ["-vf", "fps=12,scale='min(720,iw)':-2:flags=lanczos,split[a][b];[a]palettegen[p];[b][p]paletteuse", "-loop", "0"]

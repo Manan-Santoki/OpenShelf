@@ -6,6 +6,8 @@ enum MediaToolError: LocalizedError {
     case noTracks(URL)
     case cannotExport(String)
     case failed(String)
+    /// Compressing didn't make the videos smaller, so nothing was saved.
+    case notSmaller(count: Int)
 
     var errorDescription: String? {
         switch self {
@@ -13,6 +15,10 @@ enum MediaToolError: LocalizedError {
         case .noTracks(let url): "“\(url.lastPathComponent)” has no audio or video."
         case .cannotExport(let detail): "This file can’t be exported \(detail)."
         case .failed(let detail): detail
+        case .notSmaller(let count):
+            count == 1
+                ? "Already as small as it gets — nothing saved."
+                : "These \(count) videos are already as small as they get — nothing saved."
         }
     }
 }
@@ -231,27 +237,6 @@ enum MediaTools {
         return CGSize(width: abs(rect.width), height: abs(rect.height))
     }
 
-    // MARK: Compress
-
-    /// Re-encodes a video with `preset` into an MP4.
-    static func compress(_ url: URL, preset: String, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
-        let asset = AVURLAsset(url: url)
-        let session = try await makeSession(for: asset, presets: [preset, AVAssetExportPresetMediumQuality], fileType: .mp4)
-        let destination = OutputNaming.destination(for: url, suffix: "Compressed", pathExtension: "mp4")
-        try await export(session, to: destination, fileType: .mp4, progress: progress)
-        return destination
-    }
-
-    /// AVFoundation's estimate of the compressed size, or nil when it can't tell.
-    static func estimatedCompressedSize(of url: URL, preset: String) async -> Int64? {
-        let asset = AVURLAsset(url: url)
-        guard let session = try? await makeSession(for: asset, presets: [preset], fileType: .mp4) else { return nil }
-        session.outputFileType = .mp4
-        let box = MediaExportBox(session: session)
-        guard let bytes = try? await box.session.estimatedOutputFileLengthInBytes, bytes > 0 else { return nil }
-        return bytes
-    }
-
     // MARK: Export plumbing
 
     /// The first preset that can write `fileType` from `asset`.
@@ -275,8 +260,7 @@ enum MediaTools {
         // Write to a hidden file first and move it into place only when it's
         // complete, so a cancelled or failed export never leaves a partial file
         // where the user can see it (sessions can finish writing after a cancel).
-        let partial = destination.deletingLastPathComponent()
-            .appendingPathComponent(".openshelf-\(UUID().uuidString.prefix(8))-\(destination.lastPathComponent)")
+        let partial = partialURL(for: destination)
         session.outputURL = partial
         session.outputFileType = fileType
         // The session is thread-safe for these calls but isn't marked Sendable.
@@ -305,22 +289,45 @@ enum MediaTools {
             discardPartial(partial)
             throw box.session.error ?? MediaToolError.failed("Export failed.")
         }
+        try moveIntoPlace(partial, destination: destination)
+        progress(1)
+    }
+
+    /// A hidden file beside `destination` to write into before it's complete.
+    static func partialURL(for destination: URL) -> URL {
+        destination.deletingLastPathComponent()
+            .appendingPathComponent(".openshelf-\(UUID().uuidString.prefix(8))-\(destination.lastPathComponent)")
+    }
+
+    /// Moves a finished partial file to where the user will see it.
+    static func moveIntoPlace(_ partial: URL, destination: URL) throws {
         do {
             try FileManager.default.moveItem(at: partial, to: destination)
         } catch {
             discardPartial(partial)
             throw SaveError.from(error, writing: destination)
         }
-        progress(1)
+        // Tidy up anything AVFoundation left beside it.
+        discardPartial(partial)
     }
 
     /// Removes a partial export now and again shortly after, in case the
     /// session was still finishing the file.
-    private static func discardPartial(_ url: URL) {
-        try? FileManager.default.removeItem(at: url)
+    static func discardPartial(_ url: URL) {
+        removePartialFiles(url)
         Task.detached {
             try? await Task.sleep(for: .seconds(2))
-            try? FileManager.default.removeItem(at: url)
+            removePartialFiles(url)
+        }
+    }
+
+    /// The partial file and its companions: a writer optimizing for streaming
+    /// works in "<partial>.sb-…" files that can outlive it.
+    private static func removePartialFiles(_ url: URL) {
+        let folder = url.deletingLastPathComponent()
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+        for name in names where name.hasPrefix(url.lastPathComponent) {
+            try? FileManager.default.removeItem(at: folder.appendingPathComponent(name))
         }
     }
 

@@ -1,10 +1,9 @@
-@preconcurrency import AVFoundation
 import Observation
 import SwiftUI
 
 /// Re-encodes videos smaller, choosing a maximum resolution and a quality level.
 struct VideoCompressEditor: View {
-    static let windowSize = CGSize(width: 440, height: 400)
+    static let windowSize = CGSize(width: 440, height: 420)
 
     let actions: EditorActions
     @State private var model: VideoCompressModel
@@ -17,8 +16,8 @@ struct VideoCompressEditor: View {
     var body: some View {
         EditorChrome(
             title: "Compress Video",
-            primaryTitle: "Compress",
-            isPrimaryEnabled: model.exportProgress == nil,
+            primaryTitle: model.exportProgress == nil ? "Compress" : "Compressing…",
+            isPrimaryEnabled: model.canCompress,
             actions: actions,
             onReset: model.reset,
             onPrimary: { model.save(actions: actions) }
@@ -57,19 +56,14 @@ struct VideoCompressEditor: View {
                     .labelsHidden()
                 }
 
-                HStack(spacing: 8) {
-                    Image(systemName: "arrow.down.right.and.arrow.up.left")
-                        .foregroundStyle(Color.accentColor)
-                    Text(model.estimateText)
-                        .font(.system(size: 13, weight: .semibold).monospacedDigit())
-                    Spacer(minLength: 0)
-                    Text("MP4")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                sizeSummary
+
+                if let message = model.notice ?? model.sizeAdvice {
+                    Label(message, systemImage: model.notice == nil ? "info.circle" : "checkmark.circle")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(12)
-                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.06)))
-                .accessibilityElement(children: .combine)
 
                 if let progress = model.exportProgress {
                     MediaExportProgress(progress: progress, detail: model.progressDetail)
@@ -77,57 +71,35 @@ struct VideoCompressEditor: View {
                 Spacer(minLength: 0)
             }
         }
-        .task(id: model.preset) { await model.updateEstimate() }
+        .task { await model.load() }
+        .onChange(of: model.resolution) { model.notice = nil }
+        .onChange(of: model.quality) { model.notice = nil }
         .onDisappear(perform: model.cancel)
     }
-}
 
-enum VideoResolution: CaseIterable, Identifiable {
-    case original, p1080, p720, p480
-
-    var id: Self { self }
-
-    var title: String {
-        switch self {
-        case .original: "Original"
-        case .p1080: "1080p"
-        case .p720: "720p"
-        case .p480: "480p"
+    private var sizeSummary: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "arrow.down.right.and.arrow.up.left")
+                .foregroundStyle(Color.accentColor)
+            if let estimate = model.estimate {
+                Text(model.urls.count == 1 ? "≈ \(MediaSize.format(estimate))" : "≈ \(MediaSize.format(estimate)) for \(model.urls.count) videos")
+                    .font(.system(size: 13, weight: .semibold).monospacedDigit())
+                + Text(model.isSmaller ? "  (\(model.savingPercent(estimate))% smaller)" : "  (no smaller)")
+                    .font(.system(size: 12))
+                    .foregroundStyle(model.isSmaller ? Color.secondary : Color.orange)
+            } else {
+                Text(model.loadError ?? "Estimating…")
+                    .font(.system(size: 12))
+                    .foregroundStyle(model.loadError == nil ? Color.secondary : Color.orange)
+            }
+            Spacer(minLength: 0)
+            Text(model.outputSummary)
+                .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                .foregroundStyle(.secondary)
         }
-    }
-}
-
-enum VideoQuality: CaseIterable, Identifiable {
-    case high, medium, low
-
-    var id: Self { self }
-
-    var title: String {
-        switch self {
-        case .high: "High"
-        case .medium: "Medium"
-        case .low: "Low"
-        }
-    }
-}
-
-enum VideoCompressionPreset {
-    /// High uses HEVC (smaller at the same quality); Medium and Low use H.264,
-    /// with Low dropping one size further.
-    static func preset(resolution: VideoResolution, quality: VideoQuality) -> String {
-        switch (resolution, quality) {
-        case (.original, .high): AVAssetExportPresetHEVCHighestQuality
-        case (.original, .medium): AVAssetExportPresetMediumQuality
-        case (.original, .low): AVAssetExportPresetLowQuality
-        case (.p1080, .high): AVAssetExportPresetHEVC1920x1080
-        case (.p1080, .medium): AVAssetExportPreset1920x1080
-        case (.p1080, .low): AVAssetExportPreset1280x720
-        case (.p720, .high): AVAssetExportPreset1280x720
-        case (.p720, .medium): AVAssetExportPreset960x540
-        case (.p720, .low): AVAssetExportPreset640x480
-        case (.p480, .high), (.p480, .medium): AVAssetExportPreset640x480
-        case (.p480, .low): AVAssetExportPresetLowQuality
-        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.06)))
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -137,32 +109,72 @@ final class VideoCompressModel {
     let urls: [URL]
     var resolution = VideoResolution.p1080
     var quality = VideoQuality.high
-    private(set) var estimate: Int64?
-    private(set) var isEstimating = false
+    /// Set after a compress that saved nothing; cleared when the settings change.
+    var notice: String?
+    private(set) var sources: [VideoSourceInfo]?
+    private(set) var loadError: String?
     private(set) var exportProgress: Double?
     private(set) var progressDetail: String?
     @ObservationIgnored private var exportTask: Task<Void, Never>?
+    private let originalSize: Int64
 
     init(urls: [URL]) {
         self.urls = urls
+        originalSize = urls.reduce(0) { $0 + MediaSize.fileSize($1) }
     }
-
-    var preset: String { VideoCompressionPreset.preset(resolution: resolution, quality: quality) }
-
-    var originalSize: Int64 { urls.reduce(0) { $0 + MediaSize.fileSize($1) } }
 
     var title: String {
         urls.count == 1 ? urls[0].lastPathComponent : "\(urls.count) videos"
     }
 
-    var originalSummary: String { "Original \(MediaSize.format(originalSize))" }
+    var originalSummary: String {
+        guard urls.count == 1, let size = sources?.first?.displaySize else { return "Original \(MediaSize.format(originalSize))" }
+        return "\(Int(size.width)) × \(Int(size.height)) · \(MediaSize.format(originalSize))"
+    }
 
-    var estimateText: String {
-        if isEstimating { return "Estimating…" }
-        guard let estimate else { return "Size depends on the video" }
-        let suffix = urls.count > 1 ? " for \(urls.count) videos" : ""
-        let larger = estimate >= originalSize ? " (no smaller)" : ""
-        return "≈ \(MediaSize.format(estimate))\(suffix)\(larger)"
+    /// What the encoder will be asked for, summed over every video.
+    var estimate: Int64? {
+        sources.map { VideoCompressionPlan.estimatedBytes(for: $0, resolution: resolution, quality: quality) }
+    }
+
+    /// The output format, plus its frame size when there's one video.
+    var outputSummary: String {
+        guard urls.count == 1, let source = sources?.first else { return "MP4" }
+        let size = VideoCompressionPlan(source: source, resolution: resolution, quality: quality).displaySize
+        return "MP4 · \(Int(size.width)) × \(Int(size.height))"
+    }
+
+    /// How much smaller `estimate` is, at least 1% when it's smaller at all.
+    func savingPercent(_ estimate: Int64) -> Int {
+        guard originalSize > 0 else { return 0 }
+        let kept: Double = Double(estimate) / Double(originalSize) * 100
+        return max(1, 100 - Int(kept.rounded(.up)))
+    }
+
+    var isSmaller: Bool {
+        guard let estimate else { return false }
+        return estimate < originalSize
+    }
+
+    var canCompress: Bool { exportProgress == nil && isSmaller }
+
+    /// Why Compress is off when these settings wouldn't save anything.
+    var sizeAdvice: String? {
+        guard let sources, !isSmaller else { return nil }
+        return VideoCompressionPlan.advice(for: sources, originalSize: originalSize)
+    }
+
+    func load() async {
+        var loaded: [VideoSourceInfo] = []
+        for url in urls {
+            do {
+                loaded.append(try await VideoSourceInfo.load(url))
+            } catch {
+                loadError = urls.count == 1 ? "This video can’t be read." : "“\(url.lastPathComponent)” can’t be read."
+                return
+            }
+        }
+        sources = loaded
     }
 
     func reset() {
@@ -174,43 +186,77 @@ final class VideoCompressModel {
         exportTask?.cancel()
     }
 
-    func updateEstimate() async {
-        isEstimating = true
-        defer { isEstimating = false }
-        var total: Int64 = 0
-        for url in urls {
-            guard let bytes = await MediaTools.estimatedCompressedSize(of: url, preset: preset) else {
-                estimate = nil
-                return
-            }
-            if Task.isCancelled { return }
-            total += bytes
-        }
-        estimate = total
-    }
-
     func save(actions: EditorActions) {
+        notice = nil
         exportProgress = 0
         let urls = urls
-        let preset = preset
+        let resolution = resolution
+        let quality = quality
         exportTask = Task { [weak self] in
-            var outputs: [URL] = []
+            var outcomes: [URL?] = []
             do {
                 for (index, url) in urls.enumerated() {
                     self?.progressDetail = urls.count > 1 ? "Compressing \(index + 1) of \(urls.count)…" : nil
-                    let output = try await MediaTools.compress(url, preset: preset) { fraction in
-                        Task { @MainActor in self?.exportProgress = (Double(index) + fraction) / Double(urls.count) }
+                    let output = try await MediaTools.compress(url, resolution: resolution, quality: quality) { fraction in
+                        Task { @MainActor in
+                            // Late reports mustn't bring back a finished progress bar.
+                            guard self?.exportProgress != nil else { return }
+                            self?.exportProgress = (Double(index) + fraction) / Double(urls.count)
+                        }
                     }
-                    outputs.append(output)
+                    outcomes.append(output)
                 }
-                actions.saved(outputs)
             } catch is CancellationError {
-                self?.exportProgress = nil
+                self?.finishExport()
+                return
             } catch {
-                self?.exportProgress = nil
-                self?.progressDetail = nil
+                self?.finishExport()
                 actions.failed(error)
+                return
+            }
+            self?.finishExport()
+
+            let saved = outcomes.compactMap { $0 }
+            let skipped = outcomes.count - saved.count
+            if saved.isEmpty {
+                let error = MediaToolError.notSmaller(count: skipped)
+                self?.notice = error.localizedDescription
+                actions.failed(error)
+            } else {
+                actions.saved(saved)
+                if skipped > 0 {
+                    ToastController.shared.show(Toast(
+                        systemImage: "checkmark",
+                        title: "Saved \(saved.count) of \(outcomes.count)",
+                        subtitle: "\(skipped) already as small as \(skipped == 1 ? "it gets" : "they get") — not saved"
+                    ))
+                }
             }
         }
+    }
+
+    private func finishExport() {
+        exportProgress = nil
+        progressDetail = nil
+    }
+}
+
+extension VideoCompressionPlan {
+    /// The estimated total for `sources` at these settings.
+    static func estimatedBytes(for sources: [VideoSourceInfo], resolution: VideoResolution, quality: VideoQuality) -> Int64 {
+        sources.reduce(0) { $0 + VideoCompressionPlan(source: $1, resolution: resolution, quality: quality).estimatedBytes }
+    }
+
+    /// What to tell someone whose settings wouldn't make `sources` smaller:
+    /// to go lower if a lower setting would help, or that nothing will.
+    static func advice(for sources: [VideoSourceInfo], originalSize: Int64) -> String {
+        for resolution in VideoResolution.allCases {
+            for quality in VideoQuality.allCases where estimatedBytes(for: sources, resolution: resolution, quality: quality) < originalSize {
+                return "Wouldn’t get smaller at these settings. Try a lower resolution or quality."
+            }
+        }
+        return sources.count == 1
+            ? "Already as small as it gets."
+            : "These videos are already as small as they get."
     }
 }

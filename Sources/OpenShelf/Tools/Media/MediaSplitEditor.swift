@@ -94,7 +94,7 @@ struct MediaSplitEditor: View {
                                 Spacer()
                                 Text("\(MediaTime.format(segment.start)) – \(MediaTime.format(segment.end))")
                                     .foregroundStyle(.secondary)
-                                Text(MediaTime.format(segment.duration))
+                                Text(MediaTime.format(MediaTime.length(from: segment.start, to: segment.end)))
                                     .frame(width: 56, alignment: .trailing)
                             }
                             .font(.system(size: 11).monospacedDigit())

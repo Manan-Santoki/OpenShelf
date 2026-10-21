@@ -4,11 +4,24 @@ import SwiftUI
 
 /// "m:ss.s" formatting and parsing for media times.
 enum MediaTime {
+    /// Times are shown, and chosen, to a tenth of a second.
+    static let precision: Double = 0.1
+
     static func format(_ seconds: Double) -> String {
-        let clamped = max(seconds, 0)
-        let minutes = Int(clamped) / 60
-        let rest = clamped - Double(minutes * 60)
-        return String(format: "%d:%04.1f", minutes, rest)
+        // Round first, so 59.97 reads "1:00.0" rather than "0:60.0".
+        let tenths = Int((max(seconds, 0) * 10).rounded())
+        return String(format: "%d:%02d.%d", tenths / 600, tenths / 10 % 60, tenths % 10)
+    }
+
+    /// `seconds` rounded to the tenth `format` shows.
+    static func snapped(_ seconds: Double) -> Double {
+        (seconds / precision).rounded() * precision
+    }
+
+    /// The length between two times as their formatted values show it, so
+    /// "0:01.0 – 0:04.0" always reads as "0:03.0" long.
+    static func length(from start: Double, to end: Double) -> Double {
+        snapped(end) - snapped(start)
     }
 
     /// Accepts "1:02.5", "62.5" or "1:02".
