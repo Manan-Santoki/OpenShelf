@@ -89,8 +89,23 @@ struct PDFInfo: Sendable {
     var isEncrypted: Bool
     var isLocked: Bool
 
-    /// Whether the file carries any identifying details.
-    var hasMetadata: Bool { !fields.isEmpty || created != nil || modified != nil }
+    /// Whether the file says who made it or what it's about. The stamps macOS
+    /// puts on every PDF it saves (itself as Producer, and the save time) don't
+    /// count: older versions add them even to a cleaned copy, so they can't be
+    /// removed, and they describe the save rather than the author.
+    var hasMetadata: Bool {
+        var identifying = fields
+        if Self.isSystemProducer(identifying.producer) {
+            identifying.producer = ""
+        }
+        return !identifying.isEmpty
+    }
+
+    /// Whether `producer` is the stamp macOS's PDF writer adds, e.g.
+    /// "macOS Version 15.1 (Build 24B83) Quartz PDFContext".
+    static func isSystemProducer(_ producer: String) -> Bool {
+        producer.hasSuffix("Quartz PDFContext")
+    }
 }
 
 /// PDF operations used by the PDF tools. Everything here is synchronous and

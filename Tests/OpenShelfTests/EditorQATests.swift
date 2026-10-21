@@ -397,3 +397,25 @@ struct ArchiveTests {
         #expect(placed.lastPathComponent == "Tool 2.app")
     }
 }
+
+struct PDFMetadataDefinitionTests {
+    private func info(_ fields: PDFMetadataFields, created: Date? = nil) -> PDFInfo {
+        PDFInfo(fields: fields, pageCount: 1, fileSize: 1, created: created, modified: created, isEncrypted: false, isLocked: false)
+    }
+
+    @Test func macOSSaveStampsDontCountAsMetadata() {
+        var fields = PDFMetadataFields()
+        fields.producer = "macOS Version 15.1 (Build 24B83) Quartz PDFContext"
+        #expect(!info(fields, created: Date()).hasMetadata)
+    }
+
+    @Test func authorDetailsAndOtherProducersCount() {
+        var authored = PDFMetadataFields()
+        authored.author = "Someone"
+        #expect(info(authored).hasMetadata)
+
+        var exported = PDFMetadataFields()
+        exported.producer = "Microsoft® Word for Microsoft 365"
+        #expect(info(exported).hasMetadata)
+    }
+}
