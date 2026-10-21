@@ -11,392 +11,824 @@
 <meta property="og:url" content="https://openshelf.msantoki.com/">
 <meta name="twitter:card" content="summary">
 <meta name="theme-color" content="#0a0a0b">
-<link rel="icon" href="/assets/favicon.png">
-<link rel="apple-touch-icon" href="/assets/icon.png">
+<link rel="canonical" href="https://openshelf.msantoki.com/">
+<link rel="icon" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script>document.documentElement.classList.add("js");</script>
 <style>
-/* Monoline: a black canvas, thin white outlines, one solid lit petal; the accent
-   only appears where the app itself shows it (a hovered wedge). */
 :root {
   --bg: #0a0a0b;
   --panel: #131316;
   --panel-2: #1a1a1f;
   --line: #2a2a31;
+  --hair: rgba(255,255,255,0.06);
   --ink: #f4f4f6;
   --muted: #9a9aa6;
   --faint: #5d5d68;
   --accent: #3d7bfd;
+  --accent-fill: #2f6cf0;   /* white text on it passes AA */
+  --accent-ink: #7aa4ff;    /* accent-coloured text on --bg */
+  --accent-glow: rgba(61,123,253,0.16);
+  --r-lg: 22px;
+  --r-md: 14px;
+  --r-sm: 10px;
   --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
   --body: "Figtree", -apple-system, system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  /* Plex Mono has no ⇧ ⌥ ⌃ glyphs; fall back to the system font, which draws them at a readable size. */
+  --keys: "IBM Plex Mono", -apple-system, BlinkMacSystemFont, "Segoe UI Symbol", "Apple Symbols", monospace;
+  --ease: cubic-bezier(.2,.8,.2,1);
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.6 var(--body); -webkit-font-smoothing: antialiased; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 var(--body); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
 img { max-width: 100%; height: auto; display: block; }
 a { color: inherit; }
-.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right)); }
+p { margin: 0; }
+h1, h2, h3 { margin: 0; font-family: var(--display); text-wrap: balance; }
+.wrap { max-width: 1168px; margin: 0 auto; padding-left: max(24px, env(safe-area-inset-left)); padding-right: max(24px, env(safe-area-inset-right)); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.skip { position: absolute; left: 12px; top: -60px; z-index: 50; background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-weight: 600; text-decoration: none; }
+.skip:focus { top: 12px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+kbd, .cap { font-family: var(--keys) !important; }
+.nw { white-space: nowrap; }
+
+/* Buttons */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 46px; border-radius: 999px; padding: 0 22px; font: 600 15px var(--body); text-decoration: none; border: 1px solid transparent; cursor: pointer; transition: background .15s, border-color .15s, color .15s; white-space: nowrap; }
+.btn svg { width: 18px; height: 18px; flex: none; }
+.btn.primary { background: var(--ink); color: #0a0a0b; box-shadow: 0 0 0 1px rgba(255,255,255,.2), 0 8px 24px -8px rgba(255,255,255,.25); }
+.btn.primary:hover { background: #ffffff; }
+.btn.ghost { border-color: var(--line); color: var(--ink); background: rgba(255,255,255,.02); }
+.btn.ghost:hover { border-color: #3c3c46; background: rgba(255,255,255,.05); }
+.btn.small { min-height: 34px; padding: 0 14px; font-size: 14px; }
+.btn .ver { font: 500 12px var(--mono); padding: 2px 7px; border-radius: 999px; background: rgba(10,10,11,.08); color: #3b3b44; }
+.btn.small .ver { display: none; }
 
 /* Nav */
-nav { position: sticky; top: 0; z-index: 20; backdrop-filter: blur(14px); background: rgba(10,10,11,0.72); border-bottom: 1px solid rgba(255,255,255,0.06); }
-nav .wrap { display: flex; align-items: center; gap: 24px; height: 62px; }
-.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font: 700 19px var(--display); letter-spacing: -0.01em; }
-.brand img { width: 30px; height: 30px; }
-nav .links { display: flex; gap: 22px; margin-left: auto; font-size: 15px; color: var(--muted); }
-nav .links a { text-decoration: none; }
-nav .links a:hover { color: var(--ink); }
-.btn { display: inline-flex; align-items: center; gap: 10px; border-radius: 999px; padding: 12px 22px; font: 600 16px var(--body); text-decoration: none; border: 1px solid transparent; cursor: pointer; transition: transform .15s ease, background .15s ease, border-color .15s ease; }
-.btn:hover { transform: translateY(-1px); }
-.btn.primary { background: var(--ink); color: #0a0a0b; }
-.btn.ghost { border-color: var(--line); color: var(--ink); }
-.btn.ghost:hover { border-color: var(--faint); }
-.btn.small { padding: 8px 16px; font-size: 14px; }
-.btn svg { width: 18px; height: 18px; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 8px; }
+.nav { position: sticky; top: 0; z-index: 30; background: rgba(10,10,11,.78); backdrop-filter: saturate(1.4) blur(16px); -webkit-backdrop-filter: saturate(1.4) blur(16px); border-bottom: 1px solid var(--hair); }
+.nav .wrap { display: flex; align-items: center; gap: 28px; height: 60px; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font: 700 18px var(--display); letter-spacing: -0.01em; }
+.brand img { width: 28px; height: 28px; }
+.nav-links { display: flex; gap: 4px; font-size: 14px; }
+.nav-links a { color: var(--muted); text-decoration: none; padding: 6px 10px; border-radius: 8px; }
+.nav-links a:hover { color: var(--ink); background: rgba(255,255,255,.04); }
+.nav-end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.icon-link { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 8px; color: var(--muted); }
+.icon-link:hover { color: var(--ink); background: rgba(255,255,255,.05); }
+.icon-link svg { width: 19px; height: 19px; }
+.menu { display: none; position: relative; }
+.menu summary { list-style: none; cursor: pointer; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--line); color: var(--ink); }
+.menu summary::-webkit-details-marker { display: none; }
+.menu summary svg { width: 18px; height: 18px; }
+.menu[open] summary { background: var(--panel-2); }
+.menu-panel { position: absolute; right: 0; top: 46px; width: 220px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-md); padding: 6px; box-shadow: 0 24px 48px -12px rgba(0,0,0,.7); display: grid; }
+.menu-panel a { padding: 10px 12px; border-radius: 8px; text-decoration: none; color: var(--ink); font-size: 15px; }
+.menu-panel a:hover { background: rgba(255,255,255,.05); }
 
 /* Hero */
-.hero { padding-block: 72px 56px; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 40px; align-items: center; }
-.eyebrow { font: 500 13px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
-h1 { font: 800 clamp(48px, 7.4vw, 92px)/0.95 var(--display); letter-spacing: -0.035em; margin: 14px 0 22px; text-wrap: balance; }
-h1 .dim { color: var(--faint); }
-.lede { font-size: 20px; color: var(--muted); max-width: 34ch; margin: 0 0 30px; }
+.hero { position: relative; isolation: isolate; }
+.hero::before { content: ""; position: absolute; inset: -60px 0 auto; height: 720px; z-index: -1; pointer-events: none;
+  background: radial-gradient(42% 46% at 72% 34%, var(--accent-glow), transparent 70%); }
+.hero .wrap { display: grid; grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr); gap: 56px; align-items: center; padding-top: 72px; padding-bottom: 72px; }
+.eyebrow { display: inline-flex; align-items: center; gap: 8px; font: 500 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.eyebrow::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+h1 { font-weight: 800; font-size: clamp(50px, 6.6vw, 82px); line-height: .96; letter-spacing: -0.045em; margin: 22px 0 22px; }
+h1 span { color: var(--muted); }
+.lede { font-size: 19px; line-height: 1.55; color: var(--muted); max-width: 30em; }
 .lede b { color: var(--ink); font-weight: 600; }
-.cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
-.cta-note { font-size: 14px; color: var(--faint); margin-top: 14px; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; }
+.meta { margin-top: 18px; font-size: 14px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 0; }
+.meta span + span::before { content: "·"; margin: 0 9px; color: var(--muted); }
 
-.stage { position: relative; display: grid; justify-items: center; gap: 22px; }
-.keys { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; max-width: 100%; }
-.key { font: 500 15px var(--mono); color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 9px 14px; cursor: pointer; display: flex; gap: 10px; align-items: center; transition: border-color .2s, color .2s, background .2s; }
-.key kbd { font: 600 16px var(--mono); color: var(--ink); }
-.key[aria-pressed="true"] { border-color: var(--ink); color: var(--ink); background: var(--panel-2); }
-#wheel { width: min(100%, 470px); height: auto; overflow: visible; }
-#wheel .petal { fill: transparent; stroke: rgba(244,244,246,0.82); stroke-width: 2.2; transition: fill .28s ease, stroke .28s ease; }
-#wheel .petal.lit { fill: var(--ink); stroke: var(--ink); }
-#wheel .label { font: 600 14px var(--mono); fill: rgba(244,244,246,0.85); text-anchor: middle; dominant-baseline: central; letter-spacing: 0.04em; transition: fill .28s ease; pointer-events: none; }
-#wheel .label.lit { fill: #0a0a0b; }
-#wheel .hub { fill: transparent; stroke: rgba(244,244,246,0.82); stroke-width: 2.2; }
-#wheel .file .sheet { fill: url(#paper); }
-#wheel .file .fold { fill: #bdbdc7; }
-#wheel .file text { font: 600 11px var(--mono); fill: #26262c; text-anchor: middle; }
-#wheel .pill rect { fill: var(--panel-2); stroke: var(--line); }
-#wheel .pill text { font: 600 14px var(--body); fill: var(--ink); text-anchor: middle; dominant-baseline: central; }
-#wheel .bloom { transform-origin: 250px 270px; animation: bloom .55s cubic-bezier(.2,.9,.25,1); }
-@keyframes bloom { from { transform: scale(.55) rotate(-8deg); opacity: 0; } to { transform: none; opacity: 1; } }
+/* Demo */
+.demo { position: relative; }
+.stage { position: relative; height: 520px; border-radius: 26px; border: 1px solid var(--line); overflow: hidden; touch-action: manipulation; user-select: none; -webkit-user-select: none;
+  background:
+    radial-gradient(60% 50% at 50% 48%, rgba(255,255,255,.035), transparent 70%),
+    radial-gradient(rgba(255,255,255,.07) 1px, transparent 1.3px) 0 0 / 22px 22px,
+    linear-gradient(180deg, #141418, #0f0f12);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 40px 80px -40px rgba(0,0,0,.9); }
+.stage-top { position: absolute; left: 0; right: 0; top: 0; height: 56px; display: flex; align-items: center; justify-content: center; padding: 0 20px; border-bottom: 1px solid var(--hair); background: rgba(10,10,11,.35); }
+.try { position: absolute; left: 18px; font: 500 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.hint { font-size: 14px; color: var(--ink); text-align: center; line-height: 1.4; }
+.hint kbd, .kc { display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 6px; margin: 0 1px; border-radius: 6px; font: 500 15px/1 var(--mono); color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-bottom-width: 2px; vertical-align: 1px; }
+.hint .alt { color: var(--muted); }
+.home { position: absolute; left: 0; top: 0; width: 86px; height: 66px; border-radius: 10px; border: 1.5px dashed rgba(255,255,255,.12); opacity: 0; transition: opacity .2s; pointer-events: none; }
+.stage.lifted .home { opacity: 1; }
+.file { position: absolute; left: 0; top: 0; width: 78px; height: 58px; z-index: 3; cursor: grab; touch-action: none; border-radius: 6px; will-change: transform; }
+.file.returning { transition: transform .32s var(--ease); }
+.file svg.thumb { width: 100%; height: 100%; display: block; border-radius: 6px; box-shadow: 0 0 0 3px #f4f4f6, 0 10px 24px -6px rgba(0,0,0,.7); transition: box-shadow .2s, transform .2s var(--ease); }
+.fname { position: absolute; left: 50%; top: calc(100% + 12px); transform: translateX(-50%); font: 600 12px var(--body); color: var(--ink); padding: 2px 8px; border-radius: 5px; white-space: nowrap; transition: opacity .15s; }
+.file:focus-visible { outline-offset: 6px; }
+.file:focus-visible .fname, .file.held .fname { background: var(--accent-fill); }
+.file.lifted { cursor: grabbing; }
+.file.lifted svg.thumb { transform: rotate(-4deg) scale(1.05); box-shadow: 0 0 0 3px #f4f4f6, 0 26px 40px -10px rgba(0,0,0,.85); }
+.file.lifted .fname { opacity: 0; }
+.file.held .fname { opacity: 1; }
+.stage.wheel-open .fname { opacity: 0; }
+.stage.wheel-open .file svg.thumb { transform: scale(.8); }
+.stage.wheel-open .file.lifted:not(.held) svg.thumb { transform: rotate(-4deg) scale(.72); opacity: .88; }
+.ring { position: absolute; left: 0; top: 0; border-radius: 50%; pointer-events: none; border: 1px solid rgba(255,255,255,.055); transition: opacity .2s; }
+.ring.inner { border-style: dashed; border-color: rgba(255,255,255,.07); }
+.stage.wheel-open .ring, .stage.lifted .ring { opacity: 0; }
+#wheel { position: absolute; left: 0; top: 0; z-index: 2; overflow: visible; opacity: 0; pointer-events: none; transform-origin: 50% 54.8%; transition: opacity .14s ease, transform .2s var(--ease); transform: scale(.7); }
+#wheel.open { opacity: 1; transform: none; }
+#wheel .disc { filter: drop-shadow(0 22px 34px rgba(0,0,0,.6)); }
+#wheel .petal path.shape { fill: rgba(255,255,255,.12); stroke: rgba(255,255,255,.38); stroke-width: .8; transition: fill .12s; }
+#wheel .petal path.gloss { fill: url(#wheel-gloss); pointer-events: none; opacity: .3; }
+#wheel .petal text { font: 700 13px var(--body); letter-spacing: .4px; fill: rgba(255,255,255,.86); text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+#wheel .petal text.small { font-size: 9.5px; }
+#wheel .petal .ico { fill: none; stroke: rgba(255,255,255,.86); stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+#wheel .petal.on { filter: drop-shadow(0 3px 10px rgba(61,123,253,.5)); }
+#wheel .petal.on path.shape { fill: url(#wheel-lit); stroke: rgba(255,255,255,.55); }
+#wheel .petal.on path.gloss { opacity: 1; }
+#wheel .petal.on text { fill: #fff; }
+#wheel .petal.on .ico { stroke: #fff; }
+#wheel .hub { fill: rgba(255,255,255,.08); stroke: rgba(255,255,255,.5); stroke-width: .8; transition: fill .12s; }
+#wheel.has-on .hub { fill: rgba(61,123,253,.9); }
+#wheel .pill rect { fill: rgba(44,44,50,.96); stroke: rgba(255,255,255,.35); stroke-width: .8; }
+#wheel .pill text { font: 600 12px var(--body); fill: var(--ink); text-anchor: middle; dominant-baseline: central; }
+#wheel.has-on .pill rect { fill: var(--accent-fill); stroke: rgba(255,255,255,.45); }
+#wheel.has-on .pill text { fill: #fff; }
+.toast { position: absolute; left: 50%; top: 72px; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 16px 10px 10px; min-width: 230px; max-width: calc(100% - 32px);
+  background: rgba(30,30,35,.94); border: 1px solid rgba(255,255,255,.12); border-radius: 14px; box-shadow: 0 18px 40px -12px rgba(0,0,0,.8);
+  transform: translate(-50%, -8px); opacity: 0; transition: opacity .2s, transform .25s var(--ease); pointer-events: none; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast .tick { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-fill); }
+.toast .tick svg { width: 16px; height: 16px; stroke: #fff; fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.toast b { display: block; font-size: 14px; font-weight: 600; line-height: 1.3; }
+.toast small { display: block; font-size: 12.5px; color: var(--muted); line-height: 1.3; }
+.stage-keys { position: absolute; left: 0; right: 0; bottom: 0; height: 68px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 12px; border-top: 1px solid var(--hair); background: rgba(10,10,11,.35); }
+.stage-keys .lbl { font-size: 13px; color: var(--muted); margin-right: 6px; }
+.wkey { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 13px 0 8px; border-radius: 11px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); font: 600 14px var(--body); cursor: pointer; transition: border-color .15s, background .15s; }
+.wkey kbd { display: inline-grid; place-items: center; min-width: 28px; height: 26px; padding: 0 5px; border-radius: 7px; background: #26262d; border: 1px solid #34343c; font: 500 16px/1 var(--mono); }
+.wkey:hover { border-color: #3c3c46; }
+.wkey[aria-pressed="true"] { border-color: var(--accent); background: rgba(61,123,253,.12); }
+.wkey[aria-pressed="true"] kbd { background: var(--accent-fill); border-color: transparent; color: #fff; }
+.demo-caption { margin-top: 14px; font-size: 13px; color: var(--muted); text-align: center; }
 
 /* Sections */
-section { padding-block: 88px; border-top: 1px solid rgba(255,255,255,0.05); }
-h2 { font: 800 clamp(34px, 4.6vw, 56px)/1.02 var(--display); letter-spacing: -0.03em; margin: 12px 0 18px; text-wrap: balance; }
-.section-lede { color: var(--muted); font-size: 19px; max-width: 58ch; margin: 0; }
+section { padding-block: 96px; }
+.sec-head { max-width: 640px; }
+.sec-head.center { margin: 0 auto; text-align: center; }
+h2 { font-weight: 800; font-size: clamp(34px, 4.4vw, 52px); line-height: 1.04; letter-spacing: -0.035em; margin: 16px 0 16px; }
+.sec-lede { color: var(--muted); font-size: 18px; line-height: 1.6; }
+.card { position: relative; background: linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,0) 50%), var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: inset 0 1px 0 rgba(255,255,255,.04); }
+h3 { font-weight: 700; font-size: 21px; line-height: 1.2; letter-spacing: -0.015em; }
+.card p { color: var(--muted); font-size: 15.5px; }
+.plate { border-radius: var(--r-md); border: 1px solid var(--hair); background: radial-gradient(120% 90% at 50% 0%, rgba(255,255,255,.055), transparent 62%), #0e0e11; }
+code { font: 13.5px var(--mono); background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; color: var(--ink); overflow-wrap: anywhere; }
 
-.three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 44px; }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 22px; padding: 22px; display: grid; gap: 14px; align-content: start; }
-.card .kbdrow { display: flex; align-items: center; gap: 10px; }
-.card kbd { font: 600 17px var(--mono); border: 1px solid var(--line); background: var(--panel-2); border-radius: 10px; padding: 6px 11px; }
-.card h3 { margin: 0; font: 700 24px var(--display); letter-spacing: -0.01em; }
-.card p { margin: 0; color: var(--muted); font-size: 16px; }
-.card img { width: 78%; margin: 6px auto 0; }
+/* Steps */
+.steps { list-style: none; padding: 0; margin-bottom: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 56px; counter-reset: step; }
+.step { padding: 12px 12px 26px; }
+.step .art { height: 176px; display: grid; place-items: center; position: relative; overflow: hidden; }
+.step .num { display: block; margin: 22px 14px 8px; font: 500 12px var(--mono); color: var(--accent-ink); letter-spacing: .08em; }
+.step h3, .step p { margin-left: 14px; margin-right: 14px; }
+.step p { margin-top: 6px; }
+.art svg { overflow: visible; }
+.caps { display: flex; gap: 10px; }
+.cap { display: grid; place-items: center; min-width: 54px; height: 54px; padding: 0 12px; border-radius: 12px; font: 500 24px/1 var(--mono); color: var(--ink); background: linear-gradient(180deg, #24242b, #1b1b21); border: 1px solid #34343d; border-bottom-width: 3px; }
+.cap.on { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(61,123,253,.15), 0 0 26px rgba(61,123,253,.3); }
+.cap small { display: block; font: 600 10px var(--body); color: var(--muted); letter-spacing: .02em; margin-top: -4px; }
 
-.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 48px; align-items: center; margin-top: 8px; }
-.split.flip { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
-.split.flip .media { order: -1; }
-.media { display: grid; gap: 16px; }
-.media.row { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; }
-.media img { border-radius: 16px; }
-ul.ticks { list-style: none; padding: 0; margin: 24px 0 0; display: grid; gap: 12px; }
-ul.ticks li { padding-left: 30px; position: relative; color: var(--muted); }
-ul.ticks li b { color: var(--ink); font-weight: 600; }
-ul.ticks li::before { content: ""; position: absolute; left: 0; top: 7px; width: 14px; height: 14px; border: 2px solid var(--ink); border-radius: 4px 4px 4px 9px; transform: rotate(45deg); }
+/* Wheels tabs */
+.tabs { margin-top: 48px; }
+.tablist { display: inline-flex; gap: 4px; padding: 4px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); max-width: 100%; overflow-x: auto; }
+.tab { display: inline-flex; align-items: center; gap: 9px; min-height: 42px; padding: 0 16px 0 10px; border-radius: 10px; border: 0; background: transparent; color: var(--muted); font: 600 15px var(--body); cursor: pointer; white-space: nowrap; }
+.tab kbd { display: inline-grid; place-items: center; min-width: 30px; height: 26px; padding: 0 5px; border-radius: 7px; border: 1px solid var(--line); font: 500 16px/1 var(--mono); color: var(--ink); }
+.tab:hover { color: var(--ink); }
+.tab[aria-selected="true"] { background: var(--panel-2); color: var(--ink); box-shadow: inset 0 0 0 1px #34343c; }
+.tab[aria-selected="true"] kbd { background: var(--accent-fill); border-color: transparent; color: #fff; }
+.tabpanel { margin-top: 20px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0; overflow: hidden; }
+.tabpanel[hidden] { display: none; }
+.tabpanel .shot { padding: 40px; display: grid; place-items: center; border-right: 1px solid var(--line); background: radial-gradient(closest-side, rgba(61,123,253,.13), transparent 85%), radial-gradient(120% 90% at 50% 0%, rgba(255,255,255,.04), transparent 60%), #0e0e11; }
+.tabpanel .shot img { width: min(100%, 380px); }
+.tabpanel .copy { padding: 48px 48px 44px; display: flex; flex-direction: column; }
+.tabpanel h3 { font-size: 30px; letter-spacing: -0.025em; display: flex; align-items: center; gap: 14px; }
+.tabpanel h3 .kc { height: 34px; min-width: 40px; font-size: 17px; border-radius: 9px; }
+.tabpanel .copy > p { margin-top: 14px; font-size: 16.5px; }
+.examples { list-style: none; padding: 0; margin: 28px 0 0; display: grid; gap: 0; border-top: 1px solid var(--hair); }
+.examples li { display: flex; align-items: center; gap: 12px; padding: 13px 2px; border-bottom: 1px solid var(--hair); font-size: 15.5px; }
+.examples li svg { width: 18px; height: 18px; flex: none; stroke: var(--accent-ink); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.examples .to { color: var(--accent-ink); margin: 0 2px; }
+.examples small { margin-left: auto; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+.tabpanel .note { margin-top: auto; padding-top: 24px; font-size: 14px; color: var(--muted); }
 
-/* Formats */
-.formats { margin-top: 40px; display: grid; gap: 10px; }
-.frow { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 18px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px 18px; }
-.frow .from { font: 700 18px var(--display); }
-.frow .from small { display: block; font: 400 13px var(--body); color: var(--faint); }
-.chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.chip { font: 500 13px var(--mono); border: 1px solid var(--line); border-radius: 8px; padding: 4px 9px; color: var(--ink); background: var(--panel-2); }
-.chip.opt { color: var(--muted); border-style: dashed; }
-.fnote { color: var(--faint); font-size: 14px; margin-top: 14px; }
-
-/* Tool lists */
-.tools-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 30px; }
-.tools-grid .card h3 { font-size: 20px; }
+/* Bento */
+.bento { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; margin-top: 56px; }
+.tile { padding: 28px; display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
+.tile .tag { font: 500 11.5px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--accent-ink); }
+.tile .media { margin-top: 18px; }
+.span-4 { grid-column: span 4; }
+.span-3 { grid-column: span 3; }
+.span-2 { grid-column: span 2; }
+.span-6 { grid-column: span 6; }
+.editors { display: grid; grid-template-columns: 0.95fr 1.16fr 1fr; gap: 12px; align-items: end; padding: 26px 22px 0; height: 330px; overflow: hidden; }
+.editors img { width: 100%; }
+.editors img:nth-child(2) { transform: translateY(-14px); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.chip { font: 500 12.5px var(--mono); padding: 3px 9px; border-radius: 7px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); }
+.shelf-media { padding: 22px 16px 10px; display: grid; place-items: center; }
+.shelf-media img { width: min(100%, 300px); }
+.keys-media { padding: 34px 12px; display: grid; place-items: center; }
+.keys-media .caps { gap: 8px; }
+.keys-media .cap { height: 50px; min-width: 50px; font-size: 18px; }
+.keys-media .cap.wide { min-width: 132px; font: 600 14px var(--body); color: var(--muted); }
+.keys-media .plus { color: var(--faint); align-self: center; font-size: 16px; }
+.toast-media { padding: 30px 16px; display: grid; place-items: center; }
+.toast-media img { width: min(100%, 300px); }
+.video-media { padding: 14px 14px 0; height: 196px; overflow: hidden; display: grid; justify-items: center; align-items: start; }
+.video-media img { width: min(100%, 300px); }
+.formats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin-top: 22px; background: var(--hair); border: 1px solid var(--hair); border-radius: var(--r-md); overflow: hidden; }
+.fmt { background: #111114; padding: 18px 18px 20px; }
+.fmt b { display: block; font: 700 16px var(--display); letter-spacing: -0.01em; margin-bottom: 6px; }
+.fmt span { display: block; font: 13px/1.6 var(--mono); color: var(--muted); }
+.fmt i { font-style: normal; color: var(--accent-ink); }
+.fnote { margin-top: 16px; font-size: 14px; color: var(--muted); }
+.fnote i { font-style: normal; color: var(--accent-ink); }
 
 /* Trust */
-.trust { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin-top: 40px; }
-.trust .card h3 { font-size: 19px; }
+.trust { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 56px; }
+.trust .card { padding: 30px; }
+.trust .ic { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; border: 1px solid var(--line); background: var(--panel-2); margin-bottom: 22px; }
+.trust .ic svg { width: 22px; height: 22px; stroke: var(--ink); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.trust h3 { margin-bottom: 8px; }
+.trust a { color: var(--ink); text-underline-offset: 3px; text-decoration-color: rgba(255,255,255,.3); }
+.facts { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 26px; margin-top: 28px; color: var(--muted); font-size: 14px; }
+.facts span { display: inline-flex; align-items: center; gap: 8px; }
+.facts svg { width: 16px; height: 16px; stroke: var(--accent-ink); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 /* Install */
-.install { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; align-items: start; margin-top: 36px; }
-ol.steps { margin: 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 16px; }
-ol.steps li { counter-increment: s; padding-left: 52px; position: relative; color: var(--muted); }
-ol.steps li b { color: var(--ink); }
-ol.steps li::before { content: counter(s); position: absolute; left: 0; top: -2px; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); display: grid; place-items: center; font: 600 15px var(--mono); color: var(--ink); }
-code { font: 14px var(--mono); background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; color: var(--ink); word-break: break-all; }
-.req { color: var(--faint); font-size: 15px; margin-top: 18px; }
+.install { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); margin-top: 56px; overflow: hidden; }
+.install-steps { padding: 40px; }
+.install-steps ol { list-style: none; padding: 0; margin: 0; display: grid; gap: 26px; counter-reset: s; }
+.install-steps li { counter-increment: s; display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 16px; }
+.install-steps li::before { content: counter(s); width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font: 500 14px var(--mono); border: 1px solid var(--line); background: var(--panel-2); }
+.install-steps li b { display: block; font-weight: 600; color: var(--ink); }
+.install-steps li span { color: var(--muted); font-size: 15.5px; }
+.install-get { padding: 40px; border-left: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+  background: radial-gradient(70% 60% at 50% 30%, rgba(61,123,253,.12), transparent 75%), #0f0f12; }
+.install-get img { width: 88px; height: 88px; }
+.install-get h3 { margin-top: 14px; font-size: 24px; }
+.install-get p { color: var(--muted); font-size: 14px; margin-top: 6px; }
+.install-get .btn { margin-top: 22px; }
+.install-get .sub { margin-top: 14px; font-size: 14px; }
+.install-get .sub a { color: var(--muted); text-underline-offset: 3px; }
+.install-get .sub a:hover { color: var(--ink); }
+details.firstrun { margin-top: 30px; border: 1px solid var(--line); border-radius: var(--r-md); background: #0f0f12; }
+details.firstrun summary { padding: 14px 16px; }
+details.firstrun .body { padding: 0 16px 18px 46px; color: var(--muted); font-size: 15px; display: grid; gap: 10px; }
+details.firstrun .body b { color: var(--ink); font-weight: 600; }
+details.firstrun ul { margin: 0; padding-left: 18px; display: grid; gap: 8px; }
 
-/* Final CTA + footer */
-.final { text-align: center; }
-.final img { width: 96px; margin: 0 auto 16px; }
-.final .cta { justify-content: center; margin-top: 26px; }
-footer { border-top: 1px solid rgba(255,255,255,0.05); padding-block: 34px; color: var(--faint); font-size: 14px; }
-footer .wrap { display: flex; flex-wrap: wrap; gap: 14px 24px; justify-content: space-between; }
-footer a { color: var(--muted); text-decoration: none; }
-footer a:hover { color: var(--ink); }
+/* Disclosure summary (shared) */
+summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 12px; font-weight: 600; }
+summary::-webkit-details-marker { display: none; }
+summary .chev { flex: none; width: 18px; height: 18px; stroke: var(--muted); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .2s var(--ease); }
+details[open] > summary .chev { transform: rotate(90deg); }
+summary .sumnote { margin-left: auto; font-weight: 400; font-size: 13px; color: var(--muted); }
 
-@media (max-width: 960px) {
-  .hero, .split, .split.flip, .install { grid-template-columns: minmax(0, 1fr); }
-  .split.flip .media { order: 0; }
-  .three, .tools-grid { grid-template-columns: minmax(0, 1fr); }
-  .trust { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  nav .links { display: none; }
-  .hero { padding-top: 44px; }
-}
-@media (max-width: 560px) {
-  .trust { grid-template-columns: minmax(0, 1fr); }
-  .frow { grid-template-columns: minmax(0, 1fr); gap: 8px; }
-  .media.row { grid-template-columns: minmax(0, 1fr); }
-  .key { padding: 7px 11px; font-size: 13px; gap: 7px; }
-  body { font-size: 16px; }
-  .lede { font-size: 18px; }
+/* FAQ */
+.faq { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: 64px; align-items: start; }
+.faq .sec-head a { color: var(--ink); text-underline-offset: 3px; }
+.qa { border-top: 1px solid var(--line); }
+.qa details { border-bottom: 1px solid var(--line); }
+.qa summary { padding: 22px 4px; font: 600 18px var(--body); justify-content: space-between; }
+.qa summary .plus { flex: none; width: 22px; height: 22px; stroke: var(--muted); fill: none; stroke-width: 1.8; stroke-linecap: round; transition: transform .2s var(--ease); }
+.qa details[open] summary .plus { transform: rotate(45deg); }
+.qa summary:hover .plus { stroke: var(--ink); }
+.qa .ans { padding: 0 44px 24px 4px; color: var(--muted); font-size: 16px; display: grid; gap: 10px; }
+.qa .ans b { color: var(--ink); font-weight: 600; }
+
+/* Closing + footer */
+.closing { text-align: center; padding-block: 104px 96px; border-top: 1px solid var(--hair); position: relative; isolation: isolate; }
+.closing::before { content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(36% 60% at 50% 30%, rgba(61,123,253,.1), transparent 70%); }
+.closing img { width: 76px; height: 76px; margin: 0 auto 8px; }
+.closing h2 { margin-top: 10px; }
+.closing .cta { justify-content: center; margin-top: 30px; }
+footer { border-top: 1px solid var(--hair); padding-block: 36px 44px; font-size: 14px; color: var(--muted); }
+footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px 32px; }
+.foot-brand { display: flex; align-items: center; gap: 10px; color: var(--ink); font: 700 16px var(--display); text-decoration: none; }
+.foot-brand img { width: 24px; height: 24px; }
+.foot-links { display: flex; flex-wrap: wrap; gap: 6px 22px; }
+.foot-links a { color: var(--muted); text-decoration: none; }
+.foot-links a:hover { color: var(--ink); }
+.foot-meta { display: flex; gap: 14px; }
+
+/* Reveal on enter (one-time, skipped for reduced motion) */
+@media (prefers-reduced-motion: no-preference) {
+  .js .reveal { opacity: 0; transform: translateY(14px); transition: opacity .6s var(--ease), transform .6s var(--ease); }
+  .js .reveal.in { opacity: 1; transform: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  #wheel .bloom { animation: none; }
-  .btn:hover { transform: none; }
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+
+/* Responsive */
+@media (max-width: 1040px) {
+  .hero .wrap { grid-template-columns: minmax(0, 1fr); gap: 48px; padding-top: 56px; }
+  .hero .intro { max-width: 640px; }
+  .demo { max-width: 620px; width: 100%; margin: 0 auto; }
+  .nav-links { display: none; }
+  .menu { display: block; }
+  .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .span-4, .span-6 { grid-column: span 2; }
+  .span-2, .span-3 { grid-column: span 1; }
+  .formats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .faq { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+}
+@media (max-width: 860px) {
+  .steps, .trust { grid-template-columns: minmax(0, 1fr); }
+  .step .art { height: 150px; }
+  .tabpanel, .install { grid-template-columns: minmax(0, 1fr); }
+  .tabpanel .shot { border-right: 0; border-bottom: 1px solid var(--line); padding: 28px; }
+  .tabpanel .shot img { width: min(100%, 300px); }
+  .tabpanel .copy { padding: 28px 24px; }
+  .install-get { border-left: 0; border-top: 1px solid var(--line); }
+  .install-steps, .install-get { padding: 28px 24px; }
+}
+@media (max-width: 640px) {
+  .wrap { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+  section { padding-block: 80px; }
+  .hero .wrap { padding-top: 40px; padding-bottom: 80px; }
+  .lede { font-size: 17px; }
+  .cta .btn { flex: 1 1 100%; }
+  .meta { gap: 4px 16px; }
+  .meta span + span::before { content: none; }
+  .nav .btn.small { display: none; }
+  .stage { height: 500px; border-radius: 22px; }
+  .stage-keys .lbl, .try { display: none; }
+  .wkey { padding: 0 10px 0 6px; gap: 6px; font-size: 13px; }
+  .bento { grid-template-columns: minmax(0, 1fr); }
+  .span-4, .span-6, .span-2, .span-3 { grid-column: span 1; }
+  .tile { padding: 22px; }
+  .editors { height: auto; padding: 18px 12px 0; gap: 8px; align-items: end; }
+  .editors img:nth-child(2) { transform: none; }
+  .formats { grid-template-columns: minmax(0, 1fr); }
+  .tablist { display: flex; }
+  .tab { flex: 1; justify-content: center; padding: 0 8px; font-size: 14px; gap: 6px; }
+  .tab kbd { min-width: 24px; font-size: 12px; }
+  .tabpanel h3 { font-size: 26px; }
+  .examples small { display: none; }
+  .qa summary { font-size: 17px; padding: 18px 2px; }
+  .qa .ans { padding-right: 8px; }
+  details.firstrun .body { padding-left: 16px; }
+  summary .sumnote { display: none; }
+  footer .wrap { flex-direction: column; align-items: flex-start; }
+}
+@media (max-width: 380px) {
+  .wkey { font-size: 12.5px; padding: 0 8px 0 5px; }
+  .wkey kbd { min-width: 24px; padding: 0 3px; }
+  .caps { gap: 6px; }
 }
 </style>
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 
-<nav>
+<!-- Shared drawing: the sunset sample photo used across the page -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e98e78"/><stop offset="1" stop-color="#f6cf8f"/></linearGradient>
+    <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a8cc0"/><stop offset="1" stop-color="#335c98"/></linearGradient>
+    <symbol id="sunset" viewBox="0 0 78 58" preserveAspectRatio="xMidYMid slice">
+      <rect width="78" height="32" fill="url(#sky)"/>
+      <circle cx="39" cy="32" r="8" fill="#fdf1cf"/>
+      <rect y="32" width="78" height="16" fill="url(#sea)"/>
+      <rect y="48" width="78" height="10" fill="#ecd7a8"/>
+    </symbol>
+  </defs>
+</svg>
+
+<header class="nav">
   <div class="wrap">
-    <a class="brand" href="#top"><img src="/assets/icon.png" alt="" width="30" height="30">OpenShelf</a>
-    <div class="links">
-      <a href="#wheels">How it works</a>
-      <a href="#formats">Formats</a>
-      <a href="#tools">Tools</a>
-      <a href="#shelves">Shelves</a>
+    <a class="brand" href="#top" aria-label="OpenShelf home"><img src="assets/icon.png" alt="" width="28" height="28">OpenShelf</a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="#how">How it works</a>
+      <a href="#wheels">Wheels</a>
+      <a href="#features">Features</a>
       <a href="#install">Install</a>
-      <a href="https://github.com/Manan-Santoki/OpenShelf">GitHub</a>
-    </div>
-    <a class="btn primary small download-link" href="https://github.com/Manan-Santoki/OpenShelf/releases/latest">Download</a>
-  </div>
-</nav>
-
-<main id="top">
-  <div class="wrap hero">
-    <div>
-      <div class="eyebrow">Free and open source · for Mac</div>
-      <h1>Drag.<br>Tap.<br><span class="dim">Done.</span></h1>
-      <p class="lede">Start dragging any file, tap a key, and drop it on the wheel. <b>Convert it, edit it, or park it on a shelf</b> without opening another app.</p>
-      <div class="cta">
-        <a class="btn primary download-link" href="https://github.com/Manan-Santoki/OpenShelf/releases/latest">
-          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.37 12.46c-.02-2.13 1.74-3.15 1.82-3.2-1-1.45-2.54-1.65-3.08-1.67-1.31-.13-2.56.77-3.22.77-.67 0-1.69-.75-2.78-.73-1.43.02-2.75.83-3.48 2.11-1.49 2.58-.38 6.39 1.06 8.48.71 1.02 1.55 2.17 2.65 2.13 1.07-.04 1.47-.69 2.76-.69 1.28 0 1.65.69 2.78.67 1.15-.02 1.87-1.04 2.57-2.07.81-1.18 1.14-2.33 1.16-2.39-.03-.01-2.21-.85-2.24-3.41zM14.28 6.21c.58-.71.98-1.69.87-2.67-.84.03-1.87.56-2.47 1.27-.54.62-1.02 1.63-.89 2.59.94.07 1.9-.48 2.49-1.19z"/></svg>
-          <span class="download-label">Download for Mac</span>
-        </a>
-        <a class="btn ghost" href="https://github.com/Manan-Santoki/OpenShelf">View on GitHub</a>
-      </div>
-      <div class="cta-note">macOS 14 or later · Apple silicon and Intel · MIT license</div>
-    </div>
-
-    <div class="stage">
-      <div class="keys" role="group" aria-label="Choose a wheel">
-        <button class="key" type="button" data-set="convert" aria-pressed="true"><kbd>⇧</kbd>Convert</button>
-        <button class="key" type="button" data-set="tools" aria-pressed="false"><kbd>⇧⌥</kbd>Tools</button>
-        <button class="key" type="button" data-set="actions" aria-pressed="false"><kbd>⌃</kbd>Actions</button>
-      </div>
-      <svg id="wheel" viewBox="0 0 500 520" role="img" aria-label="The OpenShelf wheel"></svg>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <div class="nav-end">
+      <a class="icon-link" href="https://github.com/Manan-Santoki/OpenShelf" aria-label="OpenShelf on GitHub">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.73-1.54-2.56-.29-5.25-1.28-5.25-5.69 0-1.26.45-2.29 1.19-3.09-.12-.29-.52-1.47.11-3.06 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.77.11 3.06.74.8 1.19 1.83 1.19 3.09 0 4.42-2.7 5.39-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z"/></svg>
+      </a>
+      <a class="btn primary small download-link" href="https://github.com/Manan-Santoki/OpenShelf/releases/latest"><span class="download-label" data-prefix="Download">Download</span></a>
+      <details class="menu">
+        <summary aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 8h16M4 16h16"/></svg></summary>
+        <nav class="menu-panel" aria-label="Mobile">
+          <a href="#how">How it works</a>
+          <a href="#wheels">Wheels</a>
+          <a href="#features">Features</a>
+          <a href="#install">Install</a>
+          <a href="#faq">FAQ</a>
+          <a href="https://github.com/Manan-Santoki/OpenShelf">GitHub</a>
+        </nav>
+      </details>
     </div>
   </div>
+</header>
 
-  <section id="wheels">
+<main id="main">
+  <!-- Hero -->
+  <div class="hero" id="top">
     <div class="wrap">
-      <div class="eyebrow">How it works</div>
-      <h2>One gesture, three wheels.</h2>
-      <p class="section-lede">Press on a file in Finder, on the Desktop or in any app that lets you drag files. While you're still dragging, tap a key. The wheel blooms under the pointer and stays open until you drop. Results land next to the original, and nothing is ever overwritten.</p>
-      <div class="three">
-        <div class="card">
-          <div class="kbdrow"><kbd>⇧</kbd><h3>Convert</h3></div>
-          <p>Only the formats that make sense for what you're dragging. JPG to HEIC, PDF to Word, video to GIF, folder to ZIP.</p>
-          <img src="/assets/wheel-convert.webp" alt="The Convert wheel for a photo, showing PNG, WEBP, HEIC, TIFF, AVIF, BMP, PDF, DOCX and ZIP" loading="lazy" width="608" height="608">
+      <div class="intro">
+        <div class="eyebrow">Free &amp; open source · for Mac</div>
+        <h1>Drag. Tap. <span>Done.</span></h1>
+        <p class="lede">While you drag any file, tap a key and a wheel opens under the pointer: drop on a wedge to <b>convert it, edit it or park it on a shelf</b>.</p>
+        <div class="cta">
+          <a class="btn primary download-link" href="https://github.com/Manan-Santoki/OpenShelf/releases/latest">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.37 12.46c-.02-2.13 1.74-3.15 1.82-3.2-1-1.45-2.54-1.65-3.08-1.67-1.31-.13-2.56.77-3.22.77-.67 0-1.69-.75-2.78-.73-1.43.02-2.75.83-3.48 2.11-1.49 2.58-.38 6.39 1.06 8.48.71 1.02 1.55 2.17 2.65 2.13 1.07-.04 1.47-.69 2.76-.69 1.28 0 1.65.69 2.78.67 1.15-.02 1.87-1.04 2.57-2.07.81-1.18 1.14-2.33 1.16-2.39-.03-.01-2.21-.85-2.24-3.41zM14.28 6.21c.58-.71.98-1.69.87-2.67-.84.03-1.87.56-2.47 1.27-.54.62-1.02 1.63-.89 2.59.94.07 1.9-.48 2.49-1.19z"/></svg>
+            <span class="download-label" data-prefix="Download for Mac">Download for Mac</span>
+          </a>
+          <a class="btn ghost" href="https://github.com/Manan-Santoki/OpenShelf">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.73-1.54-2.56-.29-5.25-1.28-5.25-5.69 0-1.26.45-2.29 1.19-3.09-.12-.29-.52-1.47.11-3.06 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.77.11 3.06.74.8 1.19 1.83 1.19 3.09 0 4.42-2.7 5.39-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z"/></svg>
+            View on GitHub
+          </a>
         </div>
-        <div class="card">
-          <div class="kbdrow"><kbd>⇧⌥</kbd><h3>Tools</h3></div>
-          <p>Crop, resize, remove backgrounds, annotate, trim, merge, split PDFs. Each tool opens a small focused editor and saves a copy.</p>
-          <img src="/assets/wheel-tools.webp" alt="The Tools wheel for a photo, with Crop highlighted" loading="lazy" width="608" height="608">
-        </div>
-        <div class="card">
-          <div class="kbdrow"><kbd>⌃</kbd><h3>Actions</h3></div>
-          <p>Put it on a floating shelf, AirDrop it, copy it, move it, copy its path or open Terminal in its folder.</p>
-          <img src="/assets/wheel-actions.webp" alt="The Actions wheel, with Shelf highlighted" loading="lazy" width="608" height="608">
-        </div>
+        <p class="meta"><span>macOS 14+</span><span>Apple silicon &amp; Intel</span><span>Free &amp; open source</span></p>
       </div>
-      <div class="split" style="margin-top:56px">
-        <div>
-          <h3 style="font:700 28px var(--display);margin:0">Feedback right where you're looking.</h3>
-          <ul class="ticks">
-            <li><b>The label above the wheel</b> shows the file size, then exactly what the hovered wedge will do.</li>
-            <li><b>A small card by the pointer</b> shows progress for long jobs. Click × to cancel.</li>
-            <li><b>No drag needed:</b> select files in Finder and press <b>⌃⌥Space</b>. Arrow keys choose, Tab switches wheels, Return runs it.</li>
-            <li><b>Keyboard mid-drag too:</b> open a wheel, let go of the key, then use the arrow keys and Return. Esc cancels.</li>
-            <li><b>Your keys:</b> change the key for each wheel in Settings.</li>
-          </ul>
+
+      <div class="demo">
+        <div class="stage" id="stage" role="group" aria-label="Interactive demo of the OpenShelf wheel" aria-describedby="demo-hint">
+          <div class="stage-top">
+            <span class="try">Try it</span>
+            <p class="hint" id="demo-hint">Drag the file, then tap <kbd>⇧</kbd></p>
+          </div>
+          <div class="ring" aria-hidden="true"></div><div class="ring inner" aria-hidden="true"></div>
+          <div class="home" aria-hidden="true"></div>
+          <svg id="wheel" aria-hidden="true" focusable="false"></svg>
+          <div class="file" id="file" tabindex="0" role="button" aria-label="Photo.jpg, a file you can pick up. Press Space to pick it up.">
+            <svg class="thumb" viewBox="0 0 78 58" aria-hidden="true"><use href="#sunset"/></svg>
+            <span class="fname" aria-hidden="true">Photo.jpg</span>
+          </div>
+          <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true">
+            <span class="tick" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+            <span><b id="toast-title"></b><small id="toast-sub"></small></span>
+          </div>
+          <div class="stage-keys" role="group" aria-label="Open a wheel">
+            <span class="lbl">Or open a wheel</span>
+            <button class="wkey" type="button" data-wheel="convert" aria-pressed="false"><kbd aria-hidden="true">⇧</kbd>Convert</button>
+            <button class="wkey" type="button" data-wheel="tools" aria-pressed="false"><kbd aria-hidden="true">⇧⌥</kbd>Tools</button>
+            <button class="wkey" type="button" data-wheel="actions" aria-pressed="false"><kbd aria-hidden="true">⌃</kbd>Actions</button>
+          </div>
+          <p class="sr-only" id="demo-sr" aria-live="polite"></p>
         </div>
-        <div class="media row">
-          <img src="/assets/wheel-pill.webp" alt="The Actions wheel with AirDrop highlighted and its name shown above the wheel" loading="lazy" width="720" height="720">
-          <img src="/assets/toast-progress.webp" alt="A progress card reading Converting to HEIC, 2 of 3 saved" loading="lazy" width="600" height="184" style="align-self:center">
-          <img src="/assets/shelf-collapsed.webp" alt="A collapsed shelf holding five files" loading="lazy" width="372" height="412">
+        <p class="demo-caption">A preview in your browser. In the app, it works on any file you drag in macOS.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- How it works -->
+  <section id="how" aria-labelledby="how-title">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <div class="eyebrow">How it works</div>
+        <h2 id="how-title">One gesture. No windows to open.</h2>
+        <p class="sec-lede">It starts with a drag you were going to make anyway: from Finder, the Desktop or any app that lets you drag files.</p>
+      </div>
+      <ol class="steps" role="list">
+        <li class="card step reveal">
+          <div class="art plate" aria-hidden="true">
+            <svg width="190" height="120" viewBox="0 0 190 120">
+              <path d="M28 96 C 60 96, 70 40, 112 44" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="1.5" stroke-dasharray="3 5" stroke-linecap="round"/>
+              <rect x="10" y="78" width="40" height="30" rx="4" fill="none" stroke="rgba(255,255,255,.14)" stroke-dasharray="3 3"/>
+              <g transform="translate(100 22) rotate(-4)">
+                <rect x="-3" y="-3" width="62" height="46" rx="5" fill="#f4f4f6"/>
+                <svg x="0" y="0" width="56" height="40" viewBox="0 0 78 58"><use href="#sunset"/></svg>
+              </g>
+              <path d="M138 52 l0 22 l6 -5.5 l4 9.5 l4 -1.7 l-4 -9.3 l8 0 z" fill="#fff" stroke="#0a0a0b" stroke-width="1.4" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <span class="num">01</span>
+          <h3>Drag any file</h3>
+          <p>Photos, PDFs, documents, videos, folders. Several at once works too.</p>
+        </li>
+        <li class="card step reveal">
+          <div class="art plate" aria-hidden="true">
+            <div class="caps">
+              <span class="cap on">⇧</span>
+              <span class="cap">⇧⌥</span>
+              <span class="cap">⌃</span>
+            </div>
+          </div>
+          <span class="num">02</span>
+          <h3>Tap a key</h3>
+          <p><kbd class="kc">⇧</kbd> Convert, <kbd class="kc">⇧⌥</kbd> Tools, <kbd class="kc">⌃</kbd> Actions. A quick tap is enough; the wheel stays open until you drop.</p>
+        </li>
+        <li class="card step reveal">
+          <div class="art plate" aria-hidden="true">
+            <svg id="mini-wheel" width="150" height="150" viewBox="-75 -75 150 150"></svg>
+          </div>
+          <span class="num">03</span>
+          <h3>Drop on a wedge</h3>
+          <p>The result is saved next to the original, and nothing is ever overwritten.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- The three wheels -->
+  <section id="wheels" aria-labelledby="wheels-title">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <div class="eyebrow">The wheels</div>
+        <h2 id="wheels-title">Three wheels, one for every job.</h2>
+        <p class="sec-lede">Each wheel only shows what makes sense for the file you're dragging.</p>
+      </div>
+      <div class="tabs reveal">
+        <div class="tablist" role="tablist" aria-label="Wheels">
+          <button class="tab" role="tab" id="tab-convert" aria-controls="panel-convert" aria-selected="true"><kbd aria-hidden="true">⇧</kbd>Convert</button>
+          <button class="tab" role="tab" id="tab-tools" aria-controls="panel-tools" aria-selected="false" tabindex="-1"><kbd aria-hidden="true">⇧⌥</kbd>Tools</button>
+          <button class="tab" role="tab" id="tab-actions" aria-controls="panel-actions" aria-selected="false" tabindex="-1"><kbd aria-hidden="true">⌃</kbd>Actions</button>
+        </div>
+
+        <div class="card tabpanel" role="tabpanel" id="panel-convert" aria-labelledby="tab-convert" tabindex="0">
+          <div class="shot"><img src="assets/wheel-convert.webp" alt="The Convert wheel for a photo: PNG, WEBP, HEIC, TIFF, AVIF, BMP, PDF, DOCX and ZIP, with HEIC highlighted" width="608" height="608" loading="lazy"></div>
+          <div class="copy">
+            <h3><kbd class="kc">⇧</kbd>Convert</h3>
+            <p>Turn a file into the format you need. The wheel never offers the format it's already in, and several files convert together.</p>
+            <ul class="examples">
+              <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h14M13 7l5 5-5 5"/></svg><span>HEIC <span class="to">→</span> JPG</span></li>
+              <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h14M13 7l5 5-5 5"/></svg><span>PDF <span class="to">→</span> Word</span></li>
+              <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h14M13 7l5 5-5 5"/></svg><span>Video <span class="to">→</span> GIF</span><small>with ffmpeg</small></li>
+              <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h14M13 7l5 5-5 5"/></svg><span>CSV <span class="to">→</span> Excel</span></li>
+              <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h14M13 7l5 5-5 5"/></svg><span>Folder <span class="to">→</span> ZIP</span></li>
+            </ul>
+            <p class="note">Results land next to the original: <code>Photo.jpg</code> → <code>Photo.png</code>.</p>
+          </div>
+        </div>
+
+        <div class="card tabpanel" role="tabpanel" id="panel-tools" aria-labelledby="tab-tools" tabindex="0">
+          <div class="shot"><img src="assets/wheel-tools.webp" alt="The Tools wheel for a photo, with Crop highlighted among Compress, Metadata, Edit, Annotate, Add BG, Redact and Read QR" width="608" height="608" loading="lazy"></div>
+          <div class="copy">
+            <h3><kbd class="kc">⇧⌥</kbd>Tools</h3>
+            <p>Quick edits without opening a full app. Most tools open a small focused editor and save a copy beside the original.</p>
+            <ul class="examples">
+              <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l6-6M10 14v5M10 14H5M20 4l-6 6M14 10V5M14 10h5"/></svg><span>Compress a photo</span></li>
+              <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2v16h16M2 6h16v16"/></svg><span>Crop or resize images</span></li>
+              <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M12 7.5a2.5 2.5 0 1 0 .01 0M7.5 17c.8-2.4 2.5-3.5 4.5-3.5s3.7 1.1 4.5 3.5"/></svg><span>Remove a background</span></li>
+              <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18v12H3zM8 6v12M16 6v12"/></svg><span>Trim a video</span></li>
+              <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8h11v13H8zM5 16V3h11"/></svg><span>Combine images into one PDF</span></li>
+            </ul>
+            <p class="note">For PDFs: combine, reorder pages, split. For video and audio: trim, split, merge, change speed.</p>
+          </div>
+        </div>
+
+        <div class="card tabpanel" role="tabpanel" id="panel-actions" aria-labelledby="tab-actions" tabindex="0">
+          <div class="shot"><img src="assets/wheel-actions.webp" alt="The Actions wheel, with Shelf highlighted among Add to Shelf, AirDrop, Copy, Move, Copy Path and Terminal" width="608" height="608" loading="lazy"></div>
+          <div class="copy">
+            <h3><kbd class="kc">⌃</kbd>Actions</h3>
+            <p>Everyday file chores, right where the file already is.</p>
+            <ul class="examples">
+              <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13v6h18v-6M3 13h5l1 2h6l1-2h5M12 3v8M9 8l3 3 3-3"/></svg><span>Put files on a shelf</span></li>
+              <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.2 14.8a4 4 0 1 1 5.6 0M6.3 17.7a8 8 0 1 1 11.4 0M12 14l3 5.5H9z"/></svg><span>AirDrop them</span></li>
+              <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2h8.5A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg><span>Move them to a folder</span></li>
+              <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg><span>Copy the full path</span></li>
+              <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v14H3zM7 10l3 2-3 2M12 15h5"/></svg><span>Open Terminal in its folder</span></li>
+            </ul>
+            <p class="note">With a shelf open, <b>Add to Shelf</b> drops files on the one you used last.</p>
+          </div>
         </div>
       </div>
     </div>
   </section>
 
-  <section id="formats">
+  <!-- Features -->
+  <section id="features" aria-labelledby="features-title">
     <div class="wrap">
-      <div class="eyebrow">Convert</div>
-      <h2>Every everyday format, and then some.</h2>
-      <p class="section-lede">Drag several files at once to convert them together. Mixed selections only show the formats every file supports.</p>
-      <div class="formats">
-        <div class="frow"><div class="from">Images<small>JPG, PNG, HEIC, SVG, …</small></div><div class="chips"><span class="chip">PNG</span><span class="chip">JPG</span><span class="chip">HEIC</span><span class="chip">AVIF</span><span class="chip opt">WEBP</span><span class="chip">TIFF</span><span class="chip">BMP</span><span class="chip">PDF</span><span class="chip">DOCX</span><span class="chip">ZIP</span></div></div>
-        <div class="frow"><div class="from">PDF<small>all pages, 300 dpi</small></div><div class="chips"><span class="chip">DOCX</span><span class="chip">PPTX</span><span class="chip">XLSX</span><span class="chip">EPUB</span><span class="chip">MD</span><span class="chip">JPG</span><span class="chip">PNG</span><span class="chip">TXT</span><span class="chip">ZIP</span></div></div>
-        <div class="frow"><div class="from">Documents<small>TXT, RTF, RTFD, DOCX, HTML, MD</small></div><div class="chips"><span class="chip">PDF</span><span class="chip">DOCX</span><span class="chip">EPUB</span><span class="chip">MD</span><span class="chip">TXT</span><span class="chip">RTF</span><span class="chip">HTML</span><span class="chip">ZIP</span></div></div>
-        <div class="frow"><div class="from">Spreadsheets<small>CSV, TSV, XLSX, XLS, ODS</small></div><div class="chips"><span class="chip">XLSX</span><span class="chip">CSV</span><span class="chip">TSV</span><span class="chip">PDF</span><span class="chip opt">ODS</span><span class="chip">ZIP</span></div></div>
-        <div class="frow"><div class="from">Slides<small>PPT, PPTX, ODP</small></div><div class="chips"><span class="chip opt">PDF</span><span class="chip opt">JPG</span><span class="chip opt">PNG</span><span class="chip">ZIP</span></div></div>
-        <div class="frow"><div class="from">Audio<small>MP3, M4A, WAV, FLAC, OGG, Opus, WMA, …</small></div><div class="chips"><span class="chip opt">MP3</span><span class="chip">M4A</span><span class="chip">WAV</span><span class="chip">AIFF</span><span class="chip">FLAC</span><span class="chip opt">OGG</span><span class="chip opt">OPUS</span><span class="chip opt">WMA</span><span class="chip">ZIP</span></div></div>
-        <div class="frow"><div class="from">Video<small>MP4, MOV, MKV, WebM, AVI, WMV, …</small></div><div class="chips"><span class="chip">MP4</span><span class="chip">MOV</span><span class="chip opt">MKV</span><span class="chip opt">WEBM</span><span class="chip opt">AVI</span><span class="chip opt">WMV</span><span class="chip opt">GIF</span><span class="chip">M4A</span><span class="chip opt">MP3</span><span class="chip">ZIP</span></div></div>
-        <div class="frow"><div class="from">Subtitles<small>SRT, VTT</small></div><div class="chips"><span class="chip">TXT</span><span class="chip">SRT</span><span class="chip">VTT</span></div></div>
-        <div class="frow"><div class="from">Archives<small>ZIP, TAR, GZ, 7Z, RAR</small></div><div class="chips"><span class="chip">Unzip into a folder</span></div></div>
-        <div class="frow"><div class="from">Folders &amp; anything else</div><div class="chips"><span class="chip">ZIP</span><span class="chip">TAR</span><span class="chip">TAR.GZ</span></div></div>
+      <div class="sec-head reveal">
+        <div class="eyebrow">Features</div>
+        <h2 id="features-title">Small tools that stay out of the way.</h2>
+        <p class="sec-lede">Everything opens next to the pointer and closes when it's done.</p>
       </div>
-      <p class="fnote">Dashed formats use free tools: audio and video ones need <code>brew install ffmpeg webp</code>, slides and ODS need <code>brew install --cask libreoffice</code>. They stay hidden until the tool is installed.</p>
+      <div class="bento">
+        <article class="card tile span-4 reveal">
+          <span class="tag">Tools</span>
+          <h3>Quick editors</h3>
+          <p>Crop, Annotate, Redact, Remove background, Resize, Compress. Each opens a small window by the file and saves a copy, like <code>Photo Cropped.jpg</code>, so you can drag the result straight into another wheel.</p>
+          <div class="media plate editors">
+            <img src="assets/editor-crop.webp" alt="The Crop Image editor with aspect-ratio presets and exact pixel size fields" width="972" height="1292" loading="lazy">
+            <img src="assets/editor-annotate.webp" alt="The Annotate editor with drawing tools, colours and a line width slider" width="1212" height="1412" loading="lazy">
+            <img src="assets/editor-add-bg.webp" alt="The Add BG editor with background swatches and padding, corner and shadow sliders" width="1012" height="1412" loading="lazy">
+          </div>
+        </article>
+        <article class="card tile span-2 reveal">
+          <span class="tag">Actions</span>
+          <h3>Floating shelves</h3>
+          <p>Drop files on the Shelf wedge and they wait in a small floating window. Gather from anywhere, then drag them out together.</p>
+          <div class="media plate shelf-media">
+            <img src="assets/shelf-expanded.webp" alt="An expanded shelf holding five files in a grid, with one selected" width="660" height="588" loading="lazy">
+          </div>
+          <p>Dock it to a screen edge; it's still there after a restart.</p>
+        </article>
+        <article class="card tile span-2 reveal">
+          <span class="tag">Keyboard</span>
+          <h3>No drag needed</h3>
+          <p>Select files in Finder and press <span class="nw"><kbd class="kc">⌃⌥Space</kbd>.</span> Arrows choose, Tab switches wheels, Return runs it.</p>
+          <div class="media plate keys-media" aria-hidden="true">
+            <div class="caps"><span class="cap">⌃</span><span class="cap">⌥</span><span class="cap wide">space</span></div>
+          </div>
+        </article>
+        <article class="card tile span-2 reveal">
+          <span class="tag">Feedback</span>
+          <h3>Progress by the pointer</h3>
+          <p>Longer jobs show a small card where you dropped the file. Click × to cancel.</p>
+          <div class="media plate toast-media">
+            <img src="assets/toast-progress.webp" alt="A progress card reading Converting to HEIC, 2 of 3 saved, with a cancel button" width="600" height="184" loading="lazy">
+          </div>
+          <p>Results say what happened: “1 resized · 2 already smaller”.</p>
+        </article>
+        <article class="card tile span-2 reveal">
+          <span class="tag">Video &amp; audio</span>
+          <h3>Trim on a real timeline</h3>
+          <p>A filmstrip for video, a waveform for audio. Then split, merge, change speed, rotate or mute.</p>
+          <div class="media plate video-media">
+            <img src="assets/editor-trim.webp" alt="The Trim editor showing a video preview above a filmstrip with selection handles" width="1292" height="1212" loading="lazy">
+          </div>
+        </article>
+        <article class="card tile span-6 reveal">
+          <span class="tag">Formats</span>
+          <h3>Every everyday format, and then some</h3>
+          <p>Drag several files at once; mixed selections only show the formats every file supports.</p>
+          <div class="formats">
+            <div class="fmt"><b>Images</b><span>PNG · JPG · HEIC · AVIF · WEBP<i>*</i> · TIFF · BMP, or into a PDF or Word file</span></div>
+            <div class="fmt"><b>PDF</b><span>to Word, PowerPoint, Excel, EPUB, Markdown, JPG, PNG, TXT</span></div>
+            <div class="fmt"><b>Office documents</b><span>Word, RTF, ODT, HTML, TXT to PDF, Word and more</span></div>
+            <div class="fmt"><b>EPUB &amp; Markdown</b><span>from PDFs and documents; Markdown in, too</span></div>
+            <div class="fmt"><b>Spreadsheets</b><span>CSV ⇄ TSV ⇄ XLSX, tables to PDF; slides<i>*</i> to PDF, JPG, PNG</span></div>
+            <div class="fmt"><b>Audio</b><span>M4A · WAV · AIFF · FLAC · MP3<i>*</i> · OGG<i>*</i> · Opus<i>*</i> · WMA<i>*</i></span></div>
+            <div class="fmt"><b>Video</b><span>MP4 · MOV · GIF<i>*</i> · MKV<i>*</i> · WebM<i>*</i> · AVI<i>*</i> · WMV<i>*</i></span></div>
+            <div class="fmt"><b>Archives</b><span>ZIP · TAR · TAR.GZ, and unzip ZIP, 7Z, RAR</span></div>
+          </div>
+          <p class="fnote"><i>*</i> Optional and free: some audio and video formats need ffmpeg (<code>brew install ffmpeg</code>, plus <code>brew install webp</code> for WEBP), and slides need LibreOffice (<code>brew install --cask libreoffice</code>). Those wedges appear once the tool is installed.</p>
+        </article>
+      </div>
     </div>
   </section>
 
-  <section id="tools">
+  <!-- Trust -->
+  <section id="private" aria-labelledby="private-title">
     <div class="wrap">
-      <div class="split flip">
-        <div>
-          <div class="eyebrow">Tools</div>
-          <h2>Small editors for quick jobs.</h2>
-          <p class="section-lede">Each tool opens a focused window that zooms out of where you dropped the file. Save writes a copy beside the original (<code>Photo Cropped.jpg</code>), so you can drag the result straight back into another wheel.</p>
-        </div>
-        <div class="media row">
-          <img src="/assets/editor-crop.webp" alt="The Crop Image editor with aspect ratio presets and pixel size fields" loading="lazy" width="972" height="1292">
-          <img src="/assets/editor-add-bg.webp" alt="The Add Background editor with gradient swatches and padding, corner and shadow sliders" loading="lazy" width="1012" height="1412">
-          <img src="/assets/editor-annotate.webp" alt="The Annotate editor with drawing tools and colours" loading="lazy" width="1212" height="1412">
-        </div>
+      <div class="sec-head center reveal">
+        <div class="eyebrow">Yours</div>
+        <h2 id="private-title">Private, open and up to date.</h2>
       </div>
-      <div class="tools-grid">
-        <div class="card"><h3>Images</h3><p>Crop · Resize · Remove Background · Add Background · Annotate · Redact · Edit · Compress · Metadata · Read QR · Combine into PDF</p></div>
-        <div class="card"><h3>PDFs</h3><p>Combine · Reorder, rotate and delete pages · Split · Compress · Edit or remove metadata</p></div>
-        <div class="card"><h3>Video &amp; audio</h3><p>Trim · Split · Merge · Speed · Crop · Rotate · Compress · Mute</p></div>
-      </div>
-      <div class="split" style="margin-top:44px">
-        <div>
-          <h3 style="font:700 28px var(--display);margin:0">Trim with a real timeline.</h3>
-          <p class="section-lede" style="margin-top:12px;font-size:17px">A filmstrip for video, a waveform for audio. Drag the handles to scrub, press Space to hear the selection, then save just that part.</p>
-        </div>
-        <div class="media"><img src="/assets/editor-trim.webp" alt="The Trim editor showing a video preview above a filmstrip with selection handles" loading="lazy" width="1292" height="1212"></div>
-      </div>
-    </div>
-  </section>
-
-  <section id="shelves">
-    <div class="wrap">
-      <div class="split">
-        <div>
-          <div class="eyebrow">Shelves</div>
-          <h2>A place to put files for a minute.</h2>
-          <p class="section-lede">Drop files on the Shelf wedge and they wait in a small floating window, so you can gather them from anywhere and drag them out together later.</p>
-          <ul class="ticks">
-            <li><b>Collapsed stack or full grid and list.</b> Select like Finder, preview with Space.</li>
-            <li><b>Dock to a screen edge.</b> It tucks into a slim tab and slides back out when you hover or drop on it.</li>
-            <li><b>Comes back after a restart,</b> even if the files moved.</li>
-            <li><b>Never touches your files.</b> Closing a shelf just lets go of them.</li>
-          </ul>
-        </div>
-        <div class="media"><img src="/assets/shelf-expanded.webp" alt="An expanded shelf with five files in a grid, one selected" loading="lazy" width="660" height="588"></div>
-      </div>
-    </div>
-  </section>
-
-  <section id="trust">
-    <div class="wrap">
-      <div class="eyebrow">Yours</div>
-      <h2>Private, open and up to date.</h2>
       <div class="trust">
-        <div class="card"><h3>Runs on your Mac</h3><p>Every conversion and tool works offline. Files are never uploaded anywhere.</p></div>
-        <div class="card"><h3>No permissions needed</h3><p>Drag detection works without Accessibility or screen access.</p></div>
-        <div class="card"><h3>Open source</h3><p>MIT licensed. Read the code, file issues and send pull requests on GitHub.</p></div>
-        <div class="card"><h3>Updates itself</h3><p>New versions install from the app, signed so only genuine releases are accepted.</p></div>
+        <div class="card reveal">
+          <div class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
+          <h3>Private and offline</h3>
+          <p>Every conversion and tool runs on your Mac. Files never leave it. The only network access is checking GitHub for updates, which you can turn off.</p>
+        </div>
+        <div class="card reveal">
+          <div class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg></div>
+          <h3>Open source</h3>
+          <p>MIT licensed. Read the code, file issues and send pull requests on <a href="https://github.com/Manan-Santoki/OpenShelf">GitHub</a>.</p>
+        </div>
+        <div class="card reveal">
+          <div class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.2-7.5 9.5-4.3-1.3-7.5-4.9-7.5-9.5V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg></div>
+          <h3>Signed automatic updates</h3>
+          <p>New versions install from inside the app. Each update is signed, so only genuine OpenShelf releases are accepted.</p>
+        </div>
       </div>
+      <p class="facts reveal">
+        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>No account</span>
+        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>No telemetry</span>
+        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>No Accessibility permission needed</span>
+      </p>
     </div>
   </section>
 
-  <section id="install">
+  <!-- Install -->
+  <section id="install" aria-labelledby="install-title">
     <div class="wrap">
-      <div class="eyebrow">Install</div>
-      <h2>Ready in a minute.</h2>
-      <div class="install">
-        <ol class="steps">
-          <li><b>Download</b> the DMG and open it.</li>
-          <li><b>Drag OpenShelf</b> onto the Applications folder, then open it. It lives in your menu bar.</li>
-          <li><b>First launch only:</b> macOS may say it can't verify the app. Open <b>System Settings → Privacy &amp; Security</b>, scroll down and click <b>Open Anyway</b>. On macOS 14, right-click the app and choose Open instead.</li>
-          <li><b>Try it:</b> drag any file, tap <b>⇧</b>, and drop on a wedge.</li>
-        </ol>
-        <div class="card">
-          <h3>Prefer Terminal?</h3>
-          <p>After moving the app to Applications, this clears the first-launch prompt:</p>
-          <p><code>xattr -dr com.apple.quarantine /Applications/OpenShelf.app</code></p>
-          <p class="req">Requires macOS 14 Sonoma or later, on Apple silicon or Intel. Later versions arrive through the app's built-in updater.</p>
+      <div class="sec-head reveal">
+        <div class="eyebrow">Install</div>
+        <h2 id="install-title">Ready in a minute.</h2>
+      </div>
+      <div class="card install reveal">
+        <div class="install-steps">
+          <ol>
+            <li><div><b>Download the DMG</b><span>The latest release, straight from GitHub.</span></div></li>
+            <li><div><b>Drag OpenShelf to Applications</b><span>Then open it. It lives in your menu bar, and a short welcome guide appears the first time.</span></div></li>
+            <li><div><b>Try it</b><span>Drag any file, tap <kbd class="kc">⇧</kbd>, and drop it on a wedge.</span></div></li>
+          </ol>
+          <details class="firstrun">
+            <summary><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>First launch: macOS asks once<span class="sumnote">One time only</span></summary>
+            <div class="body">
+              <p>OpenShelf isn't notarized by Apple yet, so the first time you open it macOS says it can't verify the app. That's expected, and it only happens once.</p>
+              <ul>
+                <li><b>macOS 15 Sequoia and later:</b> click Done, open <b>System Settings → Privacy &amp; Security</b>, scroll down to the message about OpenShelf and click <b>Open Anyway</b>, then confirm.</li>
+                <li><b>macOS 14 Sonoma:</b> right-click OpenShelf in Applications, choose <b>Open</b>, then <b>Open</b> again.</li>
+                <li><b>Or in Terminal:</b> <code>xattr -dr com.apple.quarantine /Applications/OpenShelf.app</code></li>
+              </ul>
+            </div>
+          </details>
+        </div>
+        <div class="install-get">
+          <img src="assets/icon.png" alt="" width="88" height="88" loading="lazy">
+          <h3>OpenShelf for Mac</h3>
+          <p>macOS 14 Sonoma or later · Apple silicon &amp; Intel</p>
+          <a class="btn primary download-link" href="https://github.com/Manan-Santoki/OpenShelf/releases/latest"><span class="download-label" data-prefix="Download for Mac">Download for Mac</span></a>
+          <p class="sub"><a href="https://github.com/Manan-Santoki/OpenShelf/releases">All releases</a> · <a href="https://github.com/Manan-Santoki/OpenShelf/blob/main/CHANGELOG.md">What's new</a></p>
         </div>
       </div>
     </div>
   </section>
 
-  <section class="final">
-    <div class="wrap">
-      <img src="/assets/icon.png" alt="" width="96" height="96" loading="lazy">
+  <!-- FAQ -->
+  <section id="faq" aria-labelledby="faq-title">
+    <div class="wrap faq">
+      <div class="sec-head reveal">
+        <div class="eyebrow">FAQ</div>
+        <h2 id="faq-title">Questions, answered.</h2>
+        <p class="sec-lede">Something else? <a href="https://github.com/Manan-Santoki/OpenShelf/issues">Open an issue on GitHub</a>.</p>
+      </div>
+      <div class="qa reveal">
+        <details>
+          <summary>Is it free?<svg class="plus" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary>
+          <div class="ans"><p>Yes. OpenShelf is free and open source under the MIT license. No account, no subscription.</p></div>
+        </details>
+        <details>
+          <summary>Does it upload my files?<svg class="plus" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary>
+          <div class="ans"><p>No. Every conversion and tool runs on your Mac, offline. There's no telemetry; the only network access is checking GitHub for updates, which you can turn off in Settings.</p></div>
+        </details>
+        <details>
+          <summary>Which macOS versions does it support?<svg class="plus" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary>
+          <div class="ans"><p>macOS 14 Sonoma or later, on Apple silicon and Intel Macs.</p></div>
+        </details>
+        <details>
+          <summary>Which formats need extra tools?<svg class="plus" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary>
+          <div class="ans">
+            <p>Most formats work out of the box. Two free, optional tools add more:</p>
+            <p><b>ffmpeg</b> (<code>brew install ffmpeg</code>) adds MP3, OGG, Opus, WMA, MKV, WebM, AVI, WMV and GIF; <code>brew install webp</code> adds WEBP.</p>
+            <p><b>LibreOffice</b> (<code>brew install --cask libreoffice</code>) adds slides (PowerPoint and ODP) and XLS/ODS spreadsheets.</p>
+            <p>Their wedges stay hidden until the tool is installed.</p>
+          </div>
+        </details>
+        <details>
+          <summary>How do updates work?<svg class="plus" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary>
+          <div class="ans"><p>OpenShelf checks GitHub once a day (it asks the first time). When a new version is out you'll see its release notes and an <b>Install Update</b> button, and the app restarts on the new version. Updates are signed, so only genuine releases install. You can also choose <b>Check for Updates…</b> from the menu bar, or turn automatic checks off in Settings.</p></div>
+        </details>
+        <details>
+          <summary>Can I change the keys?<svg class="plus" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary>
+          <div class="ans"><p>Yes. Click the OpenShelf wheel in the menu bar, choose <b>Settings…</b>, and pick the key for each wheel. The <kbd class="kc">⌃⌥Space</kbd> shortcut can be changed or turned off in Settings → Keyboard.</p></div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <div class="closing">
+    <div class="wrap reveal">
+      <img src="assets/icon.png" alt="" width="76" height="76" loading="lazy">
       <h2>Make every drag count.</h2>
-      <p class="section-lede" style="margin:0 auto">Free forever. No account, no subscription, no uploads.</p>
+      <p class="sec-lede">Free forever. No account, no subscription, no uploads.</p>
       <div class="cta">
-        <a class="btn primary download-link" href="https://github.com/Manan-Santoki/OpenShelf/releases/latest"><span class="download-label">Download for Mac</span></a>
+        <a class="btn primary download-link" href="https://github.com/Manan-Santoki/OpenShelf/releases/latest"><span class="download-label" data-prefix="Download for Mac">Download for Mac</span></a>
         <a class="btn ghost" href="https://github.com/Manan-Santoki/OpenShelf">Star on GitHub</a>
       </div>
     </div>
-  </section>
+  </div>
 </main>
 
 <footer>
   <div class="wrap">
-    <span>© 2026 OpenShelf contributors · MIT license</span>
-    <span>
-      <a href="https://github.com/Manan-Santoki/OpenShelf">GitHub</a> ·
-      <a href="https://github.com/Manan-Santoki/OpenShelf/releases">Releases</a> ·
-      <a href="https://github.com/Manan-Santoki/OpenShelf/blob/main/CHANGELOG.md">Changelog</a> ·
-      <a href="https://github.com/Manan-Santoki/OpenShelf/issues">Report a problem</a>
-    </span>
+    <a class="foot-brand" href="#top"><img src="assets/icon.png" alt="" width="24" height="24" loading="lazy">OpenShelf</a>
+    <nav class="foot-links" aria-label="Footer">
+      <a href="https://github.com/Manan-Santoki/OpenShelf">GitHub</a>
+      <a href="https://github.com/Manan-Santoki/OpenShelf/releases">Releases</a>
+      <a href="https://github.com/Manan-Santoki/OpenShelf/blob/main/CHANGELOG.md">Changelog</a>
+      <a href="https://github.com/Manan-Santoki/OpenShelf/issues">Report an issue</a>
+    </nav>
+    <div class="foot-meta"><span>MIT License</span><span>Made for macOS</span></div>
   </div>
 </footer>
 
 <script>
-// Hero wheel: the same rounded-wedge geometry as the app, drawn in SVG.
-const WHEELS = {
-  convert: { title: "Convert", items: ["PNG", "HEIC", "WEBP", "PDF", "DOCX", "AVIF", "TIFF", "ZIP"] },
-  tools: { title: "Tools", items: ["Crop", "Resize", "Remove BG", "Compress", "Annotate", "Redact", "Edit", "Add BG"] },
-  actions: { title: "Actions", items: ["Shelf", "AirDrop", "Copy", "Move", "Path", "Terminal"] },
-};
-const CX = 250, CY = 270, INNER = 76, OUTER = 196, GAP = 14, CORNER = 22;
-const svg = document.getElementById("wheel");
-const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-let current = "convert", lit = 0, timer = null, userPicked = false;
+(() => {
+"use strict";
+const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+const NS = "http://www.w3.org/2000/svg";
+function el(name, attrs, parent) {
+  const node = document.createElementNS(NS, name);
+  for (const k in attrs) node.setAttribute(k, attrs[k]);
+  if (parent) parent.append(node);
+  return node;
+}
 
-function pt(d, a) { return [CX + d * Math.sin(a), CY - d * Math.cos(a)]; }
-function wedgePath(start, end) {
-  const half = GAP / 2, r = Math.min(CORNER, (OUTER - INNER) / 2);
+// ---- Wheel geometry: the app's rounded annular wedges, wedge 0 at 12 o'clock, clockwise.
+function pt(d, a) { return [d * Math.sin(a), -d * Math.cos(a)]; }
+function wedgePath(start, end, g) {
+  const INNER = g.inner, OUTER = g.outer, half = g.gap / 2, r = Math.min(g.corner, (OUTER - INNER) / 2);
   const s = d => start + Math.asin(Math.min(half / d, 1));
   const e = d => end - Math.asin(Math.min(half / d, 1));
   const oi = Math.min(r / OUTER, (e(OUTER) - s(OUTER)) / 2);
@@ -414,95 +846,526 @@ function wedgePath(start, end) {
     "Z",
   ].join(" ");
 }
-function el(name, attrs) {
-  const node = document.createElementNS("http://www.w3.org/2000/svg", name);
-  for (const k in attrs) node.setAttribute(k, attrs[k]);
-  return node;
-}
 
-function draw() {
-  const wheel = WHEELS[current];
-  const n = wheel.items.length, sweep = 2 * Math.PI / n;
-  svg.innerHTML = "";
-  const group = el("g", { class: reduceMotion ? "" : "bloom" });
-  wheel.items.forEach((name, i) => {
-    const c = sweep * i;
-    group.append(el("path", { d: wedgePath(c - sweep / 2, c + sweep / 2), class: "petal" + (i === lit ? " lit" : ""), "data-i": i }));
-    const [x, y] = pt((INNER + OUTER) / 2, c);
-    const label = el("text", { x: x.toFixed(1), y: y.toFixed(1), class: "label" + (i === lit ? " lit" : ""), "data-i": i });
-    label.textContent = name.toUpperCase();
-    group.append(label);
+// ---- Download: point every button at the newest DMG.
+try {
+  fetch("https://api.github.com/repos/Manan-Santoki/OpenShelf/releases/latest")
+    .then(r => r.ok ? r.json() : null)
+    .then(release => {
+      if (!release) return;
+      const dmg = (release.assets || []).find(a => a.name.endsWith(".dmg"));
+      if (!dmg) return;
+      const version = String(release.tag_name || "").replace(/^v/, "");
+      document.querySelectorAll(".download-link").forEach(a => { a.href = dmg.browser_download_url; });
+      document.querySelectorAll(".download-label").forEach(s => {
+        s.textContent = s.dataset.prefix || "Download";
+        if (!version) return;
+        const v = document.createElement("span");
+        v.className = "ver";
+        v.textContent = "v" + version;
+        s.append(" ", v);
+      });
+    })
+    .catch(() => {});
+} catch (_) {}
+
+// ---- One-time reveal as sections enter the viewport.
+(() => {
+  const items = document.querySelectorAll(".reveal");
+  if (!("IntersectionObserver" in window) || reduceMotion()) { items.forEach(n => n.classList.add("in")); return; }
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(entry => { if (entry.isIntersecting) { entry.target.classList.add("in"); io.unobserve(entry.target); } });
+  }, { rootMargin: "0px 0px -8% 0px" });
+  items.forEach(n => io.observe(n));
+})();
+
+// ---- Wheels tabs.
+(() => {
+  const tabs = [...document.querySelectorAll('[role="tab"]')];
+  if (!tabs.length) return;
+  const select = (tab, focus) => {
+    tabs.forEach(t => {
+      const on = t === tab;
+      t.setAttribute("aria-selected", String(on));
+      t.tabIndex = on ? 0 : -1;
+      const panel = document.getElementById(t.getAttribute("aria-controls"));
+      if (panel) panel.hidden = !on;
+    });
+    if (focus) tab.focus();
+  };
+  tabs.forEach((tab, i) => {
+    tab.addEventListener("click", () => select(tab, false));
+    tab.addEventListener("keydown", e => {
+      let j = null;
+      if (e.key === "ArrowRight") j = (i + 1) % tabs.length;
+      else if (e.key === "ArrowLeft") j = (i - 1 + tabs.length) % tabs.length;
+      else if (e.key === "Home") j = 0;
+      else if (e.key === "End") j = tabs.length - 1;
+      if (j !== null) { e.preventDefault(); select(tabs[j], true); }
+    });
   });
-  group.append(el("circle", { cx: CX, cy: CY, r: INNER - 14, class: "hub" }));
-  svg.append(group);
+  select(tabs.find(t => t.getAttribute("aria-selected") === "true") || tabs[0], false);
+})();
 
-  // The file being dragged, centred on the hub like Finder's drag image.
-  const defs = el("defs", {});
-  const paper = el("linearGradient", { id: "paper", x1: "0", y1: "0", x2: "0.4", y2: "1" });
-  paper.append(el("stop", { offset: "0", "stop-color": "#ffffff" }), el("stop", { offset: "1", "stop-color": "#d6d6de" }));
-  defs.append(paper);
-  svg.prepend(defs);
-  const W = 64, H = 80, FOLD = 18, x = CX - W / 2, y = CY - H / 2;
-  const file = el("g", { class: "file", "aria-hidden": "true", style: "filter: drop-shadow(0 14px 22px rgba(0,0,0,.55))" });
-  file.append(el("path", { class: "sheet", d: `M ${x + 8} ${y} H ${x + W - FOLD} L ${x + W} ${y + FOLD} V ${y + H - 8} Q ${x + W} ${y + H} ${x + W - 8} ${y + H} H ${x + 8} Q ${x} ${y + H} ${x} ${y + H - 8} V ${y + 8} Q ${x} ${y} ${x + 8} ${y} Z` }));
-  file.append(el("path", { class: "fold", d: `M ${x + W - FOLD} ${y} V ${y + FOLD - 4} Q ${x + W - FOLD} ${y + FOLD} ${x + W - FOLD + 4} ${y + FOLD} H ${x + W} Z` }));
-  const name = el("text", { x: CX, y: y + H - 12 });
-  name.textContent = "PHOTO.JPG";
-  file.append(name);
-  svg.append(file);
+// ---- Icons for the wheel's wedges (24-unit line drawings).
+const ICONS = {
+  compress: "M4 20l6-6M10 14v5M10 14H5M20 4l-6 6M14 10V5M14 10h5",
+  metadata: "M3.5 4.5v6.3l9.7 9.7 7.3-7.3L10.8 3.5H4.5a1 1 0 0 0-1 1zM8 7.2a.8.8 0 1 0 .01 0",
+  edit: "M4 7h9M17 7h3M4 17h3M11 17h9M15 5v4M9 15v4",
+  annotate: "M4 20l1.2-4.2L16 5l3 3L8.2 18.8zM14 7l3 3",
+  addbg: "M4 15V5a1 1 0 0 1 1-1h11M8 8h12v12H8zM8 17l4-4 3 3 2-2 3 3",
+  crop: "M6 2v16h16M2 6h16v16",
+  resize: "M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7",
+  removebg: "M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M12 7.5a2.5 2.5 0 1 0 .01 0M7.5 17c.8-2.4 2.5-3.5 4.5-3.5s3.7 1.1 4.5 3.5",
+  redact: "M2.5 12S6 6 12 6s9.5 6 9.5 6S18 18 12 18 2.5 12 2.5 12zM12 9.5a2.5 2.5 0 1 0 .01 0M4 4l16 16",
+  qr: "M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M8 8h3v3H8zM13 13h3v3h-3zM13 8h3v3M8 13v3h3",
+  shelf: "M3 13v6h18v-6M3 13h5l1 2h6l1-2h5M5 13l1.6-5M19 13l-1.6-5M12 3v8M9 8l3 3 3-3",
+  airdrop: "M9.2 14.8a4 4 0 1 1 5.6 0M6.3 17.7a8 8 0 1 1 11.4 0M12 14l3 5.5H9z",
+  copy: "M8 8h11v13H8zM5 16V3h11",
+  move: "M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2h8.5A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z",
+  path: "M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1",
+  terminal: "M3 5h18v14H3zM7 10l3 2-3 2M12 15h5",
+};
 
-  const pill = el("g", { class: "pill" });
-  pill.append(el("rect", { x: CX - 92, y: 14, width: 184, height: 36, rx: 18 }));
-  const text = el("text", { x: CX, y: 32 });
-  pill.append(text);
-  svg.append(pill);
-  updatePill();
+const conv = (fmt, name) => ({ label: fmt, title: "Convert to " + fmt, toast: ["Saved " + name, "Next to Photo.jpg"] });
+const tool = (label, icon, title, sub) => ({ label, icon, title, toast: [title === "Read QR" ? "No QR code found" : "Opened " + title, sub || "Saves a copy beside Photo.jpg"] });
+const WHEELS = {
+  convert: { name: "Convert", keys: "⇧", items: [
+    conv("PNG", "Photo.png"), conv("WEBP", "Photo.webp"), conv("HEIC", "Photo.heic"),
+    conv("TIFF", "Photo.tiff"), conv("AVIF", "Photo.avif"), conv("BMP", "Photo.bmp"),
+    conv("PDF", "Photo.pdf"), conv("DOCX", "Photo.docx"), conv("ZIP", "Photo.zip"),
+  ]},
+  tools: { name: "Tools", keys: "⇧⌥", items: [
+    tool("Compress", "compress", "Compress"), tool("Metadata", "metadata", "Metadata", "View or remove EXIF and location"),
+    tool("Edit", "edit", "Edit"), tool("Annotate", "annotate", "Annotate"),
+    tool("Add BG", "addbg", "Add Background"), tool("Crop", "crop", "Crop"),
+    tool("Resize", "resize", "Resize"), tool("Remove BG", "removebg", "Remove Background", "Saves a transparent PNG"),
+    tool("Redact", "redact", "Redact"), tool("Read QR", "qr", "Read QR", "Photo.jpg has no code to copy"),
+  ]},
+  actions: { name: "Actions", keys: "⌃", items: [
+    { label: "Shelf", icon: "shelf", title: "Shelf", toast: ["Put on a shelf", "Photo.jpg waits in a floating shelf"] },
+    { label: "AirDrop", icon: "airdrop", title: "AirDrop", toast: ["Opened AirDrop", "Pick a nearby device"] },
+    { label: "Copy", icon: "copy", title: "Copy", toast: ["Copied Photo.jpg", "Paste in Finder to duplicate it"] },
+    { label: "Move", icon: "move", title: "Move", toast: ["Choose a folder", "Photo.jpg moves there"] },
+    { label: "Copy Path", icon: "path", title: "Copy Path", toast: ["Copied path", "~/Desktop/Photo.jpg"] },
+    { label: "Terminal", icon: "terminal", title: "Terminal", toast: ["Opened Terminal", "In the file's folder"] },
+  ]},
+};
+const G = { inner: 50, outer: 132, gap: 7, corner: 16, rim: 9 };
+
+// Builds one wheel's petals into `group`. Shared by the demo and the "How it works" illustration.
+function buildPetals(group, items, g, opts) {
+  const n = items.length, sweep = 2 * Math.PI / n, crowded = n > 8;
+  const labelR = (g.inner + g.outer) / 2 + (crowded ? 9 : 3);
+  const petals = [];
+  items.forEach((item, i) => {
+    const c = sweep * i;
+    const p = el("g", { class: "petal" }, group);
+    const d = wedgePath(c - sweep / 2, c + sweep / 2, g);
+    el("path", { class: "shape", d }, p);
+    el("path", { class: "gloss", d }, p);
+    if (opts && opts.labels === false) { petals.push(p); return; }
+    const [x, y] = pt(labelR, c);
+    const iconH = item.icon ? (crowded ? 15 : 17) : 0, textH = item.icon ? 9 : 12, spacing = item.icon ? 4 : 0;
+    const total = iconH + spacing + textH;
+    if (item.icon) {
+      const s = iconH / 24, iy = y - total / 2;
+      el("path", { class: "ico", d: ICONS[item.icon], transform: `translate(${(x - iconH / 2).toFixed(2)} ${iy.toFixed(2)}) scale(${s.toFixed(3)})` }, p);
+    }
+    const t = el("text", { x: x.toFixed(2), y: (y + total / 2 - textH / 2).toFixed(2), class: item.icon ? "small" : "" }, p);
+    t.textContent = item.label.toUpperCase();
+    t.dataset.max = Math.max(0, Math.min(74, 2 * labelR * Math.sin(sweep / 2) - 8)).toFixed(1);
+    petals.push(p);
+  });
+  return petals;
 }
-function updatePill() {
-  const wheel = WHEELS[current];
-  const text = svg.querySelector(".pill text");
-  if (text) text.textContent = `${wheel.title} → ${wheel.items[lit]}`;
+function fitLabels(svg) {
+  svg.querySelectorAll(".petal text").forEach(t => {
+    t.style.fontSize = "";
+    let w = 0;
+    try { w = t.getComputedTextLength(); } catch (_) { return; }
+    const max = Number(t.dataset.max) || 0;
+    if (w > max && w > 0) {
+      const base = parseFloat(getComputedStyle(t).fontSize) || 12;
+      t.style.fontSize = (base * Math.max(0.65, max / w)).toFixed(2) + "px";
+    }
+  });
 }
-function setLit(i) {
-  lit = i;
-  svg.querySelectorAll(".petal, .label").forEach(node => node.classList.toggle("lit", Number(node.dataset.i) === lit));
-  updatePill();
-}
-function choose(name, fromUser) {
-  current = name;
-  lit = 0;
-  userPicked = userPicked || fromUser;
-  document.querySelectorAll(".key").forEach(k => k.setAttribute("aria-pressed", String(k.dataset.set === name)));
-  draw();
-}
-function tick() {
-  const n = WHEELS[current].items.length;
-  if (lit + 1 < n) { setLit(lit + 1); return; }
-  if (userPicked) { setLit(0); return; }
-  const order = Object.keys(WHEELS);
-  choose(order[(order.indexOf(current) + 1) % order.length], false);
+function addDefs(svg) {
+  const defs = el("defs", {}, svg);
+  const lit = el("linearGradient", { id: svg.id + "-lit", x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+  el("stop", { offset: 0, "stop-color": "#4a85ff" }, lit);
+  el("stop", { offset: 1, "stop-color": "#2b62dc" }, lit);
+  const gloss = el("linearGradient", { id: svg.id + "-gloss", x1: 0, y1: 0, x2: 0, y2: 0.5 }, defs);
+  el("stop", { offset: 0, "stop-color": "#fff", "stop-opacity": 0.3 }, gloss);
+  el("stop", { offset: 1, "stop-color": "#fff", "stop-opacity": 0 }, gloss);
+  const disc = el("linearGradient", { id: svg.id + "-disc", x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+  el("stop", { offset: 0, "stop-color": "#4a4a52", "stop-opacity": 0.96 }, disc);
+  el("stop", { offset: 1, "stop-color": "#2b2b31", "stop-opacity": 0.96 }, disc);
+  const rim = el("linearGradient", { id: svg.id + "-rim", x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+  el("stop", { offset: 0, "stop-color": "#fff", "stop-opacity": 0.75 }, rim);
+  el("stop", { offset: 0.5, "stop-color": "#fff", "stop-opacity": 0.12 }, rim);
+  el("stop", { offset: 1, "stop-color": "#fff", "stop-opacity": 0.4 }, rim);
 }
 
-document.querySelectorAll(".key").forEach(k => k.addEventListener("click", () => choose(k.dataset.set, true)));
-svg.addEventListener("mousemove", event => {
-  const target = event.target.closest("[data-i]");
-  if (target) setLit(Number(target.dataset.i));
-});
-choose("convert", false);
-if (!reduceMotion) timer = setInterval(tick, 1100);
+// ---- "How it works" step 3: a small static wheel.
+(() => {
+  const svg = document.getElementById("mini-wheel");
+  if (!svg) return;
+  addDefs(svg);
+  const g = { inner: 22, outer: 62, gap: 4, corner: 8 };
+  el("circle", { r: 67, fill: `url(#${svg.id}-disc)`, stroke: `url(#${svg.id}-rim)`, "stroke-width": 1 }, svg);
+  const group = el("g", {}, svg);
+  const petals = buildPetals(group, WHEELS.convert.items.slice(0, 8), g, { labels: false });
+  petals.forEach((p, i) => {
+    const shape = p.querySelector(".shape");
+    const on = i === 2;
+    shape.setAttribute("fill", on ? `url(#${svg.id}-lit)` : "rgba(255,255,255,.12)");
+    shape.setAttribute("stroke", on ? "rgba(255,255,255,.55)" : "rgba(255,255,255,.35)");
+    shape.setAttribute("stroke-width", ".8");
+    p.querySelector(".gloss").remove();
+    if (on) p.setAttribute("style", "filter: drop-shadow(0 2px 8px rgba(61,123,253,.55))");
+  });
+  el("circle", { r: 18, fill: "rgba(61,123,253,.9)", stroke: "rgba(255,255,255,.5)", "stroke-width": .8 }, svg);
+  el("path", { d: "M36 -10 l0 22 l6 -5.5 l4 9.5 l4 -1.7 l-4 -9.3 l8 0 z", fill: "#fff", stroke: "#0a0a0b", "stroke-width": 1.4, "stroke-linejoin": "round" }, svg);
+})();
 
-// Point every download button at the newest DMG.
-fetch("https://api.github.com/repos/Manan-Santoki/OpenShelf/releases/latest")
-  .then(r => r.ok ? r.json() : null)
-  .then(release => {
-    if (!release) return;
-    const dmg = (release.assets || []).find(a => a.name.endsWith(".dmg"));
-    if (!dmg) return;
-    const version = release.tag_name.replace(/^v/, "");
-    document.querySelectorAll(".download-link").forEach(a => { a.href = dmg.browser_download_url; });
-    document.querySelectorAll(".download-label").forEach(s => { s.textContent = `Download v${version}`; });
-  })
-  .catch(() => {});
+// ---- The interactive demo.
+(() => {
+  const stage = document.getElementById("stage");
+  const card = document.getElementById("file");
+  const svg = document.getElementById("wheel");
+  if (!stage || !card || !svg) return;
+  const hint = document.getElementById("demo-hint");
+  const top = stage.querySelector(".stage-top");
+  const keysRow = stage.querySelector(".stage-keys");
+  const home = stage.querySelector(".home");
+  const rings = [...stage.querySelectorAll(".ring")];
+  const toast = document.getElementById("toast");
+  const toastTitle = document.getElementById("toast-title");
+  const toastSub = document.getElementById("toast-sub");
+  const sr = document.getElementById("demo-sr");
+  const keyBtns = [...stage.querySelectorAll(".wkey")];
+  const touchFirst = matchMedia("(hover: none)").matches;
+
+  const HINTS = {
+    idle: touchFirst ? 'Tap a wheel below, then a wedge' : 'Drag the file, then tap <kbd>⇧</kbd>',
+    dragging: 'Now tap <kbd>⇧</kbd> <span class="alt">Convert ·</span> <kbd>⇧⌥</kbd> <span class="alt">Tools ·</span> <kbd>⌃</kbd> <span class="alt">Actions</span>',
+    dragOpen: 'Let go on a wedge <span class="alt">· Esc cancels</span>',
+    held: 'Picked up. Tap <kbd>⇧</kbd>, <kbd>⇧⌥</kbd> or <kbd>⌃</kbd>',
+    keyOpen: '<kbd>←</kbd><kbd>→</kbd> choose <span class="alt">·</span> <kbd>↵</kbd> drop <span class="alt">·</span> <kbd>esc</kbd>',
+    tapOpen: 'Tap a wedge to run it',
+    nudge: 'Pick up the file first: drag it, or focus it and press Space',
+    touchDrag: 'Now tap a wheel below with another finger',
+  };
+
+  // Static wheel scaffolding (rebuilt petals per wheel).
+  addDefs(svg);
+  svg.setAttribute("viewBox", "-150 -182 300 332");
+  const disc = el("circle", { class: "disc", r: G.outer + G.rim, fill: "url(#wheel-disc)", stroke: "url(#wheel-rim)", "stroke-width": 1.2 }, svg);
+  const petalsG = el("g", {}, svg);
+  const hub = el("circle", { class: "hub", r: G.inner - 6 }, svg);
+  const hubIcon = el("path", { class: "ico", d: "", fill: "none", stroke: "#fff", "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round", transform: "translate(-13 -13) scale(1.083)" }, svg);
+  const pill = el("g", { class: "pill" }, svg);
+  const pillRect = el("rect", { y: -(G.outer + G.rim + 20) - 13, height: 26, rx: 13 }, pill);
+  const pillText = el("text", { x: 0, y: -(G.outer + G.rim + 20) }, pill);
+
+  const st = {
+    mode: "idle",          // idle | drag | held
+    wheel: null,           // convert | tools | actions | null
+    via: null,             // drag | held | tap
+    hi: null,
+    pointer: { x: 0, y: 0 },
+    cardPos: { x: 0, y: 0 },
+    grab: { x: 0, y: 0 },
+    center: { x: 0, y: 0 },
+    pointerId: null,
+    moved: false,
+    m: null,
+  };
+  let petals = [];
+  let toastTimer = 0;
+
+  function metrics() {
+    const W = stage.clientWidth, H = stage.clientHeight;
+    const topB = top.offsetHeight, keysT = keysRow.offsetTop;
+    const s = Math.max(0.72, Math.min(1.15, (W - 24) / 282, (keysT - topB - 14) / 330));
+    const homeY = topB + 8 + 182 * s;
+    return { W, H, s, home: { x: W / 2, y: homeY }, topB, keysT };
+  }
+  function placeCard(x, y, animate) {
+    st.cardPos = { x, y };
+    card.classList.toggle("returning", !!animate && !reduceMotion());
+    card.style.transform = `translate(${(x - 39).toFixed(1)}px, ${(y - 29).toFixed(1)}px)`;
+  }
+  function layout() {
+    st.m = metrics();
+    home.style.transform = `translate(${(st.m.home.x - 43).toFixed(1)}px, ${(st.m.home.y - 33).toFixed(1)}px)`;
+    rings.forEach((r, i) => {
+      const d = (i === 0 ? (G.outer + G.rim) * 2 : G.inner * 2 + 12) * st.m.s;
+      r.style.width = r.style.height = d.toFixed(1) + "px";
+      r.style.transform = `translate(${(st.m.home.x - d / 2).toFixed(1)}px, ${(st.m.home.y - d / 2).toFixed(1)}px)`;
+    });
+    if (st.mode !== "drag") placeCard(st.m.home.x, st.m.home.y, false);
+    if (st.wheel) positionWheel();
+  }
+  function setHint(key) { hint.innerHTML = HINTS[key] || ""; }
+  function say(text) { sr.textContent = ""; setTimeout(() => { sr.textContent = text; }, 30); }
+
+  function buildWheel(name) {
+    petalsG.textContent = "";
+    petals = buildPetals(petalsG, WHEELS[name].items, G);
+    fitLabels(svg);
+  }
+  function positionWheel() {
+    const m = st.m, s = m.s, R = (G.outer + G.rim) * s;
+    let cx = st.center.x, cy = st.center.y;
+    cx = Math.min(Math.max(cx, R + 8), m.W - R - 8);
+    cy = Math.min(Math.max(cy, m.topB + 182 * s + 4), m.keysT - R - 6);
+    if (m.W - 2 * R - 16 < 0) cx = m.W / 2;
+    st.center = { x: cx, y: cy };
+    svg.style.width = (300 * s) + "px";
+    svg.style.height = (332 * s) + "px";
+    svg.style.left = (cx - 150 * s) + "px";
+    svg.style.top = (cy - 182 * s) + "px";
+  }
+  function setPill(text) {
+    pillText.textContent = text;
+    let w = 0;
+    try { w = pillText.getComputedTextLength(); } catch (_) {}
+    w = Math.max(60, (w || text.length * 7) + 26);
+    pillRect.setAttribute("x", (-w / 2).toFixed(1));
+    pillRect.setAttribute("width", w.toFixed(1));
+  }
+  function setHi(i) {
+    if (!st.wheel) return;
+    if (i === st.hi) return;
+    st.hi = i;
+    petals.forEach((p, j) => p.classList.toggle("on", j === i));
+    svg.classList.toggle("has-on", i !== null);
+    const item = i === null ? null : WHEELS[st.wheel].items[i];
+    setPill(item ? item.title : `${WHEELS[st.wheel].name} · 2.4 MB`);
+    hubIcon.setAttribute("d", item && item.icon ? ICONS[item.icon] : "");
+    if (item && st.via !== "drag") say(`${item.title}, ${i + 1} of ${WHEELS[st.wheel].items.length}`);
+  }
+  function openWheel(name) {
+    if (!WHEELS[name]) return;
+    const same = st.wheel === name;
+    if (!st.m) layout();
+    st.via = st.mode === "drag" ? "drag" : st.mode === "held" ? "held" : "tap";
+    if (!same) { buildWheel(name); st.hi = -1; }
+    st.wheel = name;
+    if (st.via === "drag") st.center = { ...st.pointer };
+    else st.center = { ...st.m.home };
+    if (st.via !== "drag") placeCard(st.m.home.x, st.m.home.y, true);
+    positionWheel();
+    if (!same) setHi(null);
+    else { const h = st.hi; st.hi = -1; setHi(h); }
+    svg.classList.add("open");
+    stage.classList.add("wheel-open");
+    keyBtns.forEach(b => b.setAttribute("aria-pressed", String(b.dataset.wheel === name)));
+    hideToast();
+    setHint(st.via === "drag" ? "dragOpen" : st.via === "held" ? "keyOpen" : (touchFirst ? "tapOpen" : "keyOpen"));
+    if (st.via !== "drag" && !touchFirst && st.via === "tap") hint.innerHTML = 'Click a wedge, or use <kbd>←</kbd><kbd>→</kbd> and <kbd>↵</kbd>';
+    if (!same) say(`${WHEELS[name].name} wheel open, ${WHEELS[name].items.length} options. ${st.via === "drag" ? "Move onto a wedge and let go." : "Use the arrow keys to choose and Return to drop, or Escape to cancel."}`);
+  }
+  function closeWheel() {
+    st.wheel = null; st.hi = null; st.via = null;
+    svg.classList.remove("open", "has-on");
+    stage.classList.remove("wheel-open");
+    keyBtns.forEach(b => b.setAttribute("aria-pressed", "false"));
+  }
+  function putDown(animate) {
+    st.mode = "idle";
+    st.pointerId = null;
+    card.classList.remove("lifted", "held");
+    card.setAttribute("aria-pressed", "false");
+    stage.classList.remove("lifted");
+    if (!st.m) layout();
+    placeCard(st.m.home.x, st.m.home.y, animate);
+  }
+  function cancel() {
+    const was = st.wheel || st.mode !== "idle";
+    closeWheel();
+    putDown(true);
+    setHint("idle");
+    if (was) say("Cancelled. The file is back where it was.");
+  }
+  function run(i) {
+    if (!st.wheel || i === null || i < 0) return;
+    const item = WHEELS[st.wheel].items[i];
+    setHi(i);
+    const finish = () => {
+      closeWheel();
+      putDown(true);
+      setHint("idle");
+      showToast(item.toast[0], item.toast[1]);
+    };
+    if (reduceMotion()) finish(); else setTimeout(finish, 140);
+  }
+  function showToast(title, sub) {
+    clearTimeout(toastTimer);
+    toastTitle.textContent = title;
+    toastSub.textContent = sub || "";
+    toast.classList.add("show");
+    toastTimer = setTimeout(hideToast, 3200);
+  }
+  function hideToast() { clearTimeout(toastTimer); toast.classList.remove("show"); }
+
+  function local(e) {
+    const r = stage.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+  function wedgeAt(p) {
+    if (!st.wheel) return null;
+    const s = st.m.s, dx = (p.x - st.center.x) / s, dy = (p.y - st.center.y) / s;
+    const d = Math.hypot(dx, dy);
+    if (d < G.inner || d > G.outer + G.rim) return null;
+    const n = WHEELS[st.wheel].items.length, sweep = 2 * Math.PI / n;
+    let a = Math.atan2(dx, -dy);
+    if (a < 0) a += 2 * Math.PI;
+    return Math.floor((a + sweep / 2) / sweep) % n;
+  }
+
+  // Mouse, pen and touch dragging of the file card.
+  card.addEventListener("pointerdown", e => {
+    if (e.button !== 0 && e.pointerType === "mouse") return;
+    if (st.mode === "drag") return;
+    e.preventDefault();
+    if (st.wheel) closeWheel();
+    if (!st.m) layout();
+    const p = local(e);
+    st.mode = "drag";
+    st.pointerId = e.pointerId;
+    st.moved = false;
+    st.pointer = p;
+    st.grab = { x: p.x - st.cardPos.x, y: p.y - st.cardPos.y };
+    try { card.setPointerCapture(e.pointerId); } catch (_) {}
+    card.classList.remove("held");
+    card.classList.add("lifted");
+    stage.classList.add("lifted");
+    placeCard(st.cardPos.x, st.cardPos.y, false);
+    hideToast();
+    setHint(e.pointerType === "touch" ? "touchDrag" : "dragging");
+  });
+  card.addEventListener("pointermove", e => {
+    if (st.mode !== "drag" || e.pointerId !== st.pointerId) return;
+    const p = local(e);
+    if (Math.hypot(p.x - st.pointer.x, p.y - st.pointer.y) > 2) st.moved = true;
+    st.pointer = p;
+    const x = Math.min(Math.max(p.x - st.grab.x, 20), st.m.W - 20);
+    const y = Math.min(Math.max(p.y - st.grab.y, 20), st.m.H - 20);
+    placeCard(x, y, false);
+    if (st.wheel) setHi(wedgeAt(p));
+  });
+  const endDrag = e => {
+    if (st.mode !== "drag" || e.pointerId !== st.pointerId) return;
+    try { card.releasePointerCapture(e.pointerId); } catch (_) {}
+    if (e.type === "pointerup" && st.wheel && st.hi !== null && st.hi >= 0) { run(st.hi); return; }
+    const hadWheel = !!st.wheel;
+    closeWheel();
+    putDown(true);
+    setHint("idle");
+    if (hadWheel) say("Dropped outside the wheel. Nothing happened.");
+  };
+  card.addEventListener("pointerup", endDrag);
+  card.addEventListener("pointercancel", endDrag);
+  card.addEventListener("lostpointercapture", e => { if (st.mode === "drag" && e.pointerId === st.pointerId) endDrag({ type: "pointercancel", pointerId: e.pointerId }); });
+  stage.addEventListener("contextmenu", e => e.preventDefault());
+
+  // Tap / click mode: wheel opened from a button, wedges are clicked or tapped.
+  stage.addEventListener("pointermove", e => {
+    if (st.via !== "tap" || st.mode === "drag" || e.pointerType !== "mouse") return;
+    setHi(wedgeAt(local(e)));
+  });
+  stage.addEventListener("click", e => {
+    if (st.via !== "tap" || st.mode === "drag") return;
+    if (e.target.closest(".wkey, .file")) return;
+    const p = local(e);
+    const i = wedgeAt(p);
+    if (i !== null) { run(i); return; }
+    const dx = p.x - st.center.x, dy = p.y - st.center.y;
+    if (Math.hypot(dx, dy) > (G.outer + G.rim) * st.m.s) cancel();
+  });
+
+  document.addEventListener("pointerdown", e => {
+    if (st.wheel && st.via !== "drag" && !stage.contains(e.target)) cancel();
+  });
+
+  keyBtns.forEach(btn => btn.addEventListener("click", () => {
+    const name = btn.dataset.wheel;
+    if (st.wheel === name && st.via !== "drag") { cancel(); return; }
+    openWheel(name);
+  }));
+
+  // Keys: modifiers open wheels while the file is held; arrows/Return/Esc drive an open wheel.
+  function wheelForKey(e) {
+    if (e.key === "Shift" || e.key === "Alt" || e.key === "Control") {
+      if (e.shiftKey && e.altKey) return "tools";
+      if (e.key === "Shift") return "convert";
+      if (e.key === "Control") return "actions";
+    }
+    return null;
+  }
+  function demoHasFocus() { return stage.contains(document.activeElement); }
+  document.addEventListener("keydown", e => {
+    const held = st.mode === "drag" || st.mode === "held";
+    const name = wheelForKey(e);
+    if (name) {
+      if (e.repeat) return;
+      if (held) { e.preventDefault(); openWheel(name); }
+      else if (!st.wheel && (stage.matches(":hover") || document.activeElement === card)) { setHint("nudge"); }
+      return;
+    }
+    const engaged = st.wheel && (st.mode !== "idle" || demoHasFocus() || stage.matches(":hover"));
+    if (st.wheel && engaged) {
+      const n = WHEELS[st.wheel].items.length;
+      const cur = st.hi === null || st.hi < 0 ? null : st.hi;
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); if (st.via === "drag") st.via = "held"; setHi(cur === null ? 0 : (cur + 1) % n); return; }
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); if (st.via === "drag") st.via = "held"; setHi(cur === null ? n - 1 : (cur - 1 + n) % n); return; }
+      if (e.key === "Enter") { e.preventDefault(); if (cur !== null) run(cur); else say("Choose a wedge with the arrow keys first."); return; }
+      if (e.key === "Escape") { e.preventDefault(); cancel(); return; }
+    }
+    if (e.key === "Escape" && st.mode !== "idle") { e.preventDefault(); cancel(); }
+  });
+  card.addEventListener("keydown", e => {
+    if (e.key !== " " && e.key !== "Spacebar") return;
+    e.preventDefault();
+    if (e.repeat) return;
+    if (st.mode === "idle") {
+      if (st.wheel) closeWheel();
+      if (!st.m) layout();
+      st.mode = "held";
+      card.classList.add("lifted", "held");
+      card.setAttribute("aria-pressed", "true");
+      placeCard(st.m.home.x, st.m.home.y, false);
+      hideToast();
+      setHint("held");
+      say("Picked up Photo.jpg. Press Shift for Convert, Shift Option for Tools, or Control for Actions.");
+    } else if (st.mode === "held" && !st.wheel) {
+      cancel();
+    }
+  });
+  stage.addEventListener("focusout", e => {
+    if (st.mode === "held" && !stage.contains(e.relatedTarget)) cancel();
+  });
+  window.addEventListener("blur", () => { if (st.mode === "drag") cancel(); });
+  let lastW = stage.clientWidth;
+  window.addEventListener("resize", () => {
+    const w = stage.clientWidth;
+    if (w !== lastW && st.mode === "drag") cancel();
+    lastW = w;
+    layout();
+  });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { layout(); if (st.wheel) fitLabels(svg); }).catch(() => {});
+
+  setHint("idle");
+  layout();
+
+  // Test hook for headless checks (no effect on visitors).
+  window.__demo = { st, openWheel, run, wedgeAt, cancel, setHi, layout };
+})();
+})();
 </script>
 </body>
 </html>
