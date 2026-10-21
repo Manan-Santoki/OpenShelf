@@ -10,6 +10,8 @@ final class WheelModel {
     var highlighted: WheelItem?
     /// What the hub shows while no wedge is hovered, e.g. "1.2 MB" or "3 files".
     var dragSummary = ""
+    /// A short instruction that replaces the label for a moment.
+    var hint: String?
     var isPresented = false
 }
 
@@ -33,6 +35,7 @@ final class WheelController {
     /// catch the drop at mouse-up so it can't land somewhere else.
     private var isAbsorbingDrop = false
     private var followTask: Task<Void, Never>?
+    private var hintTask: Task<Void, Never>?
 
     /// Shows `items` around `location`, or swaps them in place if the wheel is
     /// already open (e.g. when ⌥ is added to switch from Convert to Tools).
@@ -42,6 +45,7 @@ final class WheelController {
         model.items = items
         model.highlighted = nil
         model.dragSummary = ""
+        model.hint = nil
         summarizedURLs = []
         hasHoverReading = false
         endAbsorbingDrop()
@@ -72,6 +76,18 @@ final class WheelController {
             try? await Task.sleep(for: .milliseconds(160))
             guard !Task.isCancelled else { return }
             panel.orderOut(nil)
+        }
+    }
+
+    /// Shows a short instruction in the wheel's label for a moment.
+    func showHint(_ text: String) {
+        guard model.isPresented, model.hint != text else { return }
+        model.hint = text
+        hintTask?.cancel()
+        hintTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            self?.model.hint = nil
         }
     }
 

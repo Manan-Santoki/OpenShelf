@@ -22,6 +22,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         dragMonitor.onStep = { [weak self] direction in
             self?.wheel.step(direction)
         }
+        dragMonitor.onArrowsBlocked = { [weak self] in
+            self?.wheel.showHint("Let go of ⌃ or ⌘, then use the arrow keys")
+        }
         dragMonitor.onConfirm = { [weak self] urls in
             self?.wheel.confirmHighlighted(with: urls) ?? false
         }

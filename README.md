@@ -57,10 +57,12 @@ any app that lets you drag files, and **keep holding** while you tap a key.
    - **⇧ Shift** opens the **Convert** wheel
    - **⇧⌥ Shift-Option** opens the **Tools** wheel (or add ⌥ after ⇧ to switch)
    - **⌃ Control** opens the **Actions** wheel
-3. Move onto a wedge. It lights up and the centre shows what will happen; before
-   you hover, the centre shows the file's size.
+3. Move onto a wedge. It lights up and the label above the wheel shows what will
+   happen; before you hover, it shows the file's size.
 4. Let go on the wedge. Releasing anywhere else, or pressing **Esc**, cancels.
-   Or use the arrow keys and Return while still dragging.
+   Or, while still dragging, let go of the key and use the arrow keys and
+   Return. (⌃ or ⌘ plus an arrow is a macOS shortcut, ⌃→ switches desktops,
+   so the arrows wait until those keys are up.)
 
 Tip: on a trackpad, press the key *after* the drag has started. Holding ⌃
 before you click turns the click into a right-click.
@@ -145,7 +147,8 @@ any time, and drag them out to any app or folder when you need them.
 
 OpenShelf checks GitHub for new versions once a day (it asks the first time).
 When one is out you'll see its release notes and an **Install Update** button;
-the app restarts on the new version. You can also choose **Check for Updates…**
+the app restarts on the new version. Closing the window means "later"; it will
+remind you again. You can also choose **Check for Updates…**
 from the menu bar, or turn automatic checks and installs on or off in Settings.
 
 ### Settings

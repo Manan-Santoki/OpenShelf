@@ -33,6 +33,11 @@ struct WheelView: View {
 
             HubView(title: hubTitle, isActive: model.highlighted != nil)
                 .frame(width: (geometry.innerRadius - 6) * 2, height: (geometry.innerRadius - 6) * 2)
+
+            // The dragged file's thumbnail sits over the hub, so the same label
+            // also floats above the rim where nothing covers it.
+            LabelPill(text: model.hint ?? hubTitle, isActive: model.highlighted != nil && model.hint == nil)
+                .offset(y: -(geometry.outerRadius + rimWidth + 20))
         }
         .frame(width: WheelGeometry.panelSide, height: WheelGeometry.panelSide)
         .scaleEffect(model.isPresented || reduceMotion ? 1 : 0.4)
@@ -43,6 +48,30 @@ struct WheelView: View {
 
     private var hubTitle: String {
         model.highlighted?.title ?? (model.dragSummary.isEmpty ? "Drop" : model.dragSummary)
+    }
+}
+
+/// The current label above the wheel: file size, the hovered action, or a hint.
+private struct LabelPill: View {
+    let text: String
+    let isActive: Bool
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 12, weight: .semibold))
+            .lineLimit(1)
+            .contentTransition(.interpolate)
+            .foregroundStyle(isActive ? Color.white : Color.primary)
+            .padding(.horizontal, 12)
+            .frame(height: 26)
+            .background {
+                Capsule()
+                    .fill(isActive ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.regularMaterial))
+                    .overlay(Capsule().strokeBorder(.white.opacity(0.4), lineWidth: 0.8))
+                    .shadow(color: .black.opacity(0.18), radius: 6, y: 2)
+            }
+            .fixedSize()
+            .accessibilityHidden(true)
     }
 }
 

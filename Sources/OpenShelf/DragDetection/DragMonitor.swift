@@ -16,6 +16,8 @@ final class DragMonitor {
     var onDragEnded: (() -> Void)?
     /// Called when an arrow key moves the open wheel's highlight.
     var onStep: ((WheelStepDirection) -> Void)?
+    /// Called when an arrow is pressed while ⌃ or ⌘ is still held.
+    var onArrowsBlocked: (() -> Void)?
     /// Called when Return is pressed with a wheel open, with the dragged files.
     /// Returns whether something ran; if so, the rest of the drag is ignored.
     var onConfirm: (([URL]) -> Bool)?
@@ -103,10 +105,19 @@ final class DragMonitor {
     /// Arrow keys step the highlight (with auto-repeat); Return runs it.
     private func pollWheelKeys() {
         let now = ContinuousClock.now
-        if clockwiseKey.update(isDown: isKeyDown(kVK_RightArrow) || isKeyDown(kVK_DownArrow), at: now) {
+        var clockwise = isKeyDown(kVK_RightArrow) || isKeyDown(kVK_DownArrow)
+        var counterClockwise = isKeyDown(kVK_LeftArrow) || isKeyDown(kVK_UpArrow)
+        // ⌃ or ⌘ with an arrow is a system shortcut (⌃→ switches desktops), so
+        // arrows only count once those keys are released.
+        if !NSEvent.modifierFlags.intersection([.control, .command]).isEmpty {
+            if clockwise || counterClockwise { onArrowsBlocked?() }
+            clockwise = false
+            counterClockwise = false
+        }
+        if clockwiseKey.update(isDown: clockwise, at: now) {
             onStep?(.clockwise)
         }
-        if counterClockwiseKey.update(isDown: isKeyDown(kVK_LeftArrow) || isKeyDown(kVK_UpArrow), at: now) {
+        if counterClockwiseKey.update(isDown: counterClockwise, at: now) {
             onStep?(.counterClockwise)
         }
         let isReturnDown = isKeyDown(kVK_Return) || isKeyDown(kVK_ANSI_KeypadEnter)

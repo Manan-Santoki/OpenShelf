@@ -5,8 +5,8 @@ import CoreGraphics
 struct WheelGeometry {
     static let outerRadius: CGFloat = 132
     static let innerRadius: CGFloat = 50
-    /// Extra room around the wheel for its rim and shadow.
-    static let margin: CGFloat = 20
+    /// Room around the wheel for its rim, shadow and the label above it.
+    static let margin: CGFloat = 48
     static var panelSide: CGFloat { (outerRadius + margin) * 2 }
 
     var wedgeCount: Int
