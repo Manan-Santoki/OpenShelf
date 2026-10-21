@@ -10,6 +10,11 @@ import Carbon.HIToolbox
 /// comes back up; a drag is in progress while the button is down and the drag
 /// pasteboard has changed since before it went down. Between drags nothing runs
 /// but a slow fallback check, so the app costs nothing while idle.
+///
+/// The wheel's keys are read from the global key state, since they're usually
+/// typed while another app is frontmost. When OpenShelf itself has keyboard
+/// focus (a shelf was clicked last), they also arrive as events; those are
+/// taken out of the event stream so Return doesn't also open a shelf's files.
 @MainActor
 final class DragMonitor {
     /// Called with the wheel to show, the pointer location in screen coordinates
@@ -44,6 +49,19 @@ final class DragMonitor {
     /// Set once Return has run a wedge, so later keys and triggers in the same
     /// drag do nothing.
     private var didConfirm = false
+    /// Set once a trigger has opened a wheel during this press. From then until
+    /// the button comes up, the wheel's keys never reach OpenShelf's own windows,
+    /// even after Return or Esc has closed the wheel.
+    private var ownsWheelKeys = false
+    /// Wheel keys that arrived as events since the last reading, so a press
+    /// counts even if it was let go before the next poll looked.
+    private var keysPressedSinceLastPoll: Set<Int> = []
+
+    /// Arrows, Return, Enter and Esc: the keys that drive an open wheel.
+    private static let wheelKeyCodes: Set<Int> = [
+        kVK_LeftArrow, kVK_RightArrow, kVK_UpArrow, kVK_DownArrow,
+        kVK_Return, kVK_ANSI_KeypadEnter, kVK_Escape,
+    ]
 
     /// How long a held modifier combination must stay steady before it counts,
     /// so that pressing ⇧ on the way to ⇧⌥ does not flash the wrong wheel. A
@@ -69,6 +87,12 @@ final class DragMonitor {
         if let monitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown, handler: { [weak self] event in
             MainActor.assumeIsolated { self?.followPress() }
             return event
+        }) {
+            eventMonitors.append(monitor)
+        }
+        if let monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp], handler: { [weak self] event in
+            let isWheelKey = MainActor.assumeIsolated { self?.takeWheelKey(event) ?? false }
+            return isWheelKey ? nil : event
         }) {
             eventMonitors.append(monitor)
         }
@@ -118,8 +142,21 @@ final class DragMonitor {
         activity = nil
     }
 
+    /// Takes a wheel key event meant for one of OpenShelf's windows while a
+    /// drag's wheel owns the keyboard, remembering presses for the next poll.
+    /// Returns whether the event was taken.
+    private func takeWheelKey(_ event: NSEvent) -> Bool {
+        let keyCode = Int(event.keyCode)
+        guard ownsWheelKeys, followTask != nil, Self.wheelKeyCodes.contains(keyCode) else { return false }
+        if event.type == .keyDown, !event.isARepeat {
+            keysPressedSinceLastPoll.insert(keyCode)
+        }
+        return true
+    }
+
     /// One reading while the button is down. Returns false once it's released.
     private func poll() -> Bool {
+        defer { keysPressedSinceLastPoll.removeAll() }
         guard NSEvent.pressedMouseButtons & 1 == 1 else {
             if activeWheel != nil { onDragEnded?() }
             return false
@@ -147,6 +184,7 @@ final class DragMonitor {
            let wheel = TriggerMatcher(triggers: preferences.triggers).wheel(for: flags),
            wheel != activeWheel {
             activeWheel = wheel
+            ownsWheelKeys = true
             onTrigger?(wheel, NSEvent.mouseLocation, draggedFileURLs)
         }
         return true
@@ -178,7 +216,8 @@ final class DragMonitor {
     }
 
     private func isKeyDown(_ keyCode: Int) -> Bool {
-        CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(keyCode))
+        keysPressedSinceLastPoll.contains(keyCode)
+            || CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(keyCode))
     }
 
     private var isDraggingFiles: Bool {
@@ -198,5 +237,7 @@ final class DragMonitor {
         counterClockwiseKey = KeyRepeat()
         wasReturnDown = false
         didConfirm = false
+        ownsWheelKeys = false
+        keysPressedSinceLastPoll = []
     }
 }

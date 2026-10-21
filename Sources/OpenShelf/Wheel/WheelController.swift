@@ -133,7 +133,11 @@ final class WheelController {
     /// Runs the highlighted wedge on `urls`, as if they were dropped on it, and
     /// hides the wheel. Returns false when nothing is highlighted.
     func confirmHighlighted(with urls: [URL]) -> Bool {
-        guard model.isPresented, !isAbsorbingDrop, let item = model.highlighted, !urls.isEmpty else { return false }
+        guard model.isPresented, !isAbsorbingDrop, !urls.isEmpty else { return false }
+        guard let item = model.highlighted else {
+            showHint("Choose a wedge with the arrow keys")
+            return false
+        }
         absorbNextDrop()
         onDrop?(item, urls)
         return true
