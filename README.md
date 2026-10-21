@@ -22,12 +22,15 @@ the file on a wedge and it's done, saved right next to the original.
   any app, Quick Look (Space), dock to the left/right screen edge, multiple shelves
 - Works system-wide with **no Accessibility permission**
 - No telemetry; the only network access is checking GitHub for updates, which
-  you can turn off
+  you can turn off, and downloading an extra tool when you click Install
 - **Updates itself:** new versions install from the app (Sparkle), signed so
   only genuine OpenShelf releases are accepted
+- **Extra formats, one click away:** ffmpeg adds MP3, OGG, WebP, MKV, WebM,
+  AVI and WMV; LibreOffice adds PowerPoint, XLS and ODS. Install either from
+  Settings → Extra formats (no Homebrew or administrator needed), or use the
+  copies you already have from Homebrew
 
-See [docs/SPEC.md](docs/SPEC.md) for the full behaviour and roadmap. Optional:
-`brew install ffmpeg webp` adds MP3, GIF and WebP output.
+See [docs/SPEC.md](docs/SPEC.md) for the full behaviour and roadmap.
 
 ## Install
 
@@ -93,14 +96,14 @@ A small card next to the pointer shows progress; click its **×** to cancel.
 
 | Drag a… | Convert to |
 |---|---|
-| Image (JPG, PNG, HEIC, SVG, …) | PNG, JPG, WEBP, HEIC, TIFF, AVIF, BMP, PDF, DOCX, ZIP |
+| Image (JPG, PNG, HEIC, SVG, …) | PNG, JPG, WEBP², HEIC, TIFF, AVIF, BMP, PDF, DOCX, ZIP |
 | PDF | DOCX, JPG, PNG, TXT, Markdown, EPUB, PPTX, XLSX, ZIP |
 | Document (TXT, RTF, RTFD, DOCX, DOC, ODT, HTML, Markdown) | PDF, DOCX, TXT, Markdown, EPUB, HTML, RTF, ZIP |
 | Spreadsheet (CSV, TSV, XLSX) | XLSX, CSV, TSV, PDF, ODS¹, ZIP |
 | Spreadsheet (XLS, ODS)¹ | XLSX, CSV, PDF, ODS, ZIP |
 | Slides (PPTX, PPT, ODP)¹ | PDF, JPG, PNG (one image per slide), ZIP |
 | Audio (MP3, M4A, WAV, AIFF, FLAC, OGG², Opus², WMA², …) | MP3², M4A, WAV, AIFF, FLAC, OGG², Opus², WMA², ZIP |
-| Video (MP4, MOV, MKV², WebM², AVI², WMV², …) | MP4, MOV, M4A, GIF², MP3², MKV², WebM², AVI², WMV², ZIP |
+| Video (MP4, MOV, MKV², WebM², AVI², WMV², …) | MP4, MOV, M4A, GIF, MP3², MKV², WebM², AVI², WMV², ZIP |
 | Subtitles (SRT, VTT) | TXT, SRT, VTT, ZIP |
 | Archive (ZIP, TAR, GZ, 7Z, RAR) | Unzip into a folder |
 | Folder or anything else | ZIP, TAR, TAR.GZ |
@@ -109,11 +112,19 @@ Drag several files at once to convert them all; mixed selections show only the
 formats every file supports. Several files sent to ZIP, TAR or TAR.GZ go into
 one archive.
 
-¹ Needs LibreOffice: `brew install --cask libreoffice`. Without it, those wedges
-are hidden. Keynote files can't be converted.
-² Needs ffmpeg: `brew install ffmpeg` (`brew install webp` also adds WebP).
-Formats macOS can't play itself (OGG, Opus, WMA, MKV, WebM, AVI, WMV) are only
-offered when ffmpeg is installed. Apple's Pages format isn't offered.
+¹ Needs LibreOffice. ² Needs ffmpeg (`brew install webp` also adds WebP).
+
+Both are free and optional. Install them from **Settings → Extra formats**: one
+click downloads the official build (ffmpeg from
+[ffmpeg.martin-riedl.de](https://ffmpeg.martin-riedl.de), LibreOffice from
+[libreoffice.org](https://www.libreoffice.org)), checks its checksum and its
+publisher's code signature, and installs it for you alone, without an
+administrator password. Copies from Homebrew (`brew install ffmpeg`,
+`brew install --cask libreoffice`) are used too and take precedence. Without
+them those wedges are hidden, and dragging a file only they can open (an MKV,
+a PowerPoint deck) says which one it needs. GIFs from video are made without
+ffmpeg, though it makes slightly cleaner ones when installed. Keynote files
+can't be converted, and Apple's Pages format isn't offered.
 
 ### Tools (⇧⌥)
 
@@ -180,10 +191,16 @@ from the menu bar, or turn automatic checks and installs on or off in Settings.
 ### Settings
 
 Click the OpenShelf wheel in the menu bar → **Settings…** to change the key for
-each wheel, remove files from a shelf after dragging them out, restore shelves
-at launch, hide docked shelves at the screen edge, control updates, or open
-OpenShelf at login. **How to Use OpenShelf** in the same menu shows the welcome
-guide again.
+each wheel, install or remove the extra formats (ffmpeg and LibreOffice), remove
+files from a shelf after dragging them out, restore shelves at launch, hide
+docked shelves at the screen edge, control updates, or open OpenShelf at login.
+**How to Use OpenShelf** in the same menu shows the welcome guide again.
+
+ffmpeg and ffprobe that OpenShelf installs live in
+`~/Library/Application Support/OpenShelf/Tools`; LibreOffice goes to
+`~/Applications`. Remove in Settings deletes them (LibreOffice goes to the
+Trash). They aren't updated automatically: OpenShelf only goes online for them
+when you click Install.
 
 ## Tech stack
 
@@ -220,6 +237,7 @@ Sources/OpenShelf/
   DragDetection/  system-wide drag + modifier detection
   Wheel/          wheel items, geometry, overlay panel, SwiftUI rendering
   Convert/        format catalog, converters, progress runner
+  Install/        downloading, checking and installing ffmpeg and LibreOffice
   Tools/          tool list, launcher, editor window host
   Tools/Editors/  image editors (crop, add background, annotate, …)
   Tools/PDF/      PDF tools (combine, pages, split, compress, metadata)
