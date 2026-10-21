@@ -37,6 +37,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.wheel.confirmHighlighted(with: urls) ?? false
         }
         wheel.prepare()
+        // Detecting tools also starts learning ffmpeg's encoders in the
+        // background, so the first wheel knows whether to offer WebP.
+        _ = ExternalTools.current
         dragMonitor.start()
         Updater.shared.start()
         if Preferences.shared.restoresShelves {

@@ -7,7 +7,10 @@ struct ExternalTools: Equatable, Sendable {
     var ffprobe: URL? = nil
     var libreOffice: URL? = nil
 
-    var canEncodeWebP: Bool { cwebp != nil || ffmpeg != nil }
+    /// Never runs ffmpeg: see `WebPEncoder.isOffered`.
+    var canEncodeWebP: Bool {
+        WebPEncoder.isOffered(cwebp: cwebp, ffmpeg: ffmpeg, ffmpegEncoders: ffmpeg.flatMap(FFmpegEncoders.known))
+    }
 
     /// What's installed, as last detected. Detection is a few file checks and
     /// never runs a tool, so it's simply repeated once the answer is a few
@@ -22,6 +25,8 @@ struct ExternalTools: Equatable, Sendable {
             let tools = detect()
             cache.tools = tools
             cache.detectedAt = now
+            // Learn what this ffmpeg can encode before a wheel needs to know.
+            FFmpegEncoders.warm(tools.ffmpeg)
             return tools
         }
     }

@@ -128,24 +128,82 @@ enum MediaFormats {
 }
 
 /// The encoders an ffmpeg build offers, asked once per binary.
+///
+/// Asking means running `ffmpeg -encoders`, which the wheel can't wait for, so
+/// `warm(_:)` asks in the background as soon as ffmpeg is detected (at launch,
+/// and whenever detection finds a different binary), and the wheel only reads
+/// what's already `known(in:)`.
 enum FFmpegEncoders {
     private final class Cache: @unchecked Sendable {
         let lock = NSLock()
         var encoders: [String: Set<String>] = [:]
+        var asking: Set<String> = []
     }
     private static let cache = Cache()
 
+    /// The encoders `ffmpeg` offers, running it the first time. Blocks; use
+    /// `load(_:)` from async code that mustn't hold up a thread.
     static func available(in ffmpeg: URL) -> Set<String> {
-        if let known = cache.lock.withLock({ cache.encoders[ffmpeg.path] }) { return known }
-        let output = MediaProbe.runSync(ffmpeg, ["-hide_banner", "-encoders"]) ?? ""
-        // Lines look like " A....D libopus   libopus Opus (codec opus)".
-        let names = Set(output.split(separator: "\n").compactMap { line -> String? in
+        let key = identity(of: ffmpeg)
+        if let known = cache.lock.withLock({ cache.encoders[key] }) { return known }
+        let names = parse(MediaProbe.runSync(ffmpeg, ["-hide_banner", "-encoders"]) ?? "")
+        cache.lock.withLock {
+            cache.encoders[key] = names
+            cache.asking.remove(key)
+        }
+        return names
+    }
+
+    /// `available(in:)` on a background thread.
+    static func load(_ ffmpeg: URL) async -> Set<String> {
+        await Task.detached(priority: .userInitiated) { available(in: ffmpeg) }.value
+    }
+
+    /// What `ffmpeg` is known to offer, or nil if it hasn't been asked yet.
+    /// Never starts a process, so it's safe while building a wheel.
+    static func known(in ffmpeg: URL) -> Set<String>? {
+        let key = identity(of: ffmpeg)
+        return cache.lock.withLock { cache.encoders[key] }
+    }
+
+    /// Starts asking `ffmpeg` in the background unless the answer is known or
+    /// already on its way.
+    static func warm(_ ffmpeg: URL?) {
+        guard let ffmpeg else { return }
+        let key = identity(of: ffmpeg)
+        let isNeeded: Bool = cache.lock.withLock {
+            guard cache.encoders[key] == nil, !cache.asking.contains(key) else { return false }
+            cache.asking.insert(key)
+            return true
+        }
+        guard isNeeded else { return }
+        Task.detached(priority: .utility) { _ = available(in: ffmpeg) }
+    }
+
+    /// Stores what `ffmpeg` offers without running it: for tests.
+    static func record(_ encoders: Set<String>, for ffmpeg: URL) {
+        let key = identity(of: ffmpeg)
+        cache.lock.withLock { cache.encoders[key] = encoders }
+    }
+
+    /// Encoder names from `ffmpeg -encoders`, whose lines look like
+    /// " A....D libopus   libopus Opus (codec opus)", after a legend
+    /// (" V..... = Video").
+    static func parse(_ output: String) -> Set<String> {
+        Set(output.split(separator: "\n").compactMap { line -> String? in
             let fields = line.split(separator: " ", omittingEmptySubsequences: true)
-            guard fields.count >= 2, fields[0].count == 6 else { return nil }
+            guard fields.count >= 2, fields[0].count == 6, fields[1] != "=" else { return nil }
             return String(fields[1])
         })
-        cache.lock.withLock { cache.encoders[ffmpeg.path] = names }
-        return names
+    }
+
+    /// The binary behind `ffmpeg` and when it was written, so `brew upgrade`
+    /// (a new Cellar folder behind the same link) or a reinstall in place
+    /// counts as a different ffmpeg.
+    private static func identity(of ffmpeg: URL) -> String {
+        let resolved = ffmpeg.resolvingSymlinksInPath().path
+        let modified = (try? FileManager.default.attributesOfItem(atPath: resolved)[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+        return "\(resolved)@\(modified)"
     }
 }
 

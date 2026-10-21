@@ -42,16 +42,50 @@ enum ImageConversion {
 
     /// ImageIO can't encode WebP, so go through a temporary PNG and cwebp or ffmpeg.
     private static func writeWebP(_ image: EditableImage, to url: URL, tools: ExternalTools) async throws {
+        // Check ffmpeg (usually known already) before doing any work.
+        var encoders: Set<String> = []
+        if tools.cwebp == nil, let ffmpeg = tools.ffmpeg {
+            encoders = await FFmpegEncoders.load(ffmpeg)
+        }
+        let encoder = try WebPEncoder.choose(cwebp: tools.cwebp, ffmpeg: tools.ffmpeg, ffmpegEncoders: encoders)
+
         let temporary = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".png")
         defer { try? FileManager.default.removeItem(at: temporary) }
         try EditableImage.write(image.cgImage, to: temporary, type: .png)
 
-        if let cwebp = tools.cwebp {
+        switch encoder {
+        case .cwebp(let cwebp):
             try await ProcessRunner.run(cwebp, ["-quiet", "-q", "88", temporary.path, "-o", url.path])
-        } else if let ffmpeg = tools.ffmpeg {
-            try await ProcessRunner.run(ffmpeg, ["-y", "-loglevel", "error", "-i", temporary.path, "-quality", "88", url.path])
-        } else {
-            throw MissingToolError(name: "ffmpeg")
+        case .ffmpeg(let ffmpeg):
+            try await ProcessRunner.run(ffmpeg, ["-y", "-loglevel", "error", "-i", temporary.path, "-c:v", "libwebp", "-quality", "88", url.path])
         }
+    }
+}
+
+/// Which tool writes WebP, which ImageIO can't: cwebp, or ffmpeg when it was
+/// built with libwebp (Homebrew's isn't).
+enum WebPEncoder: Equatable {
+    case cwebp(URL)
+    case ffmpeg(URL)
+
+    static let ffmpegEncoder = "libwebp"
+
+    /// Whether to put WebP on the wheel. `ffmpegEncoders` is what
+    /// `FFmpegEncoders` already knows, nil before it has asked; until then
+    /// ffmpeg is assumed able, and `choose` checks before encoding.
+    static func isOffered(cwebp: URL?, ffmpeg: URL?, ffmpegEncoders: Set<String>?) -> Bool {
+        if cwebp != nil { return true }
+        guard ffmpeg != nil else { return false }
+        return ffmpegEncoders?.contains(ffmpegEncoder) ?? true
+    }
+
+    /// The tool to encode with, preferring cwebp.
+    static func choose(cwebp: URL?, ffmpeg: URL?, ffmpegEncoders: Set<String>) throws -> WebPEncoder {
+        if let cwebp { return .cwebp(cwebp) }
+        guard let ffmpeg else { throw MissingToolError(name: "ffmpeg") }
+        guard ffmpegEncoders.contains(ffmpegEncoder) else {
+            throw ConversionError.failed("This ffmpeg can’t write WebP. Install cwebp, or ffmpeg with libwebp.")
+        }
+        return .ffmpeg(ffmpeg)
     }
 }
