@@ -76,8 +76,10 @@ struct Annotation: Identifiable, Equatable {
 /// Draws annotations with Core Graphics, both for the live preview and the saved
 /// full-resolution image. Contexts must be y-down with image pixels as units.
 enum AnnotationRenderer {
+    /// Text follows the same size control as lines, scaled so the default
+    /// (1/200 of the image's long side) gives text about 3.5% of that side.
     static func fontSize(forLineWidth lineWidth: CGFloat) -> CGFloat {
-        max(12, lineWidth * 4)
+        max(14, lineWidth * 7)
     }
 
     static func draw(_ annotation: Annotation, in context: CGContext) {
@@ -314,7 +316,14 @@ struct AnnotateEditor: View {
                     }
                 }
 
-                EditorSlider(label: "Width", value: $lineWidth, range: 2...24)
+                // One control sizes lines and text; name it for what it changes now.
+                if tool == .text {
+                    EditorSlider(label: "Size", value: $lineWidth, range: 2...24) {
+                        Double(AnnotationRenderer.fontSize(forLineWidth: CGFloat($0)))
+                    }
+                } else {
+                    EditorSlider(label: "Width", value: $lineWidth, range: 2...24)
+                }
             }
             .background {
                 AnnotationShortcutButton(key: .delete, isEnabled: selectedID != nil && textDraft == nil, action: deleteSelection)

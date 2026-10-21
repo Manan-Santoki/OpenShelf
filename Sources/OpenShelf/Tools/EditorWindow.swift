@@ -110,12 +110,14 @@ struct EditorSlider: View {
     @Binding var value: Double
     let range: ClosedRange<Double>
     var unit = "px"
+    /// The number shown for a value, when it differs from the value itself.
+    var readout: (Double) -> Double = { $0 }
 
     var body: some View {
         EditorRow(label: label) {
             Slider(value: $value, in: range)
                 .controlSize(.small)
-            Text("\(Int(value.rounded())) \(unit)")
+            Text("\(Int(readout(value).rounded())) \(unit)")
                 .font(.system(size: 11).monospacedDigit())
                 .foregroundStyle(.secondary)
                 .frame(width: 56, alignment: .trailing)
