@@ -6,6 +6,42 @@ tags `v<version>` and publishes a GitHub release with that section as notes.
 
 Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
 
+## [1.2.0] - 2026-10-21
+
+Extra formats in one click, tidier wheels, and Settings that fits on screen.
+
+### New
+
+- **Install extra formats from Settings.** The new **Extra Formats** tab
+  installs ffmpeg (MP3, OGG, WebP, MKV, WebM, AVI, WMV) and LibreOffice
+  (PowerPoint, ODP, XLS, ODS) for you: no Terminal, no Homebrew, no restart.
+  Every download is checked against its developer's Apple signature before
+  it runs. If the download server is down, OpenShelf uses its own backup copy
+  of the same signed files, or Homebrew if you have it. Nothing is downloaded
+  unless you click Install.
+- **Wheels show six at a time.** Busy wheels (Tools for an image, Convert for
+  images, PDFs and video) now show the six everyday options plus **⋯ More**.
+  Rest on More for a moment to see the rest; **Back** sits in the same spot.
+  Arrow keys, Return and clicks work too.
+- **Video → GIF without ffmpeg.** GIFs are now made by macOS itself, so every
+  Mac gets the GIF wedge for videos.
+- **Videos macOS can't read still work** when ffmpeg is installed, such as a
+  TV-stream (`.ts`) recording saved as `.mp4`. Converting and the video tools
+  fall back to ffmpeg with progress and Cancel, and never leave a half-written
+  file. Thanks to [@Lwuisyy](https://github.com/Lwuisyy) for the idea in
+  [#2](https://github.com/Manan-Santoki/OpenShelf/pull/2).
+
+### Improved
+
+- **Settings has tabs:** General, Wheels, Shelves, Extra Formats and Updates,
+  each sized to its contents.
+- **Clear messages when a tool is missing.** Dragging an MKV without ffmpeg
+  says "MKV needs ffmpeg" instead of showing a lone ZIP wedge.
+- **WebP is offered only when it will work.** Some ffmpeg builds can't write
+  WebP; OpenShelf now checks first. Thanks again to @Lwuisyy.
+- The Markdown wedge is labelled **MD**, like the other formats.
+- The welcome guide links straight to Extra Formats.
+
 ## [1.1.0] - 2026-10-21
 
 The biggest update yet: many more formats, five new tools, and the wheel
