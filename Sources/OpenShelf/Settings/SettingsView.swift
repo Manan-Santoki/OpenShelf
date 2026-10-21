@@ -76,7 +76,6 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .frame(width: 460)
         .fixedSize(horizontal: false, vertical: true)
-        .onAppear { NSApp.activate() }
     }
 
     private func setOpensAtLogin(_ enabled: Bool) {

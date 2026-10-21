@@ -22,7 +22,7 @@ struct OpenShelfApp: App {
             Divider()
             openWheelButton
             Button("How to Use OpenShelf") { WelcomeView.present() }
-            SettingsLink { Text("Settings…") }
+            Button("Settings…") { SettingsWindowController.shared.show() }
                 .keyboardShortcut(",")
             Button("Check for Updates…") { Updater.shared.checkForUpdates() }
             Divider()
@@ -30,10 +30,6 @@ struct OpenShelfApp: App {
                 .keyboardShortcut("q")
         } label: {
             Image(nsImage: MenuBarIcon.image)
-        }
-
-        Settings {
-            SettingsView()
         }
     }
 
