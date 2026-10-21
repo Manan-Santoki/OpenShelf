@@ -31,11 +31,11 @@ struct WheelView: View {
                 )
             }
 
-            HubView(title: hubTitle, isActive: model.highlighted != nil)
+            HubView(highlighted: model.highlighted)
                 .frame(width: (geometry.innerRadius - 6) * 2, height: (geometry.innerRadius - 6) * 2)
 
-            // The dragged file's thumbnail sits over the hub, so the same label
-            // also floats above the rim where nothing covers it.
+            // The dragged file's thumbnail sits over the hub, so the label
+            // floats above the rim where nothing covers it.
             LabelPill(text: model.hint ?? pillTitle, isActive: model.highlighted != nil && model.hint == nil)
                 .offset(y: -(geometry.outerRadius + rimWidth + 20))
         }
@@ -48,10 +48,10 @@ struct WheelView: View {
 
     /// Names the wheel too when it was opened from the keyboard.
     private var pillTitle: String {
-        model.wheelName.map { "\($0) · \(hubTitle)" } ?? hubTitle
+        model.wheelName.map { "\($0) · \(currentLabel)" } ?? currentLabel
     }
 
-    private var hubTitle: String {
+    private var currentLabel: String {
         model.highlighted?.title ?? (model.dragSummary.isEmpty ? "Drop" : model.dragSummary)
     }
 }
@@ -118,7 +118,9 @@ private struct PetalView: View {
             gap: 7,
             cornerRadius: 16
         )
-        let labelRadius = (geometry.innerRadius + geometry.outerRadius) / 2 + 3
+        let isCrowded = geometry.wedgeCount > 8
+        // Narrow wedges are wider further out, so their labels sit a little outward.
+        let labelRadius = (geometry.innerRadius + geometry.outerRadius) / 2 + (isCrowded ? 9 : 3)
 
         ZStack {
             shape.fill(fill)
@@ -131,7 +133,7 @@ private struct PetalView: View {
             VStack(spacing: 4) {
                 if let systemImage = item.systemImage {
                     Image(systemName: systemImage)
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(.system(size: isCrowded ? 15 : 17, weight: .semibold))
                         .symbolRenderingMode(.hierarchical)
                 }
                 Text(item.title.uppercased())
@@ -139,9 +141,9 @@ private struct PetalView: View {
                     .font(.system(size: item.systemImage == nil ? 13 : 9.5, weight: .bold))
                     .tracking(0.4)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+                    .minimumScaleFactor(0.65)
             }
-            .frame(width: 74)
+            .frame(width: geometry.labelWidth(atRadius: labelRadius))
             .foregroundStyle(isHighlighted ? Color.white : Color.primary.opacity(0.85))
             .offset(x: sin(center) * labelRadius, y: -cos(center) * labelRadius)
         }
@@ -160,32 +162,26 @@ private struct PetalView: View {
     }
 }
 
-/// The centre of the wheel: a glass ring holding a pill with the current label.
+/// The centre of the wheel: a glass ring that lights up with the chosen
+/// wedge's symbol. Words live in the label above the rim, which the dragged
+/// file's thumbnail can't cover.
 private struct HubView: View {
-    let title: String
-    let isActive: Bool
+    let highlighted: WheelItem?
 
     var body: some View {
         ZStack {
             Circle()
-                .fill(.white.opacity(0.08))
+                .fill(highlighted == nil ? AnyShapeStyle(.white.opacity(0.08)) : AnyShapeStyle(Color.accentColor.opacity(0.9)))
                 .overlay(Circle().strokeBorder(.white.opacity(0.5), lineWidth: 0.8))
-            Text(title)
-                .font(.system(size: 11, weight: .semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .contentTransition(.interpolate)
-                .foregroundStyle(isActive ? Color.white : Color.primary.opacity(0.85))
-                .padding(.horizontal, 10)
-                .frame(height: 26)
-                .background {
-                    Capsule()
-                        .fill(isActive ? AnyShapeStyle(Color.accentColor.opacity(0.9)) : AnyShapeStyle(.regularMaterial))
-                        .overlay(Capsule().strokeBorder(.white.opacity(0.5), lineWidth: 0.8))
-                        .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
-                }
-                .padding(.horizontal, 4)
+            if let systemImage = highlighted?.systemImage {
+                Image(systemName: systemImage)
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .transition(.scale(scale: 0.6).combined(with: .opacity))
+                    .id(systemImage)
+            }
         }
+        .accessibilityHidden(true)
     }
 }
 

@@ -4,3 +4,4 @@
 /.swiftpm
 *.xcodeproj
 xcuserdata/
+.claude/

@@ -21,6 +21,14 @@ struct WheelGeometry {
         sweep * CGFloat(index)
     }
 
+    /// How wide a wedge's label can be at `radius` without reaching its
+    /// neighbours: the chord across the wedge there, less the gap between wedges.
+    func labelWidth(atRadius radius: CGFloat, maximum: CGFloat = 74) -> CGFloat {
+        guard wedgeCount > 1 else { return maximum }
+        let chord: CGFloat = 2 * radius * sin(sweep / 2)
+        return max(0, min(maximum, chord - 8))
+    }
+
     /// The wedge under `point`, or nil over the hub or outside the wheel.
     /// Both points use a y-up coordinate space (AppKit's default).
     func wedge(at point: CGPoint, center: CGPoint) -> Int? {

@@ -27,3 +27,17 @@ struct WheelGeometryTests {
         #expect(empty.wedge(at: CGPoint(x: 200, y: 300), center: center) == nil)
     }
 }
+
+struct WheelLabelWidthTests {
+    @Test func fewWedgesUseTheFullLabelWidth() {
+        #expect(WheelGeometry(wedgeCount: 4).labelWidth(atRadius: 94) == 74)
+    }
+
+    @Test func crowdedWheelsNarrowLabelsToFitTheirWedge() {
+        let width = WheelGeometry(wedgeCount: 11).labelWidth(atRadius: 94)
+        let sweep: CGFloat = 2 * .pi / 11
+        let chord: CGFloat = 2 * 94 * sin(sweep / 2)
+        #expect(width < 74)
+        #expect(width <= chord - 7)
+    }
+}
