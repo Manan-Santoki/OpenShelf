@@ -21,7 +21,6 @@ enum OutputFormat: String, CaseIterable, Hashable, Sendable {
         switch self {
         case .extract: "UNZIP"
         case .tgz: "TAR.GZ"
-        case .md: "MARKDOWN"
         default: rawValue.uppercased()
         }
     }
