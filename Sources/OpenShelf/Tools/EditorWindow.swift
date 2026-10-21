@@ -164,6 +164,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
         near location: NSPoint = NSEvent.mouseLocation,
         @ViewBuilder content: (EditorActions) -> Content
     ) {
+        ColorPanelPlacement.install()
         let controller = EditorWindowController(size: size)
         let actions = EditorActions(
             close: { [weak controller] in controller?.dismiss() },
@@ -250,6 +251,53 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         Self.open.removeAll { $0 === self }
+    }
+
+    /// The editor most recently brought forward, if any is on screen.
+    static var frontmostWindow: NSWindow? {
+        let visible = open.compactMap(\.window).filter(\.isVisible)
+        return visible.first(where: \.isKeyWindow) ?? visible.last
+    }
+}
+
+/// Opens the Colors panel (from an editor's custom colour well) beside that
+/// editor instead of wherever it was last, often a far corner of the screen.
+/// It's only placed as it opens, so a spot the user drags it to is kept.
+@MainActor
+private enum ColorPanelPlacement {
+    private static var observer: (any NSObjectProtocol)?
+    private static var wasVisible = false
+
+    static func install() {
+        guard observer == nil else { return }
+        observer = NotificationCenter.default.addObserver(
+            forName: NSWindow.didChangeOcclusionStateNotification, object: nil, queue: .main
+        ) { _ in
+            MainActor.assumeIsolated {
+                // Reading the shared panel would create it; only look once it exists.
+                guard NSColorPanel.sharedColorPanelExists else { return }
+                let panel = NSColorPanel.shared
+                let isVisible = panel.isVisible
+                guard isVisible != wasVisible else { return }
+                defer { wasVisible = isVisible }
+                guard isVisible, !wasVisible, let editor = EditorWindowController.frontmostWindow else { return }
+                place(panel, beside: editor)
+            }
+        }
+    }
+
+    /// To the editor's right if it fits on screen, else to its left, top edges aligned.
+    private static func place(_ panel: NSWindow, beside editor: NSWindow) {
+        guard let visible = (editor.screen ?? NSScreen.main)?.visibleFrame else { return }
+        let gap: CGFloat = 12
+        let size = panel.frame.size
+        var x: CGFloat = editor.frame.maxX + gap
+        if x + size.width > visible.maxX {
+            x = editor.frame.minX - gap - size.width
+        }
+        let y: CGFloat = editor.frame.maxY - size.height
+        let frame = NSRect(origin: NSPoint(x: x, y: y), size: size).clamped(to: visible)
+        panel.setFrameOrigin(frame.origin)
     }
 }
 
