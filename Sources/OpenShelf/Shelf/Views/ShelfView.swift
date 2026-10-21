@@ -71,6 +71,8 @@ private struct ShelfHeader: View {
         }
         .padding(.horizontal, 8)
         .frame(height: ShelfLayout.headerHeight)
+        // Drag the top bar to move the shelf (and dock it at a screen edge).
+        .background(WindowDragArea())
     }
 
     private var title: String {

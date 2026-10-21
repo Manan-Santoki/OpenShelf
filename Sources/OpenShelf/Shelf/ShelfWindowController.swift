@@ -27,6 +27,9 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
     /// The on-screen frame while the shelf is tucked behind the edge.
     private var shownFrame: CGRect?
     private var isHidden: Bool { shownFrame != nil }
+    /// Set when the user asked to see the shelf; it stays out until the pointer
+    /// has been over it, rather than tucking away again before they find it.
+    private var holdsOpenUntilVisited = false
 
     private var panel: ShelfPanel? { window as? ShelfPanel }
 
@@ -76,6 +79,16 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
             reveal()
         } else {
             panel?.orderFrontRegardless()
+        }
+    }
+
+    /// Brings the shelf to the front, sliding it out if it's hidden at an edge.
+    func bringForward(focus: Bool) {
+        holdsOpenUntilVisited = true
+        pointerAwaySince = nil
+        present()
+        if focus {
+            panel?.makeKey()
         }
     }
 
@@ -242,6 +255,12 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
             return
         }
         guard !isHidden else { return }
+        if holdsOpenUntilVisited {
+            if EdgeHiding.isPointerNear(NSEvent.mouseLocation, shelf: panel.frame) {
+                holdsOpenUntilVisited = false
+            }
+            return
+        }
 
         let isBusy = NSEvent.pressedMouseButtons != 0
             || isApplyingFrame

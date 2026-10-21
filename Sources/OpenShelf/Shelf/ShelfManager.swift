@@ -1,14 +1,31 @@
 import AppKit
+import Observation
 
 /// Creates shelves, keeps track of which one was used most recently, and saves
 /// them so they come back after a relaunch.
 @MainActor
+@Observable
 final class ShelfManager {
     /// Ordered from least to most recently used.
     private var controllers: [ShelfWindowController] = []
-    private var saveTask: Task<Void, Never>?
+    @ObservationIgnored private var saveTask: Task<Void, Never>?
 
     var hasShelves: Bool { !controllers.isEmpty }
+
+    /// Open shelves, most recently used first, for the menu-bar menu.
+    var openShelves: [Shelf] { controllers.reversed().map(\.shelf) }
+
+    /// Brings every shelf to the front, sliding out any hidden at an edge, and
+    /// focuses the most recently used one.
+    func showAll() {
+        for controller in controllers {
+            controller.bringForward(focus: controller === controllers.last)
+        }
+    }
+
+    func show(_ shelf: Shelf) {
+        controllers.first { $0.shelf === shelf }?.bringForward(focus: true)
+    }
 
     @discardableResult
     func newShelf(with urls: [URL] = [], near location: NSPoint = NSEvent.mouseLocation) -> Shelf {

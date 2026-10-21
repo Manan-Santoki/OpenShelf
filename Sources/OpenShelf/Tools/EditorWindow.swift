@@ -232,15 +232,3 @@ private struct EditorContainer<Content: View>: View {
             .animation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.42, dampingFraction: 0.8), value: model.isPresented)
     }
 }
-
-/// Lets the user move a borderless window by dragging this area.
-private struct WindowDragArea: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView { DragView() }
-    func updateNSView(_ nsView: NSView, context: Context) {}
-
-    private final class DragView: NSView {
-        override func mouseDown(with event: NSEvent) {
-            window?.performDrag(with: event)
-        }
-    }
-}

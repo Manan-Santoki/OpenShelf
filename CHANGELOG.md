@@ -6,6 +6,20 @@ tags `v<version>` and publishes a GitHub release with that section as notes.
 
 Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
 
+## [1.0.1] - 2026-10-20
+
+### New
+
+- **Show Shelves** in the menu-bar menu brings every shelf to the front and
+  slides out any that are tucked at a screen edge. Open shelves are also listed
+  by name, so you can jump to one. A shelf you asked to see stays out until
+  your pointer has been over it.
+
+### Fixed
+
+- Shelves couldn't be moved. Drag a shelf by its top bar again to move it or
+  dock it at a screen edge.
+
 ## [1.0.0] - 2026-10-20
 
 The first stable release.

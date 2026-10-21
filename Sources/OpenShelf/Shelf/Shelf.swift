@@ -102,6 +102,12 @@ final class Shelf: Identifiable {
         selection = Set(items.map(\.id))
     }
 
+    /// A short name for menus: the first file, and how many others there are.
+    var summary: String {
+        guard let first = items.first else { return "Empty shelf" }
+        return items.count == 1 ? first.name : "\(first.name) + \(items.count - 1) more"
+    }
+
     /// Selects the first item whose name starts with `prefix` and scrolls to it.
     @discardableResult
     func typeSelect(_ prefix: String) -> Bool {
