@@ -21,7 +21,8 @@ struct VideoCropEditor: View {
         EditorChrome(
             title: "Crop Video",
             primaryTitle: "Apply",
-            isPrimaryEnabled: model.frame != nil && model.exportProgress == nil,
+            // Cropping to the whole frame would only re-encode the video.
+            isPrimaryEnabled: model.frame != nil && model.exportProgress == nil && model.crop != model.bounds,
             actions: actions,
             onReset: model.reset,
             onPrimary: { model.save(actions: actions) }
@@ -182,30 +183,16 @@ final class VideoCropModel {
         Binding {
             Int(self.crop[keyPath: keyPath].rounded())
         } set: { newValue in
-            if keyPath == \CGRect.width {
-                self.setSize(width: CGFloat(newValue), height: nil)
-            } else {
-                self.setSize(width: nil, height: CGFloat(newValue))
-            }
+            let isWidth = keyPath == \CGRect.width
+            self.crop = CropMath.resized(
+                self.crop,
+                width: isWidth ? newValue : nil,
+                height: isWidth ? nil : newValue,
+                ratio: self.ratio.value,
+                bounds: self.bounds,
+                minimumSize: self.minimumSize
+            )
         }
-    }
-
-    /// Resizes from the top-left corner, keeping the aspect ratio when one is set.
-    private func setSize(width: CGFloat?, height: CGFloat?) {
-        var newWidth = width ?? crop.width
-        var newHeight = height ?? crop.height
-        if let ratio = ratio.value {
-            if width != nil { newHeight = newWidth / ratio } else { newWidth = newHeight * ratio }
-        }
-        newWidth = min(max(newWidth, minimumSize), bounds.width)
-        newHeight = min(max(newHeight, minimumSize), bounds.height)
-        if let ratio = ratio.value {
-            if newWidth / newHeight > ratio { newWidth = newHeight * ratio } else { newHeight = newWidth / ratio }
-        }
-        var rect = CGRect(x: crop.minX, y: crop.minY, width: newWidth, height: newHeight)
-        rect.origin.x = min(rect.minX, bounds.maxX - newWidth)
-        rect.origin.y = min(rect.minY, bounds.maxY - newHeight)
-        crop = rect
     }
 
     func save(actions: EditorActions) {

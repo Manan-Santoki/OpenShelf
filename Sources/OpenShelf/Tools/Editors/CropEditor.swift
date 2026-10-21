@@ -24,7 +24,15 @@ struct CropEditor: View {
     private var bounds: CGRect { CGRect(origin: .zero, size: image.pixelSize) }
 
     var body: some View {
-        EditorChrome(title: "Crop Image", primaryTitle: "Apply", actions: actions, onReset: reset, onPrimary: apply) {
+        EditorChrome(
+            title: "Crop Image",
+            primaryTitle: "Apply",
+            // Cropping to the whole image would only save a copy of it.
+            isPrimaryEnabled: crop != bounds,
+            actions: actions,
+            onReset: reset,
+            onPrimary: apply
+        ) {
             VStack(spacing: 14) {
                 GeometryReader { proxy in
                     canvas(in: proxy.size)
@@ -117,31 +125,16 @@ struct CropEditor: View {
         Binding {
             Int(crop[keyPath: keyPath].rounded())
         } set: { newValue in
-            if keyPath == \CGRect.width {
-                setSize(width: CGFloat(newValue), height: nil)
-            } else {
-                setSize(width: nil, height: CGFloat(newValue))
-            }
+            let isWidth = keyPath == \CGRect.width
+            crop = CropMath.resized(
+                crop,
+                width: isWidth ? newValue : nil,
+                height: isWidth ? nil : newValue,
+                ratio: ratio.value,
+                bounds: bounds,
+                minimumSize: minimumSize
+            )
         }
-    }
-
-    /// Resizes from the top-left corner, keeping the aspect ratio when one is set.
-    private func setSize(width: CGFloat?, height: CGFloat?) {
-        var newWidth = width ?? crop.width
-        var newHeight = height ?? crop.height
-        if let ratio = ratio.value {
-            if width != nil { newHeight = newWidth / ratio } else { newWidth = newHeight * ratio }
-        }
-        newWidth = min(max(newWidth, minimumSize), bounds.width)
-        newHeight = min(max(newHeight, minimumSize), bounds.height)
-        if let ratio = ratio.value {
-            // Clamping may have broken the ratio; shrink the longer side back.
-            if newWidth / newHeight > ratio { newWidth = newHeight * ratio } else { newHeight = newWidth / ratio }
-        }
-        var rect = CGRect(x: crop.minX, y: crop.minY, width: newWidth, height: newHeight)
-        rect.origin.x = min(rect.minX, bounds.maxX - newWidth)
-        rect.origin.y = min(rect.minY, bounds.maxY - newHeight)
-        crop = rect
     }
 
     private func snap(to ratio: CropRatio) {
@@ -155,8 +148,8 @@ struct CropEditor: View {
     }
 
     private func apply() {
-        let rect = crop.integral.intersection(bounds)
-        guard let cropped = image.cgImage.cropping(to: rect) else {
+        // The crop is kept on whole pixels, so this is exactly the size shown.
+        guard let cropped = image.cgImage.cropping(to: CropMath.snapped(crop, in: bounds)) else {
             actions.failed(EditableImageError.unwritable(image.url))
             return
         }
@@ -239,7 +232,13 @@ private struct HandleView: View {
 }
 
 /// Geometry for moving and resizing a crop rectangle in image pixels.
+///
+/// Crops are always whole pixels inside the image, so what the size fields show
+/// is exactly what gets saved: a fractional origin left by a drag would
+/// otherwise grow by a pixel when rounded out at save time.
 enum CropMath {
+    /// The crop after dragging `handle` (or the whole crop, for nil) by `delta`
+    /// image pixels, snapped to whole pixels.
     static func adjusted(
         _ rect: CGRect,
         handle: CropHandle?,
@@ -248,10 +247,65 @@ enum CropMath {
         bounds: CGRect,
         minimumSize: CGFloat
     ) -> CGRect {
-        guard let handle else { return moved(rect, by: delta, in: bounds) }
+        guard let handle else {
+            // Moving keeps the size; only the origin lands on a whole pixel.
+            let moved = moved(rect, by: delta, in: bounds)
+            let origin = CGPoint(x: moved.minX.rounded(), y: moved.minY.rounded())
+            return snapped(CGRect(origin: origin, size: rect.size), in: bounds)
+        }
         let free = freelyResized(rect, handle: handle, delta: delta, bounds: bounds, minimumSize: minimumSize)
-        guard let ratio else { return free }
-        return constrained(rect, proposal: free, handle: handle, ratio: ratio, bounds: bounds, minimumSize: minimumSize)
+        guard let ratio else { return snapped(free, in: bounds) }
+        return snapped(constrained(rect, proposal: free, handle: handle, ratio: ratio, bounds: bounds, minimumSize: minimumSize), in: bounds)
+    }
+
+    /// `rect` with each edge rounded to the nearest whole pixel and kept inside
+    /// `bounds`, at least one pixel across.
+    static func snapped(_ rect: CGRect, in bounds: CGRect) -> CGRect {
+        let minX: CGFloat = min(max(rect.minX.rounded(), bounds.minX), bounds.maxX - 1)
+        let minY: CGFloat = min(max(rect.minY.rounded(), bounds.minY), bounds.maxY - 1)
+        let maxX: CGFloat = max(min(rect.maxX.rounded(), bounds.maxX), minX + 1)
+        let maxY: CGFloat = max(min(rect.maxY.rounded(), bounds.maxY), minY + 1)
+        return CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+    }
+
+    /// `rect` resized from its top-left corner to a typed size. The typed side
+    /// is kept exactly; with a `ratio`, the other side follows it, rounded to a
+    /// whole pixel. Only a size that doesn't fit the image is scaled back.
+    static func resized(
+        _ rect: CGRect,
+        width: Int?,
+        height: Int?,
+        ratio: CGFloat?,
+        bounds: CGRect,
+        minimumSize: CGFloat
+    ) -> CGRect {
+        var newWidth: CGFloat = width.map { CGFloat($0) } ?? rect.width
+        var newHeight: CGFloat = height.map { CGFloat($0) } ?? rect.height
+        if let ratio {
+            if width != nil {
+                newHeight = (newWidth / ratio).rounded()
+            } else {
+                newWidth = (newHeight * ratio).rounded()
+            }
+        }
+        let smallest = CGSize(width: min(minimumSize, bounds.width), height: min(minimumSize, bounds.height))
+        let fits = newWidth >= smallest.width && newWidth <= bounds.width
+            && newHeight >= smallest.height && newHeight <= bounds.height
+        if !fits {
+            newWidth = min(max(newWidth, smallest.width), bounds.width)
+            newHeight = min(max(newHeight, smallest.height), bounds.height)
+            if let ratio {
+                // Clamping may have broken the ratio; shrink the longer side back.
+                if newWidth / newHeight > ratio {
+                    newWidth = (newHeight * ratio).rounded()
+                } else {
+                    newHeight = (newWidth / ratio).rounded()
+                }
+            }
+        }
+        let x: CGFloat = min(rect.minX, bounds.maxX - newWidth)
+        let y: CGFloat = min(rect.minY, bounds.maxY - newHeight)
+        return snapped(CGRect(x: x, y: y, width: newWidth, height: newHeight), in: bounds)
     }
 
     static func moved(_ rect: CGRect, by delta: CGSize, in bounds: CGRect) -> CGRect {
@@ -321,17 +375,17 @@ enum CropMath {
     }
 
     /// The largest rect with `ratio` that fits in `bounds`, centred on `center`
-    /// as far as the bounds allow.
+    /// as far as the bounds allow, in whole pixels.
     static func largest(ratio: CGFloat, centeredAt center: CGPoint, in bounds: CGRect) -> CGRect {
-        var width = bounds.width
-        var height = width / ratio
-        if height > bounds.height {
+        var width: CGFloat = bounds.width
+        var height: CGFloat = min((width / ratio).rounded(), bounds.height)
+        if (width / ratio).rounded() > bounds.height {
             height = bounds.height
-            width = height * ratio
+            width = min((height * ratio).rounded(), bounds.width)
         }
-        var rect = CGRect(x: center.x - width / 2, y: center.y - height / 2, width: width, height: height)
+        var rect = CGRect(x: (center.x - width / 2).rounded(), y: (center.y - height / 2).rounded(), width: width, height: height)
         rect.origin.x = min(max(rect.minX, bounds.minX), bounds.maxX - width)
         rect.origin.y = min(max(rect.minY, bounds.minY), bounds.maxY - height)
-        return rect
+        return snapped(rect, in: bounds)
     }
 }
