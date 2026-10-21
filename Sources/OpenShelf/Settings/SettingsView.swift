@@ -4,6 +4,8 @@ import SwiftUI
 struct SettingsView: View {
     @Bindable private var preferences = Preferences.shared
     @State private var opensAtLogin = SMAppService.mainApp.status == .enabled
+    @State private var checksForUpdates = Updater.shared.updater.automaticallyChecksForUpdates
+    @State private var installsUpdates = Updater.shared.updater.automaticallyDownloadsUpdates
 
     var body: some View {
         Form {
@@ -34,6 +36,21 @@ struct SettingsView: View {
                 Toggle("Remove files from a shelf after dragging them out", isOn: $preferences.removeAfterDragOut)
                 Toggle("Restore shelves when OpenShelf opens", isOn: $preferences.restoresShelves)
                 Toggle("Hide docked shelves to the screen edge", isOn: $preferences.hidesDockedShelves)
+            }
+
+            Section("Updates") {
+                Toggle("Check for updates automatically", isOn: $checksForUpdates)
+                    .onChange(of: checksForUpdates) { _, enabled in
+                        Updater.shared.updater.automaticallyChecksForUpdates = enabled
+                    }
+                Toggle("Download and install updates automatically", isOn: $installsUpdates)
+                    .disabled(!checksForUpdates)
+                    .onChange(of: installsUpdates) { _, enabled in
+                        Updater.shared.updater.automaticallyDownloadsUpdates = enabled
+                    }
+                LabeledContent("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")") {
+                    Button("Check Now") { Updater.shared.checkForUpdates() }
+                }
             }
 
             Section("General") {

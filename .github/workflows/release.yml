@@ -54,7 +54,7 @@ jobs:
         run: |
           /usr/libexec/PlistBuddy \
             -c "Set :CFBundleShortVersionString $VERSION" \
-            -c "Set :CFBundleVersion $GITHUB_RUN_NUMBER" \
+            -c "Set :CFBundleVersion $VERSION" \
             Support/Info.plist
 
       - name: Test
@@ -85,6 +85,27 @@ jobs:
           } > release-notes.md
           cat release-notes.md
 
+      - name: Sign the update and write the appcast
+        if: steps.version.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          # Sparkle reads the feed from releases/latest/download/appcast.xml, so
+          # each release carries an appcast describing itself.
+          mkdir -p updates
+          cp "build/OpenShelf-$VERSION.zip" updates/
+          scripts/changelog.sh notes "$VERSION" > update-notes.md
+          gh api -X POST /markdown -f mode=gfm -f text="$(cat update-notes.md)" > "updates/OpenShelf-$VERSION.html"
+          echo "$SPARKLE_PRIVATE_KEY" | .build/sparkle/bin/generate_appcast \
+            --ed-key-file - \
+            --download-url-prefix "https://github.com/${{ github.repository }}/releases/download/v$VERSION/" \
+            --embed-release-notes \
+            -o updates/appcast.xml \
+            updates
+          cat updates/appcast.xml
+
       - name: Publish the release
         if: steps.version.outputs.exists == 'false'
         env:
@@ -94,6 +115,7 @@ jobs:
           gh release create "v$VERSION" \
             "build/OpenShelf-$VERSION.dmg" \
             "build/OpenShelf-$VERSION.zip" \
+            updates/appcast.xml \
             --title "OpenShelf $VERSION" \
             --notes-file release-notes.md \
             --target "$GITHUB_SHA"

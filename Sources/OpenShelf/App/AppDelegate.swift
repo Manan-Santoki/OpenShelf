@@ -26,6 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.wheel.confirmHighlighted(with: urls) ?? false
         }
         dragMonitor.start()
+        Updater.shared.start()
         if Preferences.shared.restoresShelves {
             shelves.restoreSavedShelves()
         }

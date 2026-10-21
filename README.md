@@ -19,7 +19,10 @@ the file on a wedge and it's done, saved right next to the original.
 - **Shelves:** stacked preview, expandable grid/list, multi-select, drag out to
   any app, Quick Look (Space), dock to the left/right screen edge, multiple shelves
 - Works system-wide with **no Accessibility permission**
-- No network access, no telemetry, no dependencies
+- No telemetry; the only network access is checking GitHub for updates, which
+  you can turn off
+- **Updates itself:** new versions install from the app (Sparkle), signed so
+  only genuine OpenShelf releases are accepted
 
 See [docs/SPEC.md](docs/SPEC.md) for the full behaviour and roadmap. Optional:
 `brew install ffmpeg webp` adds MP3, GIF and WebP output.
@@ -138,12 +141,20 @@ any time, and drag them out to any app or folder when you need them.
 - Closing a shelf never touches your files. **New Shelf** and **Close All
   Shelves** are in the menu-bar menu.
 
+### Updates
+
+OpenShelf checks GitHub for new versions once a day (it asks the first time).
+When one is out you'll see its release notes and an **Install Update** button;
+the app restarts on the new version. You can also choose **Check for Updates…**
+from the menu bar, or turn automatic checks and installs on or off in Settings.
+
 ### Settings
 
 Click the OpenShelf wheel in the menu bar → **Settings…** to change the key for
 each wheel, remove files from a shelf after dragging them out, restore shelves
-at launch, hide docked shelves at the screen edge, or open OpenShelf at login. **How to Use OpenShelf** in the same menu shows the
-welcome guide again.
+at launch, hide docked shelves at the screen edge, control updates, or open
+OpenShelf at login. **How to Use OpenShelf** in the same menu shows the welcome
+guide again.
 
 ## Tech stack
 
@@ -152,6 +163,7 @@ welcome guide again.
 | Language | Swift 6 (strict concurrency) |
 | UI | SwiftUI for views; AppKit for panels, drag sessions, menu bar, Quick Look |
 | Frameworks | ImageIO, Core Image, PDFKit, AVFoundation, QuickLookThumbnailing, Quartz, ServiceManagement, Observation |
+| Updates | [Sparkle](https://sparkle-project.org) 2 (MIT), downloaded and checksum-verified at build time |
 | Build | `make` (calls `swiftc` directly) · `Package.swift` for SwiftPM/Xcode |
 | Tests | Swift Testing |
 | Minimum OS | macOS 14 Sonoma |
@@ -209,7 +221,12 @@ Releases are automatic and driven by [CHANGELOG.md](CHANGELOG.md):
 The **Release** workflow then tests and builds the universal app on a macOS
 runner, makes the DMG and zip, tags `v1.1.0` and publishes a GitHub release
 with that changelog section as its notes. Versions that are already tagged are
-skipped. The **CI** workflow builds and tests every push and pull request.
+skipped. The release also carries a signed `appcast.xml`, which is how
+installed copies find the update: Sparkle reads
+`releases/latest/download/appcast.xml` and only installs updates signed with
+the project's EdDSA key (stored as the `SPARKLE_PRIVATE_KEY` repository
+secret; the public key is `SUPublicEDKey` in `Support/Info.plist`). The **CI**
+workflow builds and tests every push and pull request.
 
 ## Contributing
 

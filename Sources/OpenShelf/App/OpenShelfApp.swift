@@ -23,6 +23,7 @@ struct OpenShelfApp: App {
             Button("How to Use OpenShelf") { WelcomeView.present() }
             SettingsLink { Text("Settings…") }
                 .keyboardShortcut(",")
+            Button("Check for Updates…") { Updater.shared.checkForUpdates() }
             Divider()
             Button("Quit OpenShelf") { NSApp.terminate(nil) }
                 .keyboardShortcut("q")

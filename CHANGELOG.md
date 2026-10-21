@@ -6,6 +6,19 @@ tags `v<version>` and publishes a GitHub release with that section as notes.
 
 Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
 
+## [1.0.2] - 2026-10-20
+
+### New
+
+- **Automatic updates.** OpenShelf now checks GitHub for new versions once a
+  day (it asks first) and installs them in place: you'll see the release notes
+  and an Install Update button, and the app restarts on the new version. Use
+  **Check for Updates…** in the menu bar, or the new **Updates** section in
+  Settings. Updates are signed, so only genuine OpenShelf releases install.
+
+This is the last version you need to download by hand; later versions arrive
+through the app.
+
 ## [1.0.1] - 2026-10-20
 
 ### New
