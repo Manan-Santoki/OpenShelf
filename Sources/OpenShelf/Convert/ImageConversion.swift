@@ -48,10 +48,10 @@ enum ImageConversion {
 
         if let cwebp = tools.cwebp {
             try await ProcessRunner.run(cwebp, ["-quiet", "-q", "88", temporary.path, "-o", url.path])
-        } else if let ffmpeg = tools.ffmpeg {
+        } else if let ffmpeg = tools.ffmpeg, FFmpegEncoders.available(in: ffmpeg).contains("libwebp") {
             try await ProcessRunner.run(ffmpeg, ["-y", "-loglevel", "error", "-i", temporary.path, "-quality", "88", url.path])
         } else {
-            throw ConversionError.unsupported("WebP needs cwebp or ffmpeg (brew install webp)")
+            throw ConversionError.unsupported("WebP needs cwebp or ffmpeg with libwebp (brew install webp)")
         }
     }
 }

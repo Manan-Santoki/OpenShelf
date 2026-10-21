@@ -164,7 +164,13 @@ struct ExternalTools: Sendable {
     var ffprobe: URL? = nil
     var libreOffice: URL? = nil
 
-    var canEncodeWebP: Bool { cwebp != nil || ffmpeg != nil }
+    var canEncodeWebP: Bool {
+        if cwebp != nil { return true }
+        if let ffmpeg {
+            return FFmpegEncoders.available(in: ffmpeg).contains("libwebp")
+        }
+        return false
+    }
 
     /// Looks in the usual Homebrew and MacPorts locations; GUI apps don't inherit
     /// the shell's PATH.
