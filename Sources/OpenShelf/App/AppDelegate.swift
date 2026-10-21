@@ -5,6 +5,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let shelves = ShelfManager()
     private let wheel = WheelController()
     private let dragMonitor = DragMonitor(preferences: .shared)
+    private var hasShownMoreFormatsHint = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Keeps the app out of the Dock when launched without the bundle's LSUIElement (e.g. `swift run`).
@@ -71,14 +72,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func showWheel(_ kind: WheelKind, at location: NSPoint, for urls: [URL]) {
         // A drag always gets a fresh wheel under the pointer.
         wheel.endKeyboardMode(hidingWheel: true)
-        let items = items(for: kind, urls: urls)
+        let tools = ExternalTools.current
+        let items = items(for: kind, urls: urls, tools: tools)
+        if kind == .convert,
+           let tool = MissingToolAdvice.blockingTool(for: urls, formats: ConversionCatalog.formats(in: items), tools: tools) {
+            // A lone ZIP wedge would suggest that's all OpenShelf can do with an
+            // MKV or a PowerPoint deck; say what's missing instead.
+            wheel.dismiss(after: .zero)
+            ToastController.shared.show(MissingToolAdvice.toast(for: urls, needing: tool, tools: tools), near: location, for: .seconds(4))
+            return
+        }
         guard !items.isEmpty else {
             wheel.dismiss(after: .zero)
             if kind == .tools, FileTool.needsConversionForTools(urls) {
                 // MKV, WebM, AVI and friends convert fine but can't be edited directly.
                 let convertKeys = TriggerKey.describe(Preferences.shared.trigger(for: .convert))
                 ToastController.shared.show(
-                    FileTool.convertFirstToast(for: urls, convertKeys: convertKeys),
+                    FileTool.convertFirstToast(for: urls, convertKeys: convertKeys, tools: tools),
                     near: location,
                     for: .seconds(3)
                 )
@@ -89,12 +99,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         wheel.present(items, at: location)
+        if kind == .convert, !hasShownMoreFormatsHint,
+           let hint = MissingToolAdvice.moreFormatsHint(for: urls, tools: tools) {
+            // Once per launch: OpenShelf stays open for days, so this is an
+            // occasional pointer to Settings, not something seen on every drag.
+            hasShownMoreFormatsHint = true
+            wheel.showHint(hint)
+        }
     }
 
-    private func items(for kind: WheelKind, urls: [URL]) -> [WheelItem] {
+    private func items(for kind: WheelKind, urls: [URL], tools: ExternalTools = .current) -> [WheelItem] {
         switch kind {
         case .convert:
-            WheelOrdering.formats(ConversionCatalog.formats(for: urls, tools: .detect()), for: urls).map(WheelItem.convert)
+            WheelOrdering.formats(ConversionCatalog.formats(for: urls, tools: tools), for: urls).map(WheelItem.convert)
         case .tools:
             WheelOrdering.tools(FileTool.available(for: urls)).map(WheelItem.tool)
         case .actions:

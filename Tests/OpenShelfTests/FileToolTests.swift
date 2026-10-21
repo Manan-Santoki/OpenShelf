@@ -3,6 +3,8 @@ import Testing
 @testable import OpenShelf
 
 struct FileToolTests {
+    private let ffmpeg = ExternalTools(ffmpeg: URL(fileURLWithPath: "/usr/bin/true"))
+
     private func urls(_ names: String...) -> [URL] {
         names.map { URL(fileURLWithPath: "/tmp/\($0)") }
     }
@@ -39,18 +41,18 @@ struct FileToolTests {
     }
 
     @Test func convertFirstToastNamesTheFormatToConvertTo() {
-        let video = FileTool.convertFirstToast(for: urls("a.mkv"), convertKeys: "⇧")
+        let video = FileTool.convertFirstToast(for: urls("a.mkv"), convertKeys: "⇧", tools: ffmpeg)
         #expect(video.title == "Convert to MP4 first")
         #expect(video.subtitle == "Tap ⇧ while dragging to convert")
-        #expect(FileTool.convertFirstToast(for: urls("a.wma"), convertKeys: "⇧").title == "Convert to M4A first")
-        #expect(FileTool.convertFirstToast(for: urls("a.webm", "b.wma"), convertKeys: "⇧").title == "Convert to MP4 or M4A first")
+        #expect(FileTool.convertFirstToast(for: urls("a.wma"), convertKeys: "⇧", tools: ffmpeg).title == "Convert to M4A first")
+        #expect(FileTool.convertFirstToast(for: urls("a.webm", "b.wma"), convertKeys: "⇧", tools: ffmpeg).title == "Convert to MP4 or M4A first")
         // The Convert wheel's trigger can be changed in Settings.
-        #expect(FileTool.convertFirstToast(for: urls("a.avi"), convertKeys: "⌃⌥").subtitle == "Tap ⌃⌥ while dragging to convert")
+        #expect(FileTool.convertFirstToast(for: urls("a.avi"), convertKeys: "⌃⌥", tools: ffmpeg).subtitle == "Tap ⌃⌥ while dragging to convert")
     }
 
     @Test func convertFirstToastFitsOnOneLine() {
         // The toast shows one line each: about 30 characters of subtitle fit.
-        let toast = FileTool.convertFirstToast(for: urls("a.webm", "b.wma"), convertKeys: "⇧⌥")
+        let toast = FileTool.convertFirstToast(for: urls("a.webm", "b.wma"), convertKeys: "⇧⌥", tools: ffmpeg)
         #expect(toast.title.count <= 28)
         #expect((toast.subtitle ?? "").count <= 34)
     }

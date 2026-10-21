@@ -98,9 +98,14 @@ enum FileTool: CaseIterable, Hashable {
     }
 
     /// What to tell someone who opened the Tools wheel on such files, mid-drag.
-    /// Short enough for the toast's single-line title and subtitle.
+    /// Short enough for the toast's single-line title and subtitle. Converting
+    /// MKV, WebM, WMA and friends takes ffmpeg; without it, say that instead.
     /// - Parameter convertKeys: The Convert wheel's trigger, e.g. "⇧".
-    static func convertFirstToast(for urls: [URL], convertKeys: String) -> Toast {
+    static func convertFirstToast(for urls: [URL], convertKeys: String, tools: ExternalTools) -> Toast {
+        let unreadable = urls.filter { !MediaFormats.isAVFoundationReadable($0) }
+        if tools.ffmpeg == nil, !unreadable.isEmpty {
+            return MissingToolAdvice.toast(for: unreadable, needing: .ffmpeg, tools: tools)
+        }
         let kinds = Set(urls.map { FileKind(url: $0) })
         var format = "MP4 or M4A"
         if kinds == [.video] {
