@@ -97,7 +97,7 @@ enum MediaProbe {
 /// Which media containers macOS can open itself, and which need ffmpeg.
 enum MediaFormats {
     /// Video containers AVFoundation can't read.
-    static let ffmpegOnlyVideoExtensions: Set<String> = ["mkv", "webm", "avi", "wmv", "flv", "asf", "ogv", "mpg", "mpeg", "m2ts", "mts", "vob", "rm", "rmvb"]
+    static let ffmpegOnlyVideoExtensions: Set<String> = ["mkv", "webm", "avi", "wmv", "flv", "asf", "ogv", "mpg", "mpeg", "m2ts", "mts", "ts", "vob", "rm", "rmvb"]
     /// Audio containers AVFoundation can't read.
     static let ffmpegOnlyAudioExtensions: Set<String> = ["ogg", "oga", "opus", "wma", "mka", "ape", "ac3", "wv", "spx"]
 

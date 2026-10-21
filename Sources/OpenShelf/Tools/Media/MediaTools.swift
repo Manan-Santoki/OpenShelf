@@ -24,27 +24,43 @@ enum MediaTools {
 
     /// A copy of a video with its audio tracks removed.
     static func mute(_ url: URL, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
-        let asset = AVURLAsset(url: url)
-        let videoTracks = try await asset.loadTracks(withMediaType: .video)
-        guard !videoTracks.isEmpty else { throw MediaToolError.noVideo(url) }
-        let duration = try await asset.load(.duration)
-
-        let composition = AVMutableComposition()
-        for track in videoTracks {
-            guard let compositionTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else { continue }
-            try compositionTrack.insertTimeRange(CMTimeRange(start: .zero, duration: duration), of: track, at: .zero)
-            compositionTrack.preferredTransform = try await track.load(.preferredTransform)
-        }
-
         let output = videoContainer(for: url)
         let destination = OutputNaming.destination(for: url, suffix: "Muted", pathExtension: output.pathExtension)
-        let session = try await makeSession(
-            for: composition,
-            presets: [AVAssetExportPresetPassthrough, AVAssetExportPresetHighestQuality],
-            fileType: output.fileType
-        )
-        try await export(session, to: destination, fileType: output.fileType, progress: progress)
-        return destination
+        do {
+            let asset = AVURLAsset(url: url)
+            let videoTracks = try await asset.loadTracks(withMediaType: .video)
+            guard !videoTracks.isEmpty else { throw MediaToolError.noVideo(url) }
+            let duration = try await asset.load(.duration)
+
+            let composition = AVMutableComposition()
+            for track in videoTracks {
+                guard let compositionTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else { continue }
+                try compositionTrack.insertTimeRange(CMTimeRange(start: .zero, duration: duration), of: track, at: .zero)
+                compositionTrack.preferredTransform = try await track.load(.preferredTransform)
+            }
+
+            let session = try await makeSession(
+                for: composition,
+                presets: [AVAssetExportPresetPassthrough, AVAssetExportPresetHighestQuality],
+                fileType: output.fileType
+            )
+            try await export(session, to: destination, fileType: output.fileType, progress: progress)
+            return destination
+        } catch {
+            let tools = ExternalTools.detect()
+            if let ffmpeg = tools.ffmpeg {
+                try? FileManager.default.removeItem(at: destination)
+                do {
+                    try await ProcessRunner.run(ffmpeg, ["-y", "-loglevel", "error", "-i", url.path, "-an", "-c:v", "copy", destination.path])
+                    return destination
+                } catch {
+                    try? FileManager.default.removeItem(at: destination)
+                    try await ProcessRunner.run(ffmpeg, ["-y", "-loglevel", "error", "-i", url.path, "-an", "-c:v", "libx264", "-preset", "medium", "-crf", "20", destination.path])
+                    return destination
+                }
+            }
+            throw error
+        }
     }
 
     // MARK: Trim
@@ -62,28 +78,65 @@ enum MediaTools {
         suffix: String,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws -> URL {
-        let asset = AVURLAsset(url: url)
-        let isVideo = try await !asset.loadTracks(withMediaType: .video).isEmpty
-        let session: AVAssetExportSession
+        let isVideo: Bool
         let output: (fileType: AVFileType, pathExtension: String)
+        var destination: URL
 
-        if isVideo {
-            output = videoContainer(for: url)
-            session = try await makeSession(for: asset, presets: [AVAssetExportPresetPassthrough, AVAssetExportPresetHighestQuality], fileType: output.fileType)
-        } else if let passthrough = audioPassthroughContainer(for: url),
-                  let candidate = try? await makeSession(for: asset, presets: [AVAssetExportPresetPassthrough], fileType: passthrough.fileType) {
-            output = passthrough
-            session = candidate
-        } else {
-            // Formats AVFoundation can't write back (e.g. MP3) become AAC.
-            output = (.m4a, "m4a")
-            session = try await makeSession(for: asset, presets: [AVAssetExportPresetAppleM4A], fileType: .m4a)
+        do {
+            let asset = AVURLAsset(url: url)
+            isVideo = try await !asset.loadTracks(withMediaType: .video).isEmpty
+            let session: AVAssetExportSession
+
+            if isVideo {
+                output = videoContainer(for: url)
+                session = try await makeSession(for: asset, presets: [AVAssetExportPresetPassthrough, AVAssetExportPresetHighestQuality], fileType: output.fileType)
+            } else if let passthrough = audioPassthroughContainer(for: url),
+                      let candidate = try? await makeSession(for: asset, presets: [AVAssetExportPresetPassthrough], fileType: passthrough.fileType) {
+                output = passthrough
+                session = candidate
+            } else {
+                // Formats AVFoundation can't write back (e.g. MP3) become AAC.
+                output = (.m4a, "m4a")
+                session = try await makeSession(for: asset, presets: [AVAssetExportPresetAppleM4A], fileType: .m4a)
+            }
+
+            session.timeRange = range
+            destination = OutputNaming.destination(for: url, suffix: suffix, pathExtension: output.pathExtension)
+            try await export(session, to: destination, fileType: output.fileType, progress: progress)
+            return destination
+        } catch {
+            let outExt = url.pathExtension.isEmpty ? "mp4" : url.pathExtension
+            destination = OutputNaming.destination(for: url, suffix: suffix, pathExtension: outExt)
+            let tools = ExternalTools.detect()
+            if let ffmpeg = tools.ffmpeg {
+                try? FileManager.default.removeItem(at: destination)
+                let startSeconds = CMTimeGetSeconds(range.start)
+                let durationSeconds = CMTimeGetSeconds(range.duration)
+                do {
+                    try await ProcessRunner.run(ffmpeg, [
+                        "-y", "-loglevel", "error",
+                        "-ss", String(format: "%.3f", startSeconds),
+                        "-t", String(format: "%.3f", durationSeconds),
+                        "-i", url.path,
+                        "-c", "copy",
+                        destination.path
+                    ])
+                    return destination
+                } catch {
+                    try? FileManager.default.removeItem(at: destination)
+                    try await ProcessRunner.run(ffmpeg, [
+                        "-y", "-loglevel", "error",
+                        "-ss", String(format: "%.3f", startSeconds),
+                        "-t", String(format: "%.3f", durationSeconds),
+                        "-i", url.path,
+                        "-c:v", "libx264", "-crf", "20", "-c:a", "aac",
+                        destination.path
+                    ])
+                    return destination
+                }
+            }
+            throw error
         }
-
-        session.timeRange = range
-        let destination = OutputNaming.destination(for: url, suffix: suffix, pathExtension: output.pathExtension)
-        try await export(session, to: destination, fileType: output.fileType, progress: progress)
-        return destination
     }
 
     // MARK: Speed
@@ -95,39 +148,59 @@ enum MediaTools {
         keepsPitch: Bool,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws -> URL {
-        let asset = AVURLAsset(url: url)
-        let duration = try await asset.load(.duration)
-        let videoTracks = try await asset.loadTracks(withMediaType: .video)
-        let audioTracks = try await asset.loadTracks(withMediaType: .audio)
-        guard !videoTracks.isEmpty || !audioTracks.isEmpty else { throw MediaToolError.noTracks(url) }
-        if videoTracks.isEmpty && !keepsPitch {
-            // Audio-only exports with the varispeed algorithm never finish (macOS 26),
-            // so resample the samples directly instead.
-            return try await varispeedAudio(url, rate: rate, progress: progress)
-        }
-
-        let composition = AVMutableComposition()
-        let fullRange = CMTimeRange(start: .zero, duration: duration)
-        for track in videoTracks + audioTracks {
-            guard let compositionTrack = composition.addMutableTrack(withMediaType: track.mediaType, preferredTrackID: kCMPersistentTrackID_Invalid) else { continue }
-            try compositionTrack.insertTimeRange(fullRange, of: track, at: .zero)
-            if track.mediaType == .video {
-                compositionTrack.preferredTransform = try await track.load(.preferredTransform)
+        var destination: URL
+        do {
+            let asset = AVURLAsset(url: url)
+            let duration = try await asset.load(.duration)
+            let videoTracks = try await asset.loadTracks(withMediaType: .video)
+            let audioTracks = try await asset.loadTracks(withMediaType: .audio)
+            guard !videoTracks.isEmpty || !audioTracks.isEmpty else { throw MediaToolError.noTracks(url) }
+            if videoTracks.isEmpty && !keepsPitch {
+                // Audio-only exports with the varispeed algorithm never finish (macOS 26),
+                // so resample the samples directly instead.
+                return try await varispeedAudio(url, rate: rate, progress: progress)
             }
-        }
-        composition.scaleTimeRange(fullRange, toDuration: CMTimeMultiplyByFloat64(duration, multiplier: 1 / rate))
 
-        let isVideo = !videoTracks.isEmpty
-        let output: (fileType: AVFileType, pathExtension: String) = isVideo ? videoContainer(for: url) : (.m4a, "m4a")
-        let session = try await makeSession(
-            for: composition,
-            presets: isVideo ? [AVAssetExportPresetHighestQuality] : [AVAssetExportPresetAppleM4A],
-            fileType: output.fileType
-        )
-        session.audioTimePitchAlgorithm = keepsPitch ? .spectral : .varispeed
-        let destination = OutputNaming.destination(for: url, suffix: speedSuffix(rate), pathExtension: output.pathExtension)
-        try await export(session, to: destination, fileType: output.fileType, progress: progress)
-        return destination
+            let composition = AVMutableComposition()
+            let fullRange = CMTimeRange(start: .zero, duration: duration)
+            for track in videoTracks + audioTracks {
+                guard let compositionTrack = composition.addMutableTrack(withMediaType: track.mediaType, preferredTrackID: kCMPersistentTrackID_Invalid) else { continue }
+                try compositionTrack.insertTimeRange(fullRange, of: track, at: .zero)
+                if track.mediaType == .video {
+                    compositionTrack.preferredTransform = try await track.load(.preferredTransform)
+                }
+            }
+            composition.scaleTimeRange(fullRange, toDuration: CMTimeMultiplyByFloat64(duration, multiplier: 1 / rate))
+
+            let isVideo = !videoTracks.isEmpty
+            let output: (fileType: AVFileType, pathExtension: String) = isVideo ? videoContainer(for: url) : (.m4a, "m4a")
+            let session = try await makeSession(
+                for: composition,
+                presets: isVideo ? [AVAssetExportPresetHighestQuality] : [AVAssetExportPresetAppleM4A],
+                fileType: output.fileType
+            )
+            session.audioTimePitchAlgorithm = keepsPitch ? .spectral : .varispeed
+            destination = OutputNaming.destination(for: url, suffix: speedSuffix(rate), pathExtension: output.pathExtension)
+            try await export(session, to: destination, fileType: output.fileType, progress: progress)
+            return destination
+        } catch {
+            let tools = ExternalTools.detect()
+            let outExt = url.pathExtension.isEmpty ? "mp4" : url.pathExtension
+            destination = OutputNaming.destination(for: url, suffix: speedSuffix(rate), pathExtension: outExt)
+            if let ffmpeg = tools.ffmpeg {
+                try? FileManager.default.removeItem(at: destination)
+                let pts = String(format: "%.4f", 1.0 / rate)
+                let atempo = String(format: "%.4f", rate)
+                try await ProcessRunner.run(ffmpeg, [
+                    "-y", "-loglevel", "error", "-i", url.path,
+                    "-filter_complex", "[0:v]setpts=\(pts)*PTS[v];[0:a]atempo=\(atempo)[a]",
+                    "-map", "[v]", "-map", "[a]",
+                    destination.path
+                ])
+                return destination
+            }
+            throw error
+        }
     }
 
     /// Changes speed and pitch together, like playing a record faster: the
@@ -235,11 +308,32 @@ enum MediaTools {
 
     /// Re-encodes a video with `preset` into an MP4.
     static func compress(_ url: URL, preset: String, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
-        let asset = AVURLAsset(url: url)
-        let session = try await makeSession(for: asset, presets: [preset, AVAssetExportPresetMediumQuality], fileType: .mp4)
         let destination = OutputNaming.destination(for: url, suffix: "Compressed", pathExtension: "mp4")
-        try await export(session, to: destination, fileType: .mp4, progress: progress)
-        return destination
+        do {
+            let asset = AVURLAsset(url: url)
+            let session = try await makeSession(for: asset, presets: [preset, AVAssetExportPresetMediumQuality], fileType: .mp4)
+            try await export(session, to: destination, fileType: .mp4, progress: progress)
+            return destination
+        } catch {
+            let tools = ExternalTools.detect()
+            if let ffmpeg = tools.ffmpeg {
+                try? FileManager.default.removeItem(at: destination)
+                let crf: String
+                switch preset {
+                case AVAssetExportPresetLowQuality: crf = "32"
+                case AVAssetExportPresetMediumQuality: crf = "26"
+                default: crf = "22"
+                }
+                try await ProcessRunner.run(ffmpeg, [
+                    "-y", "-loglevel", "error", "-i", url.path,
+                    "-c:v", "libx264", "-crf", crf, "-preset", "fast",
+                    "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
+                    destination.path
+                ])
+                return destination
+            }
+            throw error
+        }
     }
 
     /// AVFoundation's estimate of the compressed size, or nil when it can't tell.

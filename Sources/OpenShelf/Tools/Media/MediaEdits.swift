@@ -286,51 +286,71 @@ extension MediaTools {
     /// Turns or mirrors a video. Turns keep the original frames and only change
     /// their orientation; a mirror re-encodes. Audio is kept.
     static func rotate(_ url: URL, by rotation: VideoRotation, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
-        let asset = AVURLAsset(url: url)
-        guard let source = try await asset.loadTracks(withMediaType: .video).first else { throw MediaToolError.noVideo(url) }
-        let audioTracks = try await asset.loadTracks(withMediaType: .audio)
-        let duration = try await asset.load(.duration)
-        let (naturalSize, transform, rate) = try await source.load(.naturalSize, .preferredTransform, .nominalFrameRate)
-        let fullRange = CMTimeRange(start: .zero, duration: duration)
-        let newTransform = rotation.applied(to: transform, naturalSize: naturalSize)
-
-        let composition = AVMutableComposition()
-        guard let videoTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
-            throw MediaToolError.cannotExport("rotated")
-        }
-        try videoTrack.insertTimeRange(fullRange, of: source, at: .zero)
-        for audio in audioTracks {
-            let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
-            try track?.insertTimeRange(fullRange, of: audio, at: .zero)
-        }
-
         let output = videoContainer(for: url)
         let destination = OutputNaming.destination(for: url, suffix: "Rotated", pathExtension: output.pathExtension)
         try SaveError.checkWritable(destination)
-        let session: AVAssetExportSession
-        if rotation.isLossless {
-            videoTrack.preferredTransform = newTransform
-            session = try await makeSession(
-                for: composition,
-                presets: [AVAssetExportPresetPassthrough, AVAssetExportPresetHighestQuality],
-                fileType: output.fileType
-            )
-        } else {
-            let size = CGRect(origin: .zero, size: naturalSize).applying(newTransform).size
-            let layer = AVMutableVideoCompositionLayerInstruction(assetTrack: videoTrack)
-            layer.setTransform(newTransform, at: .zero)
-            let instruction = AVMutableVideoCompositionInstruction()
-            instruction.timeRange = fullRange
-            instruction.layerInstructions = [layer]
-            let videoComposition = AVMutableVideoComposition()
-            videoComposition.renderSize = evenSize(CGSize(width: abs(size.width), height: abs(size.height)))
-            videoComposition.frameDuration = CMTime(value: 1, timescale: CMTimeScale(rate > 0 ? rate.rounded() : 30))
-            videoComposition.instructions = [instruction]
-            session = try await makeSession(for: composition, presets: [AVAssetExportPresetHighestQuality], fileType: output.fileType)
-            session.videoComposition = videoComposition
+        do {
+            let asset = AVURLAsset(url: url)
+            guard let source = try await asset.loadTracks(withMediaType: .video).first else { throw MediaToolError.noVideo(url) }
+            let audioTracks = try await asset.loadTracks(withMediaType: .audio)
+            let duration = try await asset.load(.duration)
+            let (naturalSize, transform, rate) = try await source.load(.naturalSize, .preferredTransform, .nominalFrameRate)
+            let fullRange = CMTimeRange(start: .zero, duration: duration)
+            let newTransform = rotation.applied(to: transform, naturalSize: naturalSize)
+
+            let composition = AVMutableComposition()
+            guard let videoTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+                throw MediaToolError.cannotExport("rotated")
+            }
+            try videoTrack.insertTimeRange(fullRange, of: source, at: .zero)
+            for audio in audioTracks {
+                let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
+                try track?.insertTimeRange(fullRange, of: audio, at: .zero)
+            }
+
+            let session: AVAssetExportSession
+            if rotation.isLossless {
+                videoTrack.preferredTransform = newTransform
+                session = try await makeSession(
+                    for: composition,
+                    presets: [AVAssetExportPresetPassthrough, AVAssetExportPresetHighestQuality],
+                    fileType: output.fileType
+                )
+            } else {
+                let size = CGRect(origin: .zero, size: naturalSize).applying(newTransform).size
+                let layer = AVMutableVideoCompositionLayerInstruction(assetTrack: videoTrack)
+                layer.setTransform(newTransform, at: .zero)
+                let instruction = AVMutableVideoCompositionInstruction()
+                instruction.timeRange = fullRange
+                instruction.layerInstructions = [layer]
+                let videoComposition = AVMutableVideoComposition()
+                videoComposition.renderSize = evenSize(CGSize(width: abs(size.width), height: abs(size.height)))
+                videoComposition.frameDuration = CMTime(value: 1, timescale: CMTimeScale(rate > 0 ? rate.rounded() : 30))
+                videoComposition.instructions = [instruction]
+                session = try await makeSession(for: composition, presets: [AVAssetExportPresetHighestQuality], fileType: output.fileType)
+                session.videoComposition = videoComposition
+            }
+            try await export(session, to: destination, fileType: output.fileType, progress: progress)
+            return destination
+        } catch {
+            let tools = ExternalTools.detect()
+            if let ffmpeg = tools.ffmpeg {
+                try? FileManager.default.removeItem(at: destination)
+                let vf: String
+                switch rotation {
+                case .right: vf = "transpose=1"
+                case .left: vf = "transpose=2"
+                case .upsideDown: vf = "transpose=2,transpose=2"
+                case .flipHorizontal: vf = "hflip"
+                }
+                try await ProcessRunner.run(ffmpeg, [
+                    "-y", "-loglevel", "error", "-i", url.path,
+                    "-vf", vf, "-c:a", "copy", destination.path
+                ])
+                return destination
+            }
+            throw error
         }
-        try await export(session, to: destination, fileType: output.fileType, progress: progress)
-        return destination
     }
 
     /// Video encoders need even dimensions.

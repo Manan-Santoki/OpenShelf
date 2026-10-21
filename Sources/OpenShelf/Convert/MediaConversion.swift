@@ -23,7 +23,16 @@ enum MediaConversion {
         }
         do {
             if isNative && !format.needsFFmpeg {
-                try await convertNatively(source, to: format, destination: destination, progress: progress)
+                do {
+                    try await convertNatively(source, to: format, destination: destination, progress: progress)
+                } catch {
+                    if tools.ffmpeg != nil {
+                        try? FileManager.default.removeItem(at: destination)
+                        try await convertWithFFmpeg(source, to: format, destination: destination, tools: tools, progress: progress)
+                    } else {
+                        throw error
+                    }
+                }
             } else {
                 try await convertWithFFmpeg(source, to: format, destination: destination, tools: tools, progress: progress)
             }
@@ -72,10 +81,10 @@ enum MediaConversion {
         let encoders = FFmpegEncoders.available(in: ffmpeg)
         let duration = await duration(of: source, tools: tools)
 
-        if format == .mkv {
-            // Matroska holds almost any codec, so try copying the streams first.
+        if format == .mkv || format == .mov || format == .mp4 {
+            let copyArgs: [String] = (format == .mp4) ? ["-c", "copy", "-movflags", "+faststart"] : ["-c", "copy"]
             do {
-                try await run(ffmpeg, source: source, destination: destination, arguments: ["-map", "0", "-c", "copy"], duration: duration, progress: progress)
+                try await run(ffmpeg, source: source, destination: destination, arguments: copyArgs, duration: duration, progress: progress)
                 return
             } catch is CancellationError {
                 throw CancellationError()
@@ -114,18 +123,20 @@ enum MediaConversion {
     private static func duration(of source: URL, tools: ExternalTools) async -> Double {
         if MediaFormats.isAVFoundationReadable(source),
            let seconds = try? await AVURLAsset(url: source).load(.duration).seconds,
-           seconds.isFinite {
+           seconds.isFinite, seconds > 0 {
             return seconds
         }
         return MediaProbe.duration(of: source, ffprobe: tools.ffprobe) ?? 0
     }
 
     private static func requireAudio(in source: URL, isNative: Bool, tools: ExternalTools) async throws {
-        let hasAudio: Bool
-        if isNative {
-            hasAudio = try await !AVURLAsset(url: source).loadTracks(withMediaType: .audio).isEmpty
+        var hasAudio: Bool = false
+        if isNative, let tracks = try? await AVURLAsset(url: source).loadTracks(withMediaType: .audio) {
+            hasAudio = !tracks.isEmpty
         } else {
-            // When ffprobe can't tell, let ffmpeg try and report.
+            hasAudio = MediaProbe.hasAudioTrack(source, ffprobe: tools.ffprobe) ?? true
+        }
+        if !hasAudio && isNative {
             hasAudio = MediaProbe.hasAudioTrack(source, ffprobe: tools.ffprobe) ?? true
         }
         guard hasAudio else {
