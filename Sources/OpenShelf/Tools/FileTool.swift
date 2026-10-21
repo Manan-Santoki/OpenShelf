@@ -97,6 +97,24 @@ enum FileTool: CaseIterable, Hashable {
         }
     }
 
+    /// What to tell someone who opened the Tools wheel on such files, mid-drag.
+    /// Short enough for the toast's single-line title and subtitle.
+    /// - Parameter convertKeys: The Convert wheel's trigger, e.g. "⇧".
+    static func convertFirstToast(for urls: [URL], convertKeys: String) -> Toast {
+        let kinds = Set(urls.map { FileKind(url: $0) })
+        var format = "MP4 or M4A"
+        if kinds == [.video] {
+            format = "MP4"
+        } else if kinds == [.audio] {
+            format = "M4A"
+        }
+        return Toast(
+            systemImage: "arrow.triangle.2.circlepath",
+            title: "Convert to \(format) first",
+            subtitle: "Tap \(convertKeys) while dragging to convert"
+        )
+    }
+
     /// Tools that apply to every file in `urls`, in wheel order.
     static func available(for urls: [URL]) -> [FileTool] {
         guard !urls.isEmpty else { return [] }

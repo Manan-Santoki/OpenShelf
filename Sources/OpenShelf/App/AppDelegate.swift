@@ -76,8 +76,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             wheel.dismiss(after: .zero)
             if kind == .tools, FileTool.needsConversionForTools(urls) {
                 // MKV, WebM, AVI and friends convert fine but can't be edited directly.
+                let convertKeys = TriggerKey.describe(Preferences.shared.trigger(for: .convert))
                 ToastController.shared.show(
-                    Toast(systemImage: "arrow.triangle.2.circlepath", title: "Convert to MP4 or M4A first", subtitle: "Tools work on MP4, MOV and M4A. Tap ⇧ to convert."),
+                    FileTool.convertFirstToast(for: urls, convertKeys: convertKeys),
                     near: location,
                     for: .seconds(3)
                 )
