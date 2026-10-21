@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>OpenShelf · Convert, edit and share files mid-drag on your Mac</title>
+<meta name="description" content="OpenShelf is a free, open-source Mac app. Start dragging any file, tap a key, and drop it on a wheel to convert it, edit it or put it on a floating shelf. Everything runs on your Mac.">
+<meta property="og:title" content="OpenShelf: drag, tap, done.">
+<meta property="og:description" content="A free, open-source Mac app that turns every file drag into a launcher: convert, edit and share files without opening another app.">
+<meta property="og:image" content="https://openshelf.msantoki.com/assets/icon.png">
+<meta property="og:url" content="https://openshelf.msantoki.com/">
+<meta name="twitter:card" content="summary">
+<meta name="theme-color" content="#0a0a0b">
+<link rel="icon" href="/assets/favicon.png">
+<link rel="apple-touch-icon" href="/assets/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Monoline: a black canvas, thin white outlines, one solid lit petal; the accent
+   only appears where the app itself shows it (a hovered wedge). */
+:root {
+  --bg: #0a0a0b;
+  --panel: #131316;
+  --panel-2: #1a1a1f;
+  --line: #2a2a31;
+  --ink: #f4f4f6;
+  --muted: #9a9aa6;
+  --faint: #5d5d68;
+  --accent: #3d7bfd;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "Figtree", -apple-system, system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.6 var(--body); -webkit-font-smoothing: antialiased; }
+img { max-width: 100%; height: auto; display: block; }
+a { color: inherit; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right)); }
+
+/* Nav */
+nav { position: sticky; top: 0; z-index: 20; backdrop-filter: blur(14px); background: rgba(10,10,11,0.72); border-bottom: 1px solid rgba(255,255,255,0.06); }
+nav .wrap { display: flex; align-items: center; gap: 24px; height: 62px; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font: 700 19px var(--display); letter-spacing: -0.01em; }
+.brand img { width: 30px; height: 30px; }
+nav .links { display: flex; gap: 22px; margin-left: auto; font-size: 15px; color: var(--muted); }
+nav .links a { text-decoration: none; }
+nav .links a:hover { color: var(--ink); }
+.btn { display: inline-flex; align-items: center; gap: 10px; border-radius: 999px; padding: 12px 22px; font: 600 16px var(--body); text-decoration: none; border: 1px solid transparent; cursor: pointer; transition: transform .15s ease, background .15s ease, border-color .15s ease; }
+.btn:hover { transform: translateY(-1px); }
+.btn.primary { background: var(--ink); color: #0a0a0b; }
+.btn.ghost { border-color: var(--line); color: var(--ink); }
+.btn.ghost:hover { border-color: var(--faint); }
+.btn.small { padding: 8px 16px; font-size: 14px; }
+.btn svg { width: 18px; height: 18px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 8px; }
+
+/* Hero */
+.hero { padding-block: 72px 56px; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 40px; align-items: center; }
+.eyebrow { font: 500 13px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+h1 { font: 800 clamp(48px, 7.4vw, 92px)/0.95 var(--display); letter-spacing: -0.035em; margin: 14px 0 22px; text-wrap: balance; }
+h1 .dim { color: var(--faint); }
+.lede { font-size: 20px; color: var(--muted); max-width: 34ch; margin: 0 0 30px; }
+.lede b { color: var(--ink); font-weight: 600; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.cta-note { font-size: 14px; color: var(--faint); margin-top: 14px; }
+
+.stage { position: relative; display: grid; justify-items: center; gap: 22px; }
+.keys { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; max-width: 100%; }
+.key { font: 500 15px var(--mono); color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 9px 14px; cursor: pointer; display: flex; gap: 10px; align-items: center; transition: border-color .2s, color .2s, background .2s; }
+.key kbd { font: 600 16px var(--mono); color: var(--ink); }
+.key[aria-pressed="true"] { border-color: var(--ink); color: var(--ink); background: var(--panel-2); }
+#wheel { width: min(100%, 470px); height: auto; overflow: visible; }
+#wheel .petal { fill: transparent; stroke: rgba(244,244,246,0.82); stroke-width: 2.2; transition: fill .28s ease, stroke .28s ease; }
+#wheel .petal.lit { fill: var(--ink); stroke: var(--ink); }
+#wheel .label { font: 600 14px var(--mono); fill: rgba(244,244,246,0.85); text-anchor: middle; dominant-baseline: central; letter-spacing: 0.04em; transition: fill .28s ease; pointer-events: none; }
+#wheel .label.lit { fill: #0a0a0b; }
+#wheel .hub { fill: transparent; stroke: rgba(244,244,246,0.82); stroke-width: 2.2; }
+#wheel .file .sheet { fill: url(#paper); }
+#wheel .file .fold { fill: #bdbdc7; }
+#wheel .file text { font: 600 11px var(--mono); fill: #26262c; text-anchor: middle; }
+#wheel .pill rect { fill: var(--panel-2); stroke: var(--line); }
+#wheel .pill text { font: 600 14px var(--body); fill: var(--ink); text-anchor: middle; dominant-baseline: central; }
+#wheel .bloom { transform-origin: 250px 270px; animation: bloom .55s cubic-bezier(.2,.9,.25,1); }
+@keyframes bloom { from { transform: scale(.55) rotate(-8deg); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* Sections */
+section { padding-block: 88px; border-top: 1px solid rgba(255,255,255,0.05); }
+h2 { font: 800 clamp(34px, 4.6vw, 56px)/1.02 var(--display); letter-spacing: -0.03em; margin: 12px 0 18px; text-wrap: balance; }
+.section-lede { color: var(--muted); font-size: 19px; max-width: 58ch; margin: 0; }
+
+.three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 44px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 22px; padding: 22px; display: grid; gap: 14px; align-content: start; }
+.card .kbdrow { display: flex; align-items: center; gap: 10px; }
+.card kbd { font: 600 17px var(--mono); border: 1px solid var(--line); background: var(--panel-2); border-radius: 10px; padding: 6px 11px; }
+.card h3 { margin: 0; font: 700 24px var(--display); letter-spacing: -0.01em; }
+.card p { margin: 0; color: var(--muted); font-size: 16px; }
+.card img { width: 78%; margin: 6px auto 0; }
+
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 48px; align-items: center; margin-top: 8px; }
+.split.flip { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
+.split.flip .media { order: -1; }
+.media { display: grid; gap: 16px; }
+.media.row { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; }
+.media img { border-radius: 16px; }
+ul.ticks { list-style: none; padding: 0; margin: 24px 0 0; display: grid; gap: 12px; }
+ul.ticks li { padding-left: 30px; position: relative; color: var(--muted); }
+ul.ticks li b { color: var(--ink); font-weight: 600; }
+ul.ticks li::before { content: ""; position: absolute; left: 0; top: 7px; width: 14px; height: 14px; border: 2px solid var(--ink); border-radius: 4px 4px 4px 9px; transform: rotate(45deg); }
+
+/* Formats */
+.formats { margin-top: 40px; display: grid; gap: 10px; }
+.frow { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 18px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px 18px; }
+.frow .from { font: 700 18px var(--display); }
+.frow .from small { display: block; font: 400 13px var(--body); color: var(--faint); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { font: 500 13px var(--mono); border: 1px solid var(--line); border-radius: 8px; padding: 4px 9px; color: var(--ink); background: var(--panel-2); }
+.chip.opt { color: var(--muted); border-style: dashed; }
+.fnote { color: var(--faint); font-size: 14px; margin-top: 14px; }
+
+/* Tool lists */
+.tools-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 30px; }
+.tools-grid .card h3 { font-size: 20px; }
+
+/* Trust */
+.trust { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin-top: 40px; }
+.trust .card h3 { font-size: 19px; }
+
+/* Install */
+.install { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; align-items: start; margin-top: 36px; }
+ol.steps { margin: 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 16px; }
+ol.steps li { counter-increment: s; padding-left: 52px; position: relative; color: var(--muted); }
+ol.steps li b { color: var(--ink); }
+ol.steps li::before { content: counter(s); position: absolute; left: 0; top: -2px; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); display: grid; place-items: center; font: 600 15px var(--mono); color: var(--ink); }
+code { font: 14px var(--mono); background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; color: var(--ink); word-break: break-all; }
+.req { color: var(--faint); font-size: 15px; margin-top: 18px; }
+
+/* Final CTA + footer */
+.final { text-align: center; }
+.final img { width: 96px; margin: 0 auto 16px; }
+.final .cta { justify-content: center; margin-top: 26px; }
+footer { border-top: 1px solid rgba(255,255,255,0.05); padding-block: 34px; color: var(--faint); font-size: 14px; }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 14px 24px; justify-content: space-between; }
+footer a { color: var(--muted); text-decoration: none; }
+footer a:hover { color: var(--ink); }
+
+@media (max-width: 960px) {
+  .hero, .split, .split.flip, .install { grid-template-columns: minmax(0, 1fr); }
+  .split.flip .media { order: 0; }
+  .three, .tools-grid { grid-template-columns: minmax(0, 1fr); }
+  .trust { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  nav .links { display: none; }
+  .hero { padding-top: 44px; }
+}
+@media (max-width: 560px) {
+  .trust { grid-template-columns: minmax(0, 1fr); }
+  .frow { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .media.row { grid-template-columns: minmax(0, 1fr); }
+  .key { padding: 7px 11px; font-size: 13px; gap: 7px; }
+  body { font-size: 16px; }
+  .lede { font-size: 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  #wheel .bloom { animation: none; }
+  .btn:hover { transform: none; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#top"><img src="/assets/icon.png" alt="" width="30" height="30">OpenShelf</a>
+    <div class="links">
+      <a href="#wheels">How it works</a>
+      <a href="#formats">Formats</a>
+      <a href="#tools">Tools</a>
+      <a href="#shelves">Shelves</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/Manan-Santoki/OpenShelf">GitHub</a>
+    </div>
+    <a class="btn primary small download-link" href="https://github.com/Manan-Santoki/OpenShelf/releases/latest">Download</a>
+  </div>
+</nav>
+
+<main id="top">
+  <div class="wrap hero">
+    <div>
+      <div class="eyebrow">Free and open source · for Mac</div>
+      <h1>Drag.<br>Tap.<br><span class="dim">Done.</span></h1>
+      <p class="lede">Start dragging any file, tap a key, and drop it on the wheel. <b>Convert it, edit it, or park it on a shelf</b> without opening another app.</p>
+      <div class="cta">
+        <a class="btn primary download-link" href="https://github.com/Manan-Santoki/OpenShelf/releases/latest">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.37 12.46c-.02-2.13 1.74-3.15 1.82-3.2-1-1.45-2.54-1.65-3.08-1.67-1.31-.13-2.56.77-3.22.77-.67 0-1.69-.75-2.78-.73-1.43.02-2.75.83-3.48 2.11-1.49 2.58-.38 6.39 1.06 8.48.71 1.02 1.55 2.17 2.65 2.13 1.07-.04 1.47-.69 2.76-.69 1.28 0 1.65.69 2.78.67 1.15-.02 1.87-1.04 2.57-2.07.81-1.18 1.14-2.33 1.16-2.39-.03-.01-2.21-.85-2.24-3.41zM14.28 6.21c.58-.71.98-1.69.87-2.67-.84.03-1.87.56-2.47 1.27-.54.62-1.02 1.63-.89 2.59.94.07 1.9-.48 2.49-1.19z"/></svg>
+          <span class="download-label">Download for Mac</span>
+        </a>
+        <a class="btn ghost" href="https://github.com/Manan-Santoki/OpenShelf">View on GitHub</a>
+      </div>
+      <div class="cta-note">macOS 14 or later · Apple silicon and Intel · MIT license</div>
+    </div>
+
+    <div class="stage">
+      <div class="keys" role="group" aria-label="Choose a wheel">
+        <button class="key" type="button" data-set="convert" aria-pressed="true"><kbd>⇧</kbd>Convert</button>
+        <button class="key" type="button" data-set="tools" aria-pressed="false"><kbd>⇧⌥</kbd>Tools</button>
+        <button class="key" type="button" data-set="actions" aria-pressed="false"><kbd>⌃</kbd>Actions</button>
+      </div>
+      <svg id="wheel" viewBox="0 0 500 520" role="img" aria-label="The OpenShelf wheel"></svg>
+    </div>
+  </div>
+
+  <section id="wheels">
+    <div class="wrap">
+      <div class="eyebrow">How it works</div>
+      <h2>One gesture, three wheels.</h2>
+      <p class="section-lede">Press on a file in Finder, on the Desktop or in any app that lets you drag files. While you're still dragging, tap a key. The wheel blooms under the pointer and stays open until you drop. Results land next to the original, and nothing is ever overwritten.</p>
+      <div class="three">
+        <div class="card">
+          <div class="kbdrow"><kbd>⇧</kbd><h3>Convert</h3></div>
+          <p>Only the formats that make sense for what you're dragging. JPG to HEIC, PDF to Word, video to GIF, folder to ZIP.</p>
+          <img src="/assets/wheel-convert.webp" alt="The Convert wheel for a photo, showing PNG, WEBP, HEIC, TIFF, AVIF, BMP, PDF, DOCX and ZIP" loading="lazy" width="608" height="608">
+        </div>
+        <div class="card">
+          <div class="kbdrow"><kbd>⇧⌥</kbd><h3>Tools</h3></div>
+          <p>Crop, compress, annotate, redact, trim, split PDFs. Each tool opens a small focused editor and saves a copy.</p>
+          <img src="/assets/wheel-tools.webp" alt="The Tools wheel for a photo, with Crop highlighted" loading="lazy" width="608" height="608">
+        </div>
+        <div class="card">
+          <div class="kbdrow"><kbd>⌃</kbd><h3>Actions</h3></div>
+          <p>Put it on a floating shelf, AirDrop it, copy it, move it, copy its path or open Terminal in its folder.</p>
+          <img src="/assets/wheel-actions.webp" alt="The Actions wheel, with Shelf highlighted" loading="lazy" width="608" height="608">
+        </div>
+      </div>
+      <div class="split" style="margin-top:56px">
+        <div>
+          <h3 style="font:700 28px var(--display);margin:0">Feedback right where you're looking.</h3>
+          <ul class="ticks">
+            <li><b>The label above the wheel</b> shows the file size, then exactly what the hovered wedge will do.</li>
+            <li><b>A small card by the pointer</b> shows progress for long jobs. Click × to cancel.</li>
+            <li><b>Keyboard too:</b> open a wheel, let go of the key, then use the arrow keys and Return. Esc cancels.</li>
+            <li><b>Your keys:</b> change the key for each wheel in Settings.</li>
+          </ul>
+        </div>
+        <div class="media row">
+          <img src="/assets/wheel-pill.webp" alt="The Actions wheel with AirDrop highlighted and its name shown above the wheel" loading="lazy" width="720" height="720">
+          <img src="/assets/toast-progress.webp" alt="A progress card reading Converting to HEIC, 2 of 3 saved" loading="lazy" width="600" height="184" style="align-self:center">
+          <img src="/assets/shelf-collapsed.webp" alt="A collapsed shelf holding five files" loading="lazy" width="372" height="412">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="formats">
+    <div class="wrap">
+      <div class="eyebrow">Convert</div>
+      <h2>Every everyday format.</h2>
+      <p class="section-lede">Drag several files at once to convert them together. Mixed selections only show the formats every file supports.</p>
+      <div class="formats">
+        <div class="frow"><div class="from">Images<small>JPG, PNG, HEIC, SVG, …</small></div><div class="chips"><span class="chip">PNG</span><span class="chip">JPG</span><span class="chip">HEIC</span><span class="chip">AVIF</span><span class="chip opt">WEBP</span><span class="chip">TIFF</span><span class="chip">BMP</span><span class="chip">PDF</span><span class="chip">DOCX</span><span class="chip">ZIP</span></div></div>
+        <div class="frow"><div class="from">PDF<small>all pages, 300 dpi</small></div><div class="chips"><span class="chip">DOCX</span><span class="chip">JPG</span><span class="chip">PNG</span><span class="chip">TXT</span><span class="chip">ZIP</span></div></div>
+        <div class="frow"><div class="from">Documents<small>TXT, RTF, DOCX, HTML, MD</small></div><div class="chips"><span class="chip">PDF</span><span class="chip">DOCX</span><span class="chip">TXT</span><span class="chip">RTF</span><span class="chip">HTML</span><span class="chip">ZIP</span></div></div>
+        <div class="frow"><div class="from">Audio</div><div class="chips"><span class="chip opt">MP3</span><span class="chip">M4A</span><span class="chip">WAV</span><span class="chip">AIFF</span><span class="chip">FLAC</span><span class="chip">ZIP</span></div></div>
+        <div class="frow"><div class="from">Video</div><div class="chips"><span class="chip">MP4</span><span class="chip">MOV</span><span class="chip">M4A</span><span class="chip opt">GIF</span><span class="chip opt">MP3</span><span class="chip">ZIP</span></div></div>
+        <div class="frow"><div class="from">Subtitles<small>SRT, VTT</small></div><div class="chips"><span class="chip">TXT</span><span class="chip">SRT</span><span class="chip">VTT</span></div></div>
+        <div class="frow"><div class="from">Archives<small>ZIP, TAR, GZ, 7Z, RAR</small></div><div class="chips"><span class="chip">Unzip into a folder</span></div></div>
+        <div class="frow"><div class="from">Folders &amp; anything else</div><div class="chips"><span class="chip">ZIP</span></div></div>
+      </div>
+      <p class="fnote">Dashed formats use free tools you can add with <code>brew install ffmpeg webp</code>; they're hidden until then.</p>
+    </div>
+  </section>
+
+  <section id="tools">
+    <div class="wrap">
+      <div class="split flip">
+        <div>
+          <div class="eyebrow">Tools</div>
+          <h2>Small editors for quick jobs.</h2>
+          <p class="section-lede">Each tool opens a focused window that zooms out of where you dropped the file. Save writes a copy beside the original (<code>Photo Cropped.jpg</code>), so you can drag the result straight back into another wheel.</p>
+        </div>
+        <div class="media row">
+          <img src="/assets/editor-crop.webp" alt="The Crop Image editor with aspect ratio presets and pixel size fields" loading="lazy" width="972" height="1292">
+          <img src="/assets/editor-add-bg.webp" alt="The Add Background editor with gradient swatches and padding, corner and shadow sliders" loading="lazy" width="1012" height="1412">
+          <img src="/assets/editor-annotate.webp" alt="The Annotate editor with drawing tools and colours" loading="lazy" width="1212" height="1412">
+        </div>
+      </div>
+      <div class="tools-grid">
+        <div class="card"><h3>Images</h3><p>Crop · Add Background · Annotate · Redact · Edit · Compress · Metadata · Read QR · Combine into PDF</p></div>
+        <div class="card"><h3>PDFs</h3><p>Combine · Reorder, rotate and delete pages · Split · Compress · Edit or remove metadata</p></div>
+        <div class="card"><h3>Video &amp; audio</h3><p>Trim · Speed · Crop · Compress · Mute</p></div>
+      </div>
+      <div class="split" style="margin-top:44px">
+        <div>
+          <h3 style="font:700 28px var(--display);margin:0">Trim with a real timeline.</h3>
+          <p class="section-lede" style="margin-top:12px;font-size:17px">A filmstrip for video, a waveform for audio. Drag the handles to scrub, press Space to hear the selection, then save just that part.</p>
+        </div>
+        <div class="media"><img src="/assets/editor-trim.webp" alt="The Trim editor showing a video preview above a filmstrip with selection handles" loading="lazy" width="1292" height="1212"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="shelves">
+    <div class="wrap">
+      <div class="split">
+        <div>
+          <div class="eyebrow">Shelves</div>
+          <h2>A place to put files for a minute.</h2>
+          <p class="section-lede">Drop files on the Shelf wedge and they wait in a small floating window, so you can gather them from anywhere and drag them out together later.</p>
+          <ul class="ticks">
+            <li><b>Collapsed stack or full grid and list.</b> Select like Finder, preview with Space.</li>
+            <li><b>Dock to a screen edge.</b> It tucks into a slim tab and slides back out when you hover or drop on it.</li>
+            <li><b>Comes back after a restart,</b> even if the files moved.</li>
+            <li><b>Never touches your files.</b> Closing a shelf just lets go of them.</li>
+          </ul>
+        </div>
+        <div class="media"><img src="/assets/shelf-expanded.webp" alt="An expanded shelf with five files in a grid, one selected" loading="lazy" width="660" height="588"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="trust">
+    <div class="wrap">
+      <div class="eyebrow">Yours</div>
+      <h2>Private, open and up to date.</h2>
+      <div class="trust">
+        <div class="card"><h3>Runs on your Mac</h3><p>Every conversion and tool works offline. Files are never uploaded anywhere.</p></div>
+        <div class="card"><h3>No permissions needed</h3><p>Drag detection works without Accessibility or screen access.</p></div>
+        <div class="card"><h3>Open source</h3><p>MIT licensed. Read the code, file issues and send pull requests on GitHub.</p></div>
+        <div class="card"><h3>Updates itself</h3><p>New versions install from the app, signed so only genuine releases are accepted.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="install">
+    <div class="wrap">
+      <div class="eyebrow">Install</div>
+      <h2>Ready in a minute.</h2>
+      <div class="install">
+        <ol class="steps">
+          <li><b>Download</b> the DMG and open it.</li>
+          <li><b>Drag OpenShelf</b> onto the Applications folder, then open it. It lives in your menu bar.</li>
+          <li><b>First launch only:</b> macOS may say it can't verify the app. Open <b>System Settings → Privacy &amp; Security</b>, scroll down and click <b>Open Anyway</b>. On macOS 14, right-click the app and choose Open instead.</li>
+          <li><b>Try it:</b> drag any file, tap <b>⇧</b>, and drop on a wedge.</li>
+        </ol>
+        <div class="card">
+          <h3>Prefer Terminal?</h3>
+          <p>After moving the app to Applications, this clears the first-launch prompt:</p>
+          <p><code>xattr -dr com.apple.quarantine /Applications/OpenShelf.app</code></p>
+          <p class="req">Requires macOS 14 Sonoma or later, on Apple silicon or Intel. Later versions arrive through the app's built-in updater.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="final">
+    <div class="wrap">
+      <img src="/assets/icon.png" alt="" width="96" height="96" loading="lazy">
+      <h2>Make every drag count.</h2>
+      <p class="section-lede" style="margin:0 auto">Free forever. No account, no subscription, no uploads.</p>
+      <div class="cta">
+        <a class="btn primary download-link" href="https://github.com/Manan-Santoki/OpenShelf/releases/latest"><span class="download-label">Download for Mac</span></a>
+        <a class="btn ghost" href="https://github.com/Manan-Santoki/OpenShelf">Star on GitHub</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>© 2026 OpenShelf contributors · MIT license</span>
+    <span>
+      <a href="https://github.com/Manan-Santoki/OpenShelf">GitHub</a> ·
+      <a href="https://github.com/Manan-Santoki/OpenShelf/releases">Releases</a> ·
+      <a href="https://github.com/Manan-Santoki/OpenShelf/blob/main/CHANGELOG.md">Changelog</a> ·
+      <a href="https://github.com/Manan-Santoki/OpenShelf/issues">Report a problem</a>
+    </span>
+  </div>
+</footer>
+
+<script>
+// Hero wheel: the same rounded-wedge geometry as the app, drawn in SVG.
+const WHEELS = {
+  convert: { title: "Convert", items: ["PNG", "HEIC", "WEBP", "PDF", "DOCX", "AVIF", "TIFF", "ZIP"] },
+  tools: { title: "Tools", items: ["Crop", "Compress", "Annotate", "Redact", "Edit", "Metadata", "Add BG", "Read QR"] },
+  actions: { title: "Actions", items: ["Shelf", "AirDrop", "Copy", "Move", "Path", "Terminal"] },
+};
+const CX = 250, CY = 270, INNER = 76, OUTER = 196, GAP = 14, CORNER = 22;
+const svg = document.getElementById("wheel");
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let current = "convert", lit = 0, timer = null, userPicked = false;
+
+function pt(d, a) { return [CX + d * Math.sin(a), CY - d * Math.cos(a)]; }
+function wedgePath(start, end) {
+  const half = GAP / 2, r = Math.min(CORNER, (OUTER - INNER) / 2);
+  const s = d => start + Math.asin(Math.min(half / d, 1));
+  const e = d => end - Math.asin(Math.min(half / d, 1));
+  const oi = Math.min(r / OUTER, (e(OUTER) - s(OUTER)) / 2);
+  const ii = Math.min(r / INNER, (e(INNER) - s(INNER)) / 2);
+  const f = p => p.map(n => n.toFixed(2)).join(" ");
+  return [
+    "M", f(pt(OUTER - r, s(OUTER - r))),
+    "Q", f(pt(OUTER, s(OUTER))), f(pt(OUTER, s(OUTER) + oi)),
+    "A", OUTER, OUTER, 0, 0, 1, f(pt(OUTER, e(OUTER) - oi)),
+    "Q", f(pt(OUTER, e(OUTER))), f(pt(OUTER - r, e(OUTER - r))),
+    "L", f(pt(INNER + r, e(INNER + r))),
+    "Q", f(pt(INNER, e(INNER))), f(pt(INNER, e(INNER) - ii)),
+    "A", INNER, INNER, 0, 0, 0, f(pt(INNER, s(INNER) + ii)),
+    "Q", f(pt(INNER, s(INNER))), f(pt(INNER + r, s(INNER + r))),
+    "Z",
+  ].join(" ");
+}
+function el(name, attrs) {
+  const node = document.createElementNS("http://www.w3.org/2000/svg", name);
+  for (const k in attrs) node.setAttribute(k, attrs[k]);
+  return node;
+}
+
+function draw() {
+  const wheel = WHEELS[current];
+  const n = wheel.items.length, sweep = 2 * Math.PI / n;
+  svg.innerHTML = "";
+  const group = el("g", { class: reduceMotion ? "" : "bloom" });
+  wheel.items.forEach((name, i) => {
+    const c = sweep * i;
+    group.append(el("path", { d: wedgePath(c - sweep / 2, c + sweep / 2), class: "petal" + (i === lit ? " lit" : ""), "data-i": i }));
+    const [x, y] = pt((INNER + OUTER) / 2, c);
+    const label = el("text", { x: x.toFixed(1), y: y.toFixed(1), class: "label" + (i === lit ? " lit" : ""), "data-i": i });
+    label.textContent = name.toUpperCase();
+    group.append(label);
+  });
+  group.append(el("circle", { cx: CX, cy: CY, r: INNER - 14, class: "hub" }));
+  svg.append(group);
+
+  // The file being dragged, centred on the hub like Finder's drag image.
+  const defs = el("defs", {});
+  const paper = el("linearGradient", { id: "paper", x1: "0", y1: "0", x2: "0.4", y2: "1" });
+  paper.append(el("stop", { offset: "0", "stop-color": "#ffffff" }), el("stop", { offset: "1", "stop-color": "#d6d6de" }));
+  defs.append(paper);
+  svg.prepend(defs);
+  const W = 64, H = 80, FOLD = 18, x = CX - W / 2, y = CY - H / 2;
+  const file = el("g", { class: "file", "aria-hidden": "true", style: "filter: drop-shadow(0 14px 22px rgba(0,0,0,.55))" });
+  file.append(el("path", { class: "sheet", d: `M ${x + 8} ${y} H ${x + W - FOLD} L ${x + W} ${y + FOLD} V ${y + H - 8} Q ${x + W} ${y + H} ${x + W - 8} ${y + H} H ${x + 8} Q ${x} ${y + H} ${x} ${y + H - 8} V ${y + 8} Q ${x} ${y} ${x + 8} ${y} Z` }));
+  file.append(el("path", { class: "fold", d: `M ${x + W - FOLD} ${y} V ${y + FOLD - 4} Q ${x + W - FOLD} ${y + FOLD} ${x + W - FOLD + 4} ${y + FOLD} H ${x + W} Z` }));
+  const name = el("text", { x: CX, y: y + H - 12 });
+  name.textContent = "PHOTO.JPG";
+  file.append(name);
+  svg.append(file);
+
+  const pill = el("g", { class: "pill" });
+  pill.append(el("rect", { x: CX - 92, y: 14, width: 184, height: 36, rx: 18 }));
+  const text = el("text", { x: CX, y: 32 });
+  pill.append(text);
+  svg.append(pill);
+  updatePill();
+}
+function updatePill() {
+  const wheel = WHEELS[current];
+  const text = svg.querySelector(".pill text");
+  if (text) text.textContent = `${wheel.title} → ${wheel.items[lit]}`;
+}
+function setLit(i) {
+  lit = i;
+  svg.querySelectorAll(".petal, .label").forEach(node => node.classList.toggle("lit", Number(node.dataset.i) === lit));
+  updatePill();
+}
+function choose(name, fromUser) {
+  current = name;
+  lit = 0;
+  userPicked = userPicked || fromUser;
+  document.querySelectorAll(".key").forEach(k => k.setAttribute("aria-pressed", String(k.dataset.set === name)));
+  draw();
+}
+function tick() {
+  const n = WHEELS[current].items.length;
+  if (lit + 1 < n) { setLit(lit + 1); return; }
+  if (userPicked) { setLit(0); return; }
+  const order = Object.keys(WHEELS);
+  choose(order[(order.indexOf(current) + 1) % order.length], false);
+}
+
+document.querySelectorAll(".key").forEach(k => k.addEventListener("click", () => choose(k.dataset.set, true)));
+svg.addEventListener("mousemove", event => {
+  const target = event.target.closest("[data-i]");
+  if (target) setLit(Number(target.dataset.i));
+});
+choose("convert", false);
+if (!reduceMotion) timer = setInterval(tick, 1100);
+
+// Point every download button at the newest DMG.
+fetch("https://api.github.com/repos/Manan-Santoki/OpenShelf/releases/latest")
+  .then(r => r.ok ? r.json() : null)
+  .then(release => {
+    if (!release) return;
+    const dmg = (release.assets || []).find(a => a.name.endsWith(".dmg"));
+    if (!dmg) return;
+    const version = release.tag_name.replace(/^v/, "");
+    document.querySelectorAll(".download-link").forEach(a => { a.href = dmg.browser_download_url; });
+    document.querySelectorAll(".download-label").forEach(s => { s.textContent = `Download v${version}`; });
+  })
+  .catch(() => {});
+</script>
+</body>
+</html>
