@@ -48,14 +48,49 @@ without dragging.
 - **Quick taps work.** A brisk tap of ⇧ (or ⇧⌥, ⌃) used to be too short to
   count. Now the wheel opens as soon as you let go of the key; holding the keys
   still works as before.
+- **Return in the wheel stays in the wheel.** With a shelf open, pressing
+  Return to run a wedge could also open the shelf's files, and the wheel stayed
+  up to run a second action on release. Wheel keys no longer reach shelves, and
+  the wheel closes as soon as Return runs something.
+- **Video Compress keeps its promises.** 720p is now 1280×720 and 480p is
+  854×480 (not 960×540 or 224×128), Quality sets a real bitrate, the size
+  estimate matches the result, and a video that wouldn't get smaller isn't
+  saved. HDR, rotation, date and location are kept.
+- **Crop saves exactly the size you type** (800 × 450 was coming out 801 × 451).
+- **Annotate takes your text straight away**, without a second click, and text
+  is a readable size on large photos.
+- **The keyboard wheel always starts on Convert.** Letting go of ⌥ before ⌃
+  after ⌃⌥Space could switch it to Actions.
+- **Settings comes to the front** every time you choose it, and fits on
+  smaller screens.
+- **Docking a shelf keeps it where you dropped it**, instead of moving it to
+  the middle of the screen edge.
+- Trim's length now matches the start and end it shows.
 
 ### Improved
 
 - **The wheel feels snappier.** It appears in about a tenth of a second, the
   first time too, and blooms open faster.
+- **Busy wheels are easier to read.** Labels fit their wedge on wheels with
+  10 or more options, and the size or action shows once, above the wheel.
+- **Files dropped on a shelf appear at once**, with thumbnails filling in after.
+- **Results say what happened:** "1 resized · 2 already smaller", "Nothing
+  saved" when files couldn't shrink, and Save stays disabled until there's a
+  change to save.
+- **Redact each area your own way:** a black box over a name and a blur over a
+  face in the same image.
+- **Tidier output:**
+  - ZIPs leave out Mac-only `__MACOSX` and `.DS_Store` files.
+  - Unzipping a single folder puts it right next to the archive.
+  - Names don't repeat ("Photo Compressed 2", not "Photo Compressed Compressed").
+  - Lossy audio is sized to its source (a voice memo to OGG is now about 20 KB,
+    not 110 KB).
+- **Windows behave:** drag shelves and editors by their titles, Tab moves
+  between fields, editor layouts don't jump when a message appears, and the
+  Colors panel opens beside the editor.
 - Cancelling a video or audio export never leaves a half-written file behind.
 - Tools aren't offered for MKV, WebM, AVI and other formats they can't edit;
-  you're told to convert to MP4 or M4A first.
+  you're told how to convert them first.
 
 Audio/video formats beyond Apple's own need `brew install ffmpeg`; slides and
 ODS need `brew install --cask libreoffice`. Those wedges stay hidden until the
