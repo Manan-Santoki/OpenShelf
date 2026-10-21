@@ -195,6 +195,9 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
         window.isMovableByWindowBackground = false
         window.isReleasedWhenClosed = false
         window.collectionBehavior = [.fullScreenAuxiliary, .moveToActiveSpace]
+        // Borderless windows don't build a Tab order on their own; without one,
+        // Tab can't move between fields such as Crop's width and height.
+        window.autorecalculatesKeyViewLoop = true
         super.init(window: window)
         window.delegate = self
     }
