@@ -1,11 +1,11 @@
 import AppKit
 import Observation
 
-enum ShelfEdge {
+enum ShelfEdge: String, Codable {
     case left, right
 }
 
-enum ShelfViewMode {
+enum ShelfViewMode: String, Codable {
     case grid, list
 
     mutating func toggle() {
@@ -23,6 +23,8 @@ final class Shelf: Identifiable {
     var isExpanded = false
     var viewMode = ShelfViewMode.grid
     var dockedEdge: ShelfEdge?
+    /// An item the expanded view should scroll into view, e.g. after type-select.
+    var scrollTarget: ShelfItem.ID?
     /// Whether the shelf has ever held items, so an emptied shelf can close itself
     /// while a freshly created empty one stays open.
     private(set) var hasHadItems = false
@@ -98,5 +100,14 @@ final class Shelf: Identifiable {
 
     func selectAll() {
         selection = Set(items.map(\.id))
+    }
+
+    /// Selects the first item whose name starts with `prefix` and scrolls to it.
+    @discardableResult
+    func typeSelect(_ prefix: String) -> Bool {
+        guard let index = TypeSelect.match(prefix, in: items.map(\.name)) else { return false }
+        select(items[index], modifiers: [])
+        scrollTarget = items[index].id
+        return true
     }
 }

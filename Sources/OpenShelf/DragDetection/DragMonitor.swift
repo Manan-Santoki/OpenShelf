@@ -14,6 +14,11 @@ final class DragMonitor {
     var onTrigger: ((WheelKind, NSPoint, [URL]) -> Void)?
     /// Called when the primary button is released or Esc is pressed after a trigger.
     var onDragEnded: (() -> Void)?
+    /// Called when an arrow key moves the open wheel's highlight.
+    var onStep: ((WheelStepDirection) -> Void)?
+    /// Called when Return is pressed with a wheel open, with the dragged files.
+    /// Returns whether something ran; if so, the rest of the drag is ignored.
+    var onConfirm: (([URL]) -> Bool)?
 
     private let preferences: Preferences
     private let dragPasteboard = NSPasteboard(name: .drag)
@@ -24,6 +29,12 @@ final class DragMonitor {
     private var activeWheel: WheelKind?
     private var pendingWheel: WheelKind?
     private var pendingSince: ContinuousClock.Instant?
+    private var clockwiseKey = KeyRepeat()
+    private var counterClockwiseKey = KeyRepeat()
+    private var wasReturnDown = false
+    /// Set once Return has run a wedge, so later keys and triggers in the same
+    /// drag do nothing.
+    private var didConfirm = false
 
     /// How long a modifier combination must be held before it counts, so that
     /// pressing ⇧ on the way to ⇧⌥ does not flash the wrong wheel.
@@ -64,10 +75,15 @@ final class DragMonitor {
         guard isButtonDown else { return idleInterval }
         guard isDraggingFiles else { return activeInterval }
 
-        if activeWheel != nil, CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(kVK_Escape)) {
+        if activeWheel != nil, isKeyDown(kVK_Escape) {
             onDragEnded?()
             resetDrag()
             return activeInterval
+        }
+        guard !didConfirm else { return activeInterval }
+        if activeWheel != nil {
+            pollWheelKeys()
+            guard !didConfirm else { return activeInterval }
         }
 
         let matcher = TriggerMatcher(triggers: preferences.triggers)
@@ -84,6 +100,26 @@ final class DragMonitor {
         return activeInterval
     }
 
+    /// Arrow keys step the highlight (with auto-repeat); Return runs it.
+    private func pollWheelKeys() {
+        let now = ContinuousClock.now
+        if clockwiseKey.update(isDown: isKeyDown(kVK_RightArrow) || isKeyDown(kVK_DownArrow), at: now) {
+            onStep?(.clockwise)
+        }
+        if counterClockwiseKey.update(isDown: isKeyDown(kVK_LeftArrow) || isKeyDown(kVK_UpArrow), at: now) {
+            onStep?(.counterClockwise)
+        }
+        let isReturnDown = isKeyDown(kVK_Return) || isKeyDown(kVK_ANSI_KeypadEnter)
+        if isReturnDown && !wasReturnDown, onConfirm?(draggedFileURLs) == true {
+            didConfirm = true
+        }
+        wasReturnDown = isReturnDown
+    }
+
+    private func isKeyDown(_ keyCode: Int) -> Bool {
+        CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(keyCode))
+    }
+
     private var isDraggingFiles: Bool {
         dragPasteboard.changeCount != changeCountAtMouseDown
             && dragPasteboard.types?.contains(.fileURL) == true
@@ -98,5 +134,9 @@ final class DragMonitor {
         activeWheel = nil
         pendingWheel = nil
         pendingSince = nil
+        clockwiseKey = KeyRepeat()
+        counterClockwiseKey = KeyRepeat()
+        wasReturnDown = false
+        didConfirm = false
     }
 }

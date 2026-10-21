@@ -7,6 +7,8 @@ An open-source macOS menu-bar utility for working with files mid-drag.
 Start dragging any file and tap a key — a wheel appears under the pointer. Drop
 the file on a wedge and it's done, saved right next to the original.
 
+<p align="center"><img src="docs/images/wheels.png" alt="The Convert, Tools and Actions wheels" width="900"></p>
+
 - **⇧ Convert wheel:** images, PDFs, documents, audio, video, subtitles and
   archives into the formats that make sense for them (JPG, PNG, HEIC, AVIF,
   WEBP, PDF, DOCX, TXT, MP3, WAV, GIF, ZIP, …)
@@ -55,6 +57,7 @@ any app that lets you drag files, and **keep holding** while you tap a key.
 3. Move onto a wedge. It lights up and the centre shows what will happen; before
    you hover, the centre shows the file's size.
 4. Let go on the wedge. Releasing anywhere else, or pressing **Esc**, cancels.
+   Or use the arrow keys and Return while still dragging.
 
 Tip: on a trackpad, press the key *after* the drag has started. Holding ⌃
 before you click turns the click into a right-click.
@@ -65,6 +68,8 @@ The wheel only offers formats that make sense for what you're dragging, and
 never the format it's already in. The result is saved **next to the original**
 and nothing is ever overwritten (`Photo.jpg` → `Photo.png`, `Photo 2.png`, …).
 A small card next to the pointer shows progress; click its **×** to cancel.
+
+<p align="center"><img src="docs/images/progress.png" alt="Progress card next to the pointer" width="300"></p>
 
 | Drag a… | Convert to |
 |---|---|
@@ -95,6 +100,9 @@ bottom right (or Return); a copy is saved next to the original with a suffix,
 like `Photo Cropped.jpg`, so you can drag the result straight back into another
 wheel. **Read QR**, **Combine** and **Mute** run immediately without an editor.
 
+<p align="center"><img src="docs/images/editors.png" alt="Crop, Add Background and Annotate editors" width="900"></p>
+<p align="center"><img src="docs/images/trim.png" alt="Trim editor for video and audio" width="560"></p>
+
 ### Actions (⌃)
 
 | Wedge | What it does |
@@ -112,21 +120,29 @@ wheel. **Read QR**, **Combine** and **Mute** run immediately without an editor.
 A shelf holds files for later without moving them. Drop more files onto it at
 any time, and drag them out to any app or folder when you need them.
 
+<p align="center"><img src="docs/images/shelf.png" alt="A collapsed and an expanded shelf" width="620"></p>
+
 - **Collapsed**, it shows a stack with a count. Drag the stack to drag every file.
 - **Expand** (chevron or double-click) for a grid or list. Click, ⌘-click and
-  ⇧-click to select; drag a selection out together.
+  ⇧-click to select, or drag across empty space to select several at once;
+  drag a selection out together. Type the start of a name to jump to a file.
 - **Space** previews with Quick Look, **⌫** removes from the shelf, **Return**
   opens, **⌘A** selects all, **Esc** collapses, **⌘W** closes. Right-click for
   more, including Share.
 - Drag a shelf near the left or right edge of the screen to dock it there.
+  When you move the pointer away, a docked shelf slides behind the edge and
+  leaves a slim tab with the file count; hover the tab, or drag files onto it,
+  to bring the shelf back.
+- Shelves are still there after you quit and reopen OpenShelf, even if you
+  moved or renamed the files in the meantime.
 - Closing a shelf never touches your files. **New Shelf** and **Close All
   Shelves** are in the menu-bar menu.
 
 ### Settings
 
 Click the OpenShelf wheel in the menu bar → **Settings…** to change the key for
-each wheel, remove files from a shelf after dragging them out, or open
-OpenShelf at login. **How to Use OpenShelf** in the same menu shows the
+each wheel, remove files from a shelf after dragging them out, restore shelves
+at launch, hide docked shelves at the screen edge, or open OpenShelf at login. **How to Use OpenShelf** in the same menu shows the
 welcome guide again.
 
 ## Tech stack
@@ -181,6 +197,19 @@ held modifier keys, and the change count of the system drag pasteboard. When
 the button is down, the drag pasteboard has changed since it went down and holds
 file URLs, a file drag is in progress; if a wheel's modifier combination is then
 held for ~70 ms, the wheel opens. The wheel itself is an ordinary drop target.
+
+## Releasing
+
+Releases are automatic and driven by [CHANGELOG.md](CHANGELOG.md):
+
+1. Add a section for the new version at the top of `CHANGELOG.md`, e.g.
+   `## [1.1.0] - 2026-11-02`, describing what changed.
+2. Push to `main`.
+
+The **Release** workflow then tests and builds the universal app on a macOS
+runner, makes the DMG and zip, tags `v1.1.0` and publishes a GitHub release
+with that changelog section as its notes. Versions that are already tagged are
+skipped. The **CI** workflow builds and tests every push and pull request.
 
 ## Contributing
 

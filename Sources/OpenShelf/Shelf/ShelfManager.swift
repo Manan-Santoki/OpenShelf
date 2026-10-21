@@ -1,10 +1,12 @@
 import AppKit
 
-/// Creates shelves and keeps track of which one was used most recently.
+/// Creates shelves, keeps track of which one was used most recently, and saves
+/// them so they come back after a relaunch.
 @MainActor
 final class ShelfManager {
     /// Ordered from least to most recently used.
     private var controllers: [ShelfWindowController] = []
+    private var saveTask: Task<Void, Never>?
 
     var hasShelves: Bool { !controllers.isEmpty }
 
@@ -12,15 +14,7 @@ final class ShelfManager {
     func newShelf(with urls: [URL] = [], near location: NSPoint = NSEvent.mouseLocation) -> Shelf {
         let shelf = Shelf()
         shelf.add(urls)
-        let controller = ShelfWindowController(shelf: shelf, near: location)
-        controller.onClose = { [weak self] closed in
-            self?.controllers.removeAll { $0 === closed }
-        }
-        controller.onBecomeKey = { [weak self] active in
-            self?.markRecentlyUsed(active)
-        }
-        controllers.append(controller)
-        controller.present()
+        open(ShelfWindowController(shelf: shelf, near: location))
         return shelf
     }
 
@@ -37,6 +31,57 @@ final class ShelfManager {
         for controller in controllers {
             controller.dismiss()
         }
+    }
+
+    // MARK: Saving and restoring
+
+    /// Reopens the shelves saved at the end of the last session. Files that no
+    /// longer exist are skipped, and shelves left with nothing aren't reopened.
+    func restoreSavedShelves() {
+        for snapshot in ShelfStore.load() {
+            let urls = snapshot.items.compactMap { ShelfStore.resolve($0) }
+            guard !urls.isEmpty else { continue }
+            let shelf = Shelf()
+            shelf.add(urls)
+            shelf.isExpanded = snapshot.isExpanded
+            shelf.viewMode = snapshot.viewMode
+            shelf.dockedEdge = snapshot.dockedEdge
+            open(ShelfWindowController(shelf: shelf, near: NSEvent.mouseLocation, restoringFrame: snapshot.frame))
+        }
+        scheduleSave()
+    }
+
+    /// Writes every open shelf to disk right away, e.g. when quitting.
+    func saveNow() {
+        saveTask?.cancel()
+        saveTask = nil
+        try? ShelfStore.save(controllers.compactMap(\.snapshot))
+    }
+
+    /// Coalesces bursts of changes (resizing, moving, adding files) into one write.
+    private func scheduleSave() {
+        saveTask?.cancel()
+        saveTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(600))
+            guard !Task.isCancelled else { return }
+            self?.saveNow()
+        }
+    }
+
+    private func open(_ controller: ShelfWindowController) {
+        controller.onClose = { [weak self] closed in
+            self?.controllers.removeAll { $0 === closed }
+            self?.scheduleSave()
+        }
+        controller.onBecomeKey = { [weak self] active in
+            self?.markRecentlyUsed(active)
+        }
+        controller.onStateChange = { [weak self] in
+            self?.scheduleSave()
+        }
+        controllers.append(controller)
+        controller.present()
+        scheduleSave()
     }
 
     private func markRecentlyUsed(_ controller: ShelfWindowController) {

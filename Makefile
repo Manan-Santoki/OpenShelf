@@ -67,6 +67,7 @@ dmg:
 		--hide-extension "$(APP_NAME).app" \
 		--app-drop-link 450 190 \
 		--no-internet-enable \
+		$(DMG_FLAGS) \
 		"$(RELEASE_DMG)" "$(APP_BUNDLE)"
 	@echo "$(RELEASE_DMG)"
 

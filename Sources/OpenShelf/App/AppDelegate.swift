@@ -19,8 +19,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         dragMonitor.onDragEnded = { [weak self] in
             self?.wheel.dismiss()
         }
+        dragMonitor.onStep = { [weak self] direction in
+            self?.wheel.step(direction)
+        }
+        dragMonitor.onConfirm = { [weak self] urls in
+            self?.wheel.confirmHighlighted(with: urls) ?? false
+        }
         dragMonitor.start()
+        if Preferences.shared.restoresShelves {
+            shelves.restoreSavedShelves()
+        }
         WelcomeView.presentIfNeeded()
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        shelves.saveNow()
     }
 
     private func showWheel(_ kind: WheelKind, at location: NSPoint, for urls: [URL]) {

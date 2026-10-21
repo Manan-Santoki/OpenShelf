@@ -9,6 +9,8 @@ final class Preferences {
 
     private enum Key {
         static let removeAfterDragOut = "removeAfterDragOut"
+        static let restoresShelves = "restoresShelves"
+        static let hidesDockedShelves = "hidesDockedShelves"
 
         static func trigger(_ kind: WheelKind) -> String {
             switch kind {
@@ -29,6 +31,16 @@ final class Preferences {
         didSet { defaults.set(removeAfterDragOut, forKey: Key.removeAfterDragOut) }
     }
 
+    /// Reopen the shelves that were open when OpenShelf last quit.
+    var restoresShelves: Bool {
+        didSet { defaults.set(restoresShelves, forKey: Key.restoresShelves) }
+    }
+
+    /// Slide shelves docked to a screen edge out of the way, leaving a tab.
+    var hidesDockedShelves: Bool {
+        didSet { defaults.set(hidesDockedShelves, forKey: Key.hidesDockedShelves) }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         var triggers: [WheelKind: NSEvent.ModifierFlags] = [:]
@@ -39,6 +51,8 @@ final class Preferences {
         }
         self.triggers = triggers
         removeAfterDragOut = defaults.bool(forKey: Key.removeAfterDragOut)
+        restoresShelves = defaults.object(forKey: Key.restoresShelves) as? Bool ?? true
+        hidesDockedShelves = defaults.object(forKey: Key.hidesDockedShelves) as? Bool ?? true
     }
 
     static func defaultTrigger(for kind: WheelKind) -> NSEvent.ModifierFlags {

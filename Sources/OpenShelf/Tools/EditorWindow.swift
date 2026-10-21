@@ -164,9 +164,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
 
     private func install<Content: View>(_ root: Content, near location: NSPoint) {
         guard let window else { return }
-        let hostingView = NSHostingView(rootView: root)
-        hostingView.sizingOptions = []
-        window.contentView = hostingView
+        window.contentView = hostingContainer(for: root, size: window.frame.size)
 
         var frame = window.frame
         frame.origin = NSPoint(x: location.x - frame.width / 2, y: location.y - frame.height / 2)

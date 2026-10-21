@@ -10,6 +10,7 @@ final class ShelfItem: Identifiable {
     let url: URL
     private(set) var thumbnail: NSImage
     @ObservationIgnored private var didRequestThumbnail = false
+    @ObservationIgnored private var cachedBookmark: Data?
 
     init(url: URL) {
         self.url = url
@@ -19,6 +20,14 @@ final class ShelfItem: Identifiable {
     var name: String { url.lastPathComponent }
 
     var exists: Bool { FileManager.default.fileExists(atPath: url.path) }
+
+    /// Bookmark data for finding the file again after a move, created once.
+    var bookmark: Data? {
+        if cachedBookmark == nil {
+            cachedBookmark = try? url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+        }
+        return cachedBookmark
+    }
 
     /// Replaces the Finder icon with a Quick Look thumbnail, once.
     func loadThumbnail(side: CGFloat, scale: CGFloat) {

@@ -1,0 +1,99 @@
+name: Release
+
+# Publishes the newest version in CHANGELOG.md. Add a new "## [x.y.z] - date"
+# section at the top and push to main; versions that already have a tag are
+# skipped, so this is safe to run on every change to the changelog.
+on:
+  push:
+    branches: [main]
+    paths: [CHANGELOG.md]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read the version from CHANGELOG.md
+        id: version
+        run: |
+          version="$(scripts/changelog.sh version)"
+          if [ -z "$version" ]; then
+            echo "::error::No '## [x.y.z]' heading found in CHANGELOG.md"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+            echo "v$version is already released; nothing to do."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Select the newest Xcode
+        if: steps.version.outputs.exists == 'false'
+        run: |
+          xcode="$(ls -d /Applications/Xcode_*.app | sort -V | tail -n 1)"
+          sudo xcode-select -s "$xcode"
+          xcodebuild -version
+
+      - name: Stamp the version into Info.plist
+        if: steps.version.outputs.exists == 'false'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          /usr/libexec/PlistBuddy \
+            -c "Set :CFBundleShortVersionString $VERSION" \
+            -c "Set :CFBundleVersion $GITHUB_RUN_NUMBER" \
+            Support/Info.plist
+
+      - name: Test
+        if: steps.version.outputs.exists == 'false'
+        run: swift test
+
+      - name: Build the universal app
+        if: steps.version.outputs.exists == 'false'
+        run: make release
+
+      - name: Build the installer
+        if: steps.version.outputs.exists == 'false'
+        run: |
+          brew install create-dmg
+          # Finder lays out the installer window; if it can't on this runner,
+          # fall back to a plain disk image rather than failing the release.
+          make dmg || make dmg DMG_FLAGS=--skip-jenkins
+
+      - name: Write the release notes
+        if: steps.version.outputs.exists == 'false'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          {
+            scripts/changelog.sh notes "$VERSION"
+            echo
+            sed "s/VERSION/$VERSION/g" .github/release-footer.md
+          } > release-notes.md
+          cat release-notes.md
+
+      - name: Publish the release
+        if: steps.version.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "v$VERSION" \
+            "build/OpenShelf-$VERSION.dmg" \
+            "build/OpenShelf-$VERSION.zip" \
+            --title "OpenShelf $VERSION" \
+            --notes-file release-notes.md \
+            --target "$GITHUB_SHA"

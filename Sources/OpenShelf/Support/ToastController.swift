@@ -114,9 +114,7 @@ final class ToastController {
         panel.hidesOnDeactivate = false
         panel.ignoresMouseEvents = true
 
-        let hostingView = NSHostingView(rootView: ToastView(model: model))
-        hostingView.sizingOptions = []
-        panel.contentView = hostingView
+        panel.contentView = hostingContainer(for: ToastView(model: model), size: panelSize)
         return panel
     }
 }

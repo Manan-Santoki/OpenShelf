@@ -179,38 +179,104 @@ private struct StackPreview: View {
 
 private struct ExpandedShelfView: View {
     let shelf: Shelf
+    /// Item frames in the content's coordinate space, for rubber-band hit testing.
+    @State private var frames = ItemFrames()
+    @State private var band: CGRect?
+    @State private var selectionBeforeBand: Set<ShelfItem.ID>?
+
+    private static let space = "shelfContent"
 
     var body: some View {
-        ScrollView {
-            Group {
-                switch shelf.viewMode {
-                case .grid:
-                    LazyVGrid(
-                        columns: Array(repeating: GridItem(.fixed(ShelfLayout.tileSize.width), spacing: ShelfLayout.tileSpacing), count: ShelfLayout.gridColumns),
-                        spacing: ShelfLayout.tileSpacing
-                    ) {
-                        ForEach(shelf.items) { item in
-                            ItemTile(item: item, isSelected: shelf.selection.contains(item.id))
-                                .overlay { ItemDragArea(shelf: shelf, item: item) }
-                                .transition(.scale(scale: 0.6).combined(with: .opacity))
-                        }
-                    }
-                case .list:
-                    LazyVStack(spacing: 0) {
-                        ForEach(shelf.items) { item in
-                            ItemRow(item: item, isSelected: shelf.selection.contains(item.id))
-                                .overlay { ItemDragArea(shelf: shelf, item: item) }
-                                .transition(.move(edge: .top).combined(with: .opacity))
-                        }
-                    }
+        GeometryReader { viewport in
+            ScrollViewReader { proxy in
+                ScrollView {
+                    items
+                        .padding(ShelfLayout.contentPadding)
+                        // Fill the viewport so empty space below the items can start a rubber band.
+                        .frame(maxWidth: .infinity, minHeight: viewport.size.height, alignment: .top)
+                        .background { RubberBandArea(onChange: updateBand, onClick: { shelf.selection.removeAll() }) }
+                        .overlay(alignment: .topLeading) { bandOverlay }
+                        .coordinateSpace(.named(Self.space))
+                }
+                .onChange(of: shelf.scrollTarget) { _, target in
+                    guard let target else { return }
+                    withAnimation(.snappy) { proxy.scrollTo(target, anchor: .center) }
+                    shelf.scrollTarget = nil
                 }
             }
-            .padding(ShelfLayout.contentPadding)
         }
-        .background {
-            Color.clear
-                .contentShape(Rectangle())
-                .onTapGesture { shelf.selection.removeAll() }
+    }
+
+    @ViewBuilder
+    private var items: some View {
+        switch shelf.viewMode {
+        case .grid:
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.fixed(ShelfLayout.tileSize.width), spacing: ShelfLayout.tileSpacing), count: ShelfLayout.gridColumns),
+                spacing: ShelfLayout.tileSpacing
+            ) {
+                ForEach(shelf.items) { item in
+                    ItemTile(item: item, isSelected: shelf.selection.contains(item.id))
+                        .overlay { ItemDragArea(shelf: shelf, item: item) }
+                        .modifier(TracksFrame(id: item.id, frames: frames, space: Self.space))
+                        .id(item.id)
+                        .transition(.scale(scale: 0.6).combined(with: .opacity))
+                }
+            }
+        case .list:
+            LazyVStack(spacing: 0) {
+                ForEach(shelf.items) { item in
+                    ItemRow(item: item, isSelected: shelf.selection.contains(item.id))
+                        .overlay { ItemDragArea(shelf: shelf, item: item) }
+                        .modifier(TracksFrame(id: item.id, frames: frames, space: Self.space))
+                        .id(item.id)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var bandOverlay: some View {
+        if let band {
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .fill(Color.accentColor.opacity(0.15))
+                .overlay(RoundedRectangle(cornerRadius: 3, style: .continuous).strokeBorder(Color.accentColor.opacity(0.8), lineWidth: 1))
+                .frame(width: band.width, height: band.height)
+                .offset(x: band.minX, y: band.minY)
+                .allowsHitTesting(false)
+        }
+    }
+
+    private func updateBand(_ rect: CGRect?, modifiers: NSEvent.ModifierFlags) {
+        guard let rect else {
+            band = nil
+            selectionBeforeBand = nil
+            return
+        }
+        let initial = selectionBeforeBand ?? shelf.selection
+        selectionBeforeBand = initial
+        band = rect
+        let visible = frames.byID.filter { id, _ in shelf.items.contains { $0.id == id } }
+        shelf.selection = RubberBand.selection(itemFrames: visible, rect: rect, initial: initial, modifiers: modifiers)
+    }
+}
+
+/// Item frames kept outside SwiftUI state, so measuring doesn't trigger re-renders.
+private final class ItemFrames {
+    var byID: [ShelfItem.ID: CGRect] = [:]
+}
+
+private struct TracksFrame: ViewModifier {
+    let id: ShelfItem.ID
+    let frames: ItemFrames
+    let space: String
+
+    func body(content: Content) -> some View {
+        content.onGeometryChange(for: CGRect.self) { proxy in
+            proxy.frame(in: .named(space))
+        } action: { frame in
+            frames.byID[id] = frame
         }
     }
 }

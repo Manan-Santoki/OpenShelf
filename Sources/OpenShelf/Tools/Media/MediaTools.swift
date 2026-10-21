@@ -89,6 +89,11 @@ enum MediaTools {
         let videoTracks = try await asset.loadTracks(withMediaType: .video)
         let audioTracks = try await asset.loadTracks(withMediaType: .audio)
         guard !videoTracks.isEmpty || !audioTracks.isEmpty else { throw MediaToolError.noTracks(url) }
+        if videoTracks.isEmpty && !keepsPitch {
+            // Audio-only exports with the varispeed algorithm never finish (macOS 26),
+            // so resample the samples directly instead.
+            return try await varispeedAudio(url, rate: rate, progress: progress)
+        }
 
         let composition = AVMutableComposition()
         let fullRange = CMTimeRange(start: .zero, duration: duration)
@@ -111,6 +116,49 @@ enum MediaTools {
         session.audioTimePitchAlgorithm = keepsPitch ? .spectral : .varispeed
         let destination = OutputNaming.destination(for: url, suffix: speedSuffix(rate), pathExtension: output.pathExtension)
         try await export(session, to: destination, fileType: output.fileType, progress: progress)
+        return destination
+    }
+
+    /// Changes speed and pitch together, like playing a record faster: the
+    /// samples are written unchanged with a sample rate scaled by `rate`, then
+    /// resampled to 44.1 kHz AAC.
+    private static func varispeedAudio(_ url: URL, rate: Double, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
+        let source = try AVAudioFile(forReading: url)
+        let format = source.processingFormat
+        guard let scaledFormat = AVAudioFormat(
+            commonFormat: .pcmFormatFloat32,
+            sampleRate: format.sampleRate * rate,
+            channels: format.channelCount,
+            interleaved: false
+        ) else { throw MediaToolError.cannotExport("at this speed") }
+
+        let temporary = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".caf")
+        defer { try? FileManager.default.removeItem(at: temporary) }
+        do {
+            let target = try AVAudioFile(forWriting: temporary, settings: scaledFormat.settings, commonFormat: .pcmFormatFloat32, interleaved: false)
+            let frameCount: AVAudioFrameCount = 32_768
+            guard let input = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount),
+                  let output = AVAudioPCMBuffer(pcmFormat: scaledFormat, frameCapacity: frameCount)
+            else { throw MediaToolError.cannotExport("at this speed") }
+            while source.framePosition < source.length {
+                try Task.checkCancellation()
+                try source.read(into: input, frameCount: frameCount)
+                guard input.frameLength > 0, let from = input.floatChannelData, let to = output.floatChannelData else { break }
+                for channel in 0..<Int(format.channelCount) {
+                    to[channel].update(from: from[channel], count: Int(input.frameLength))
+                }
+                output.frameLength = input.frameLength
+                try target.write(from: output)
+                progress(0.8 * Double(source.framePosition) / Double(max(source.length, 1)))
+            }
+        }
+
+        let destination = OutputNaming.destination(for: url, suffix: speedSuffix(rate), pathExtension: "m4a")
+        try await ProcessRunner.run(
+            URL(fileURLWithPath: "/usr/bin/afconvert"),
+            [temporary.path, destination.path, "-f", "m4af", "-d", "aac@44100"]
+        )
+        progress(1)
         return destination
     }
 

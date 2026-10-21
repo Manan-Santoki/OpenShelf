@@ -24,6 +24,15 @@ final class WheelController {
     private lazy var panel = makePanel()
     private var dismissTask: Task<Void, Never>?
     private var summarizedURLs: [URL] = []
+    /// The wedge under the pointer at the last hover update. AppKit repeats
+    /// hover updates while the pointer rests, so only a change of wedge moves the
+    /// highlight; that keeps a keyboard choice until the pointer actually moves.
+    private var lastHoverWedge: Int?
+    private var hasHoverReading = false
+    /// After Return runs a wedge, the invisible panel stays under the pointer to
+    /// catch the drop at mouse-up so it can't land somewhere else.
+    private var isAbsorbingDrop = false
+    private var followTask: Task<Void, Never>?
 
     /// Shows `items` around `location`, or swaps them in place if the wheel is
     /// already open (e.g. when ⌥ is added to switch from Convert to Tools).
@@ -34,6 +43,8 @@ final class WheelController {
         model.highlighted = nil
         model.dragSummary = ""
         summarizedURLs = []
+        hasHoverReading = false
+        endAbsorbingDrop()
         dropView.geometry = WheelGeometry(wedgeCount: items.count)
         guard !isSwitching else { return }
 
@@ -57,10 +68,69 @@ final class WheelController {
             guard let self, !Task.isCancelled else { return }
             model.isPresented = false
             model.highlighted = nil
+            endAbsorbingDrop()
             try? await Task.sleep(for: .milliseconds(160))
             guard !Task.isCancelled else { return }
             panel.orderOut(nil)
         }
+    }
+
+    /// Moves the highlight one wedge with the keyboard.
+    func step(_ direction: WheelStepDirection) {
+        guard model.isPresented, !isAbsorbingDrop else { return }
+        let current = model.highlighted.flatMap { model.items.firstIndex(of: $0) }
+        guard let next = WheelKeyboardNavigator.step(from: current, count: model.items.count, direction: direction) else { return }
+        setHighlight(model.items[next])
+    }
+
+    /// Runs the highlighted wedge on `urls`, as if they were dropped on it, and
+    /// hides the wheel. Returns false when nothing is highlighted.
+    func confirmHighlighted(with urls: [URL]) -> Bool {
+        guard model.isPresented, !isAbsorbingDrop, let item = model.highlighted, !urls.isEmpty else { return false }
+        absorbNextDrop()
+        onDrop?(item, urls)
+        return true
+    }
+
+    /// Hides the wheel but keeps its panel, invisible, centred under the pointer
+    /// so the user's mouse-up drops the files here, where nothing happens,
+    /// instead of on whatever is underneath. Ends when the drop arrives or the
+    /// drag ends (`dismiss`).
+    private func absorbNextDrop() {
+        dismissTask?.cancel()
+        isAbsorbingDrop = true
+        model.isPresented = false
+        model.highlighted = nil
+        dropView.isAbsorbingDrop = true
+        // Windows let drags pass through fully transparent pixels, so keep a
+        // nearly invisible fill over the whole panel.
+        dropView.wantsLayer = true
+        dropView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.01).cgColor
+        followTask?.cancel()
+        followTask = Task { [weak self] in
+            while let self, self.isAbsorbingDrop, !Task.isCancelled {
+                let location = NSEvent.mouseLocation
+                let side = self.panel.frame.width
+                self.panel.setFrameOrigin(NSPoint(x: location.x - side / 2, y: location.y - side / 2))
+                try? await Task.sleep(for: .milliseconds(25))
+            }
+        }
+    }
+
+    private func endAbsorbingDrop() {
+        guard isAbsorbingDrop else { return }
+        isAbsorbingDrop = false
+        followTask?.cancel()
+        followTask = nil
+        dropView.isAbsorbingDrop = false
+        dropView.layer?.backgroundColor = nil
+    }
+
+    private func setHighlight(_ item: WheelItem?) {
+        if item != model.highlighted, item != nil {
+            NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+        }
+        model.highlighted = item
     }
 
     /// Summarises the dragged files for the hub: the size of a single file (or of
@@ -95,16 +165,18 @@ final class WheelController {
         dropView.onHover = { [weak self] wedge, urls in
             guard let self else { return }
             updateSummary(for: urls)
-            let highlighted = wedge.flatMap { self.model.items[safe: $0] }
-            if highlighted != model.highlighted, highlighted != nil {
-                NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
-            }
-            model.highlighted = highlighted
+            guard !hasHoverReading || wedge != lastHoverWedge else { return }
+            hasHoverReading = true
+            lastHoverWedge = wedge
+            setHighlight(wedge.flatMap { self.model.items[safe: $0] })
         }
         dropView.onDrop = { [weak self] wedge, urls in
             guard let self, let item = model.items[safe: wedge] else { return }
             dismiss(after: .zero)
             onDrop?(item, urls)
+        }
+        dropView.onAbsorbedDrop = { [weak self] in
+            self?.dismiss(after: .zero)
         }
 
         // Size the container first: autoresizing can't grow a subview from a zero-sized superview.
@@ -124,6 +196,9 @@ final class WheelDropView: NSView {
     var geometry = WheelGeometry(wedgeCount: 0)
     var onHover: ((Int?, [URL]) -> Void)?
     var onDrop: ((Int, [URL]) -> Void)?
+    /// While set, any drop is accepted and discarded (see `absorbNextDrop`).
+    var isAbsorbingDrop = false
+    var onAbsorbedDrop: (() -> Void)?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -139,16 +214,23 @@ final class WheelDropView: NSView {
     }
 
     override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        guard !isAbsorbingDrop else { return .copy }
         let wedge = wedge(for: sender)
         onHover?(wedge, fileURLs(in: sender))
         return wedge == nil ? [] : .copy
     }
 
     override func draggingExited(_ sender: (any NSDraggingInfo)?) {
+        guard !isAbsorbingDrop else { return }
         onHover?(nil, [])
     }
 
     override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        if isAbsorbingDrop {
+            // The wedge already ran from the keyboard; swallow the drop.
+            onAbsorbedDrop?()
+            return true
+        }
         let urls = fileURLs(in: sender)
         guard let wedge = wedge(for: sender), !urls.isEmpty else { return false }
         onDrop?(wedge, urls)

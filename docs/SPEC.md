@@ -29,6 +29,10 @@ this spec; it does not contain or derive from any other app's code or assets.
   ("1.2 MB"), or count and total size for several files ("3 · 4.2 MB").
 - Dropping on a wedge runs its action with all dragged files. Dropping on the
   hub or outside the wheel does nothing.
+- Keyboard, while still dragging: ←/↑ and →/↓ move the highlight round the
+  wheel (repeating when held), Return runs it, Esc cancels. After Return the
+  wheel hides but quietly catches the eventual mouse-up, so the files aren't
+  also dropped wherever the pointer happens to be.
 - Blooms out from the pointer with a spring, petals staggered; shrinks away
   after a drop. Respects Reduce Motion.
 - Actions confirm themselves with a small toast next to the pointer ("Copied
@@ -124,7 +128,12 @@ never copies or modifies them by itself).
 - **Expanded state:** grid or list of all items. Toggle with the header button
   or double-click the stack.
 - **Selection:** click, ⌘-click (toggle), ⇧-click (range), ⌘A. Dragging a
-  selected item drags the whole selection.
+  selected item drags the whole selection. In an expanded shelf, dragging on
+  empty space draws a selection rectangle: it selects what it touches, ⇧ adds
+  to the selection and ⌘ toggles. Clicking empty space clears the selection.
+- **Type-to-select:** typing letters while the shelf is key selects the first
+  file whose name starts with them (case- and accent-insensitive) and scrolls to
+  it; a pause of about a second starts a new prefix.
 - **Drag out:** to Finder/any app. Plain drop follows the destination's rules
   (Finder: same volume moves, other volume copies, ⌥ forces copy). Files that no
   longer exist at their path afterwards are removed from the shelf. Optional
@@ -136,6 +145,18 @@ never copies or modifies them by itself).
 - **Edge docking:** release a shelf within 48 pt of the left or right screen edge
   and it docks flush to that edge (its outer corners square off). Shelves are
   always kept fully on screen.
+- **Hiding at the edge:** once the pointer has stayed clear of a docked shelf for
+  1.5 s (and no mouse button is down and Quick Look isn't open), the shelf slides
+  behind the edge, leaving a 14 pt glass tab with the file count. Hovering or
+  clicking the tab, or dragging files onto it, slides the shelf back out so the
+  drop lands on it; adding files from the Actions wheel also reveals it. With
+  Reduce Motion the shelf fades instead of sliding. Can be turned off in Settings.
+- **Restoring:** open shelves (files, position, docked edge, expanded state and
+  view mode) are saved to `~/Library/Application Support/OpenShelf/shelves.json`
+  shortly after each change and on quit, and reopened at launch. Each file is
+  saved with its path and a bookmark, so files moved or renamed in the meantime
+  are still found; files that are gone are skipped, and a shelf left empty isn't
+  reopened. Can be turned off in Settings.
 - **Close:** header × button; the shelf also closes when its last item is
   removed. Closing never touches the files.
 - Multiple shelves may exist at once.
@@ -148,6 +169,8 @@ New Shelf · Close All Shelves · Settings… · Quit.
 
 - Trigger keys per wheel (any combination of ⌃ ⌥ ⇧ ⌘, at least one).
 - Remove files from a shelf after dragging them out (default off).
+- Restore shelves when OpenShelf opens (default on).
+- Hide docked shelves to the screen edge (default on).
 - Open at login.
 
 ## 6. Roadmap
@@ -168,9 +191,10 @@ New Shelf · Close All Shelves · Settings… · Quit.
      drag handles, Reset / Apply.
    - *Add background:* gradient and solid swatches or a custom image; padding,
      corner radius and shadow sliders; output ratio (Auto, 1:1, 16:9, 4:5).
-3. Keyboard control of an open wheel (arrows + Return).
-4. Notarized builds and a Homebrew cask.
-4. Shelf auto-hide: docked shelves slide into a slim tab and reveal on hover.
-5. Rubber-band selection and type-to-select in expanded shelves.
-6. Shelf persistence across relaunches (security-scoped bookmarks).
-7. Batch progress window for long-running conversions.
+3. ~~Keyboard control of an open wheel (arrows + Return).~~ (done, §2)
+4. PDF redaction and video/audio tools beyond trim, speed, crop, compress and mute.
+5. ~~Shelf auto-hide: docked shelves slide into a slim tab and reveal on hover.~~ (done, §3)
+6. ~~Rubber-band selection and type-to-select in expanded shelves.~~ (done, §3)
+7. ~~Shelf persistence across relaunches (with bookmarks).~~ (done, §3)
+8. ~~Batch progress for long-running conversions.~~ (done: the progress card, §2.3)
+9. Notarized builds once a Developer ID is available; then a Homebrew cask.
