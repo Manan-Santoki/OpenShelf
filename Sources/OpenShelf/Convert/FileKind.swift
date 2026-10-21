@@ -2,7 +2,7 @@ import Foundation
 import UniformTypeIdentifiers
 
 /// Broad category of a file, used to decide which conversions and tools apply.
-enum FileKind: Equatable {
+enum FileKind: Hashable {
     case image
     case pdf
     case document

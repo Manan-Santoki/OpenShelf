@@ -78,6 +78,7 @@ struct RedactEditor: View {
     private let previewImage: CGImage
 
     @State private var regions: [RedactRegion] = []
+    @State private var history = EditHistory<[RedactRegion]>()
     @State private var draftRect: CGRect?
     @State private var selectedID: RedactRegion.ID?
     @State private var hoveredID: RedactRegion.ID?
@@ -117,9 +118,13 @@ struct RedactEditor: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.05)))
 
-                Text(hint)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                HStack {
+                    Text(hint)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    UndoRedoButtons(canUndo: history.canUndo, canRedo: history.canRedo, undo: undo, redo: redo)
+                }
 
                 EditorRow(label: "Style") {
                     Picker("Style", selection: $style) {
@@ -182,9 +187,7 @@ struct RedactEditor: View {
                 if let id = hoveredID ?? selectedID, let region = regions.first(where: { $0.id == id }), dragMode == nil {
                     let rect = viewRect(region.rect, fit: fit)
                     Button {
-                        regions.removeAll { $0.id == id }
-                        if selectedID == id { selectedID = nil }
-                        hoveredID = nil
+                        removeRegion(id)
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 16))
@@ -243,11 +246,23 @@ struct RedactEditor: View {
                 }
             }
             .onEnded { _ in
-                if case .create = dragMode, let draftRect,
-                   draftRect.width >= fit.imageLength(4), draftRect.height >= fit.imageLength(4) {
-                    let region = RedactRegion(rect: draftRect)
-                    regions.append(region)
-                    selectedID = region.id
+                switch dragMode {
+                case .create:
+                    if let draftRect, draftRect.width >= fit.imageLength(4), draftRect.height >= fit.imageLength(4) {
+                        let region = RedactRegion(rect: draftRect)
+                        history.record(regions)
+                        regions.append(region)
+                        selectedID = region.id
+                    }
+                case .move(let original, _):
+                    // Record the move as one step, from where it started.
+                    if let index = regions.firstIndex(where: { $0.id == original.id }), regions[index] != original {
+                        var before = regions
+                        before[index] = original
+                        history.record(before)
+                    }
+                case nil:
+                    break
                 }
                 draftRect = nil
                 dragMode = nil
@@ -265,15 +280,42 @@ struct RedactEditor: View {
     }
 
     private func deleteSelection() {
-        regions.removeAll { $0.id == selectedID }
-        selectedID = nil
+        guard let selectedID else { return }
+        removeRegion(selectedID)
+    }
+
+    private func removeRegion(_ id: RedactRegion.ID) {
+        guard regions.contains(where: { $0.id == id }) else { return }
+        history.record(regions)
+        regions.removeAll { $0.id == id }
+        if selectedID == id { selectedID = nil }
+        hoveredID = nil
+    }
+
+    private func undo() {
+        guard let previous = history.undo(from: regions) else { return }
+        restore(previous)
+    }
+
+    private func redo() {
+        guard let next = history.redo(from: regions) else { return }
+        restore(next)
+    }
+
+    private func restore(_ snapshot: [RedactRegion]) {
+        regions = snapshot
+        draftRect = nil
+        if !snapshot.contains(where: { $0.id == selectedID }) { selectedID = nil }
+        if !snapshot.contains(where: { $0.id == hoveredID }) { hoveredID = nil }
     }
 
     private func reset() {
-        regions = []
         draftRect = nil
         selectedID = nil
         hoveredID = nil
+        guard !regions.isEmpty else { return }
+        history.record(regions)
+        regions = []
     }
 
     private func save() {

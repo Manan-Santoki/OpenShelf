@@ -21,9 +21,13 @@ enum FileActions {
     }
 
     static func copyPaths(_ urls: [URL]) {
+        copyText(urls.map(\.path).joined(separator: "\n"))
+    }
+
+    static func copyText(_ text: String) {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        pasteboard.setString(urls.map(\.path).joined(separator: "\n"), forType: .string)
+        pasteboard.setString(text, forType: .string)
     }
 
     static func airDrop(_ urls: [URL]) {

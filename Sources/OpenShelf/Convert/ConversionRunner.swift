@@ -1,47 +1,68 @@
 import AppKit
 
-/// Runs conversions one batch at a time, reporting progress in a toast next to
-/// the pointer.
+/// Runs file jobs one batch at a time, reporting progress in a toast next to
+/// the pointer. Used by the Convert wheel and by one-click tools.
 @MainActor
 final class ConversionRunner {
     static let shared = ConversionRunner()
 
+    /// Produces the files written for one job's inputs, reporting 0...1 progress.
+    typealias Operation = @Sendable ([URL], @escaping @Sendable (Double) -> Void) async throws -> [URL]
+
     private var current: Task<Void, Never>?
 
     func convert(_ urls: [URL], to format: OutputFormat, near location: NSPoint = NSEvent.mouseLocation) {
-        guard !urls.isEmpty else { return }
-        let previous = current
-        current = Task { [weak self] in
-            // Batches queue behind each other so their toasts don't collide.
-            await previous?.value
-            await self?.run(urls, to: format, near: location)
-        }
-    }
-
-    private func run(_ urls: [URL], to format: OutputFormat, near location: NSPoint) async {
-        let toasts = ToastController.shared
         let tools = ExternalTools.detect()
-        // Several files zip into one archive; everything else converts per file.
-        let jobs: [[URL]] = format == .zip ? [urls] : urls.map { [$0] }
-        let total = jobs.count
-
         let title = switch format {
         case .zip: "Compressing to ZIP"
         case .extract: "Extracting"
         default: "Converting to \(format.title)"
         }
+        // Several files zip into one archive; everything else converts per file.
+        let jobs: [[URL]] = format == .zip ? [urls] : urls.map { [$0] }
+        run(title: title, jobs: jobs, savedSubtitle: format == .extract ? nil : "as \(format.title)", near: location) { sources, progress in
+            if format == .zip {
+                return [try await ArchiveConversion.zip(sources)]
+            }
+            return try await Converter.convert(sources[0], to: format, tools: tools, progress: progress)
+        }
+    }
+
+    /// Queues `jobs` behind any batch already running.
+    func run(
+        title: String,
+        jobs: [[URL]],
+        savedSubtitle: String? = nil,
+        near location: NSPoint = NSEvent.mouseLocation,
+        operation: @escaping Operation
+    ) {
+        guard !jobs.isEmpty else { return }
+        let previous = current
+        current = Task { [weak self] in
+            // Batches queue behind each other so their toasts don't collide.
+            await previous?.value
+            await self?.execute(title: title, jobs: jobs, savedSubtitle: savedSubtitle, near: location, operation: operation)
+        }
+    }
+
+    private func execute(
+        title: String,
+        jobs: [[URL]],
+        savedSubtitle: String?,
+        near location: NSPoint,
+        operation: @escaping Operation
+    ) async {
+        let toasts = ToastController.shared
+        let total = jobs.count
         let job = Task {
             var saved: [URL] = []
             var failures: [String] = []
             for (index, sources) in jobs.enumerated() {
                 if Task.isCancelled { break }
                 do {
-                    let outputs = try await format == .zip
-                        ? [ArchiveConversion.zip(sources)]
-                        : Converter.convert(sources[0], to: format, tools: tools) { fraction in
-                            Task { @MainActor in toasts.updateProgress((Double(index) + fraction) / Double(total)) }
-                        }
-                    saved += outputs
+                    saved += try await operation(sources) { fraction in
+                        Task { @MainActor in toasts.updateProgress((Double(index) + fraction) / Double(total)) }
+                    }
                 } catch is CancellationError {
                     break
                 } catch {
@@ -60,12 +81,12 @@ final class ConversionRunner {
         if job.isCancelled {
             toasts.show(Toast(systemImage: "xmark", title: "Cancelled", subtitle: saved.isEmpty ? nil : "\(saved.count) saved"))
         } else if let failure = failures.first {
-            let title = failures.count == 1 ? "Couldn’t convert" : "\(failures.count) files couldn’t be converted"
+            let title = failures.count == 1 ? "Something went wrong" : "\(failures.count) files failed"
             toasts.show(Toast(systemImage: "exclamationmark.triangle", title: title, subtitle: failure), for: .seconds(4))
         } else if saved.count == 1 {
             toasts.show(Toast(systemImage: "checkmark", title: "Saved", subtitle: saved[0].lastPathComponent))
         } else {
-            toasts.show(Toast(systemImage: "checkmark", title: "Saved \(saved.count) files", subtitle: format == .extract ? nil : "as \(format.title)"))
+            toasts.show(Toast(systemImage: "checkmark", title: "Saved \(saved.count) files", subtitle: savedSubtitle))
         }
     }
 }

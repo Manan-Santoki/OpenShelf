@@ -52,7 +52,7 @@ enum FileAction: CaseIterable {
 enum WheelCommand: Hashable {
     case action(FileAction)
     case convert(OutputFormat)
-    case tool(ImageTool)
+    case tool(FileTool)
 }
 
 /// One wedge on a wheel.
@@ -72,7 +72,7 @@ struct WheelItem: Identifiable, Hashable {
         WheelItem(command: .convert(format), title: format.title, systemImage: nil)
     }
 
-    static func tool(_ tool: ImageTool) -> WheelItem {
+    static func tool(_ tool: FileTool) -> WheelItem {
         WheelItem(command: .tool(tool), title: tool.title, systemImage: tool.systemImage)
     }
 }

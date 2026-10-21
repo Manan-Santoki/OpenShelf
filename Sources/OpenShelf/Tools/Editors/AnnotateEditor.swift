@@ -42,8 +42,8 @@ enum AnnotationTool: CaseIterable, Identifiable {
 }
 
 /// One mark on the image. Coordinates are image pixels, origin top-left.
-struct Annotation: Identifiable {
-    enum Figure {
+struct Annotation: Identifiable, Equatable {
+    enum Figure: Equatable {
         case stroke([CGPoint])
         case arrow(from: CGPoint, to: CGPoint)
         case box(CGRect)
@@ -230,6 +230,7 @@ struct AnnotateEditor: View {
     private let previewImage: CGImage
 
     @State private var annotations: [Annotation] = []
+    @State private var history = EditHistory<[Annotation]>()
     @State private var draft: Annotation?
     @State private var selectedID: Annotation.ID?
     @State private var tool = AnnotationTool.draw
@@ -264,6 +265,8 @@ struct AnnotateEditor: View {
             title: "Annotate",
             primaryTitle: "Save",
             isPrimaryEnabled: textDraft == nil && !annotations.isEmpty,
+            // While typing, Esc finishes the text instead of closing the editor.
+            closesOnEscape: textDraft == nil,
             actions: actions,
             onReset: reset,
             onPrimary: save
@@ -274,16 +277,26 @@ struct AnnotateEditor: View {
                     .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.05)))
 
                 VStack(spacing: 6) {
-                    Picker("Tool", selection: $tool) {
-                        ForEach(AnnotationTool.allCases) { tool in
-                            Image(systemName: tool.systemImage)
-                                .help(tool.title)
-                                .accessibilityLabel(tool.title)
-                                .tag(tool)
+                    HStack(spacing: 10) {
+                        Picker("Tool", selection: $tool) {
+                            ForEach(AnnotationTool.allCases) { tool in
+                                Image(systemName: tool.systemImage)
+                                    .help(tool.title)
+                                    .accessibilityLabel(tool.title)
+                                    .tag(tool)
+                            }
                         }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .fixedSize()
+
+                        UndoRedoButtons(
+                            canUndo: history.canUndo && textDraft == nil,
+                            canRedo: history.canRedo && textDraft == nil,
+                            undo: undo,
+                            redo: redo
+                        )
                     }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
 
                     Text(tool.hint)
                         .font(.system(size: 11))
@@ -306,12 +319,12 @@ struct AnnotateEditor: View {
             .background {
                 AnnotationShortcutButton(key: .delete, isEnabled: selectedID != nil && textDraft == nil, action: deleteSelection)
                 AnnotationShortcutButton(key: .deleteForward, isEnabled: selectedID != nil && textDraft == nil, action: deleteSelection)
-                AnnotationShortcutButton(key: "z", modifiers: .command, isEnabled: !annotations.isEmpty && textDraft == nil, action: undo)
             }
         }
         .onChange(of: tool) { _, _ in commitText() }
-        .onChange(of: color) { _, newColor in updateSelection { $0.color = newColor } }
-        .onChange(of: lineWidth) { _, newWidth in updateSelection { $0.lineWidth = CGFloat(newWidth) } }
+        .onChange(of: color) { _, newColor in updateSelection(coalescing: "color") { $0.color = newColor } }
+        .onChange(of: lineWidth) { _, newWidth in updateSelection(coalescing: "width") { $0.lineWidth = CGFloat(newWidth) } }
+        .onChange(of: selectedID) { _, _ in history.endCoalescing() }
     }
 
     private var preview: some View {
@@ -357,6 +370,7 @@ struct AnnotateEditor: View {
                     .background(RoundedRectangle(cornerRadius: 4).strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 1, dash: [3, 2])))
                     .focused($isTextFieldFocused)
                     .onSubmit(commitText)
+                    .onExitCommand(perform: commitText)
                     .onAppear { isTextFieldFocused = true }
                     .offset(x: origin.x - 3, y: origin.y)
                 }
@@ -392,12 +406,20 @@ struct AnnotateEditor: View {
                 switch dragMode {
                 case .create:
                     if let draft, isMeaningful(draft, fit: fit) {
+                        history.record(annotations)
                         annotations.append(draft)
                     }
                     draft = nil
                 case .tap(let point):
                     place(at: point, fit: fit)
-                case .move, .ignore, nil:
+                case .move(let original, _):
+                    // Record the move as one step, using the position it started from.
+                    if let index = annotations.firstIndex(where: { $0.id == original.id }), annotations[index] != original {
+                        var before = annotations
+                        before[index] = original
+                        history.record(before)
+                    }
+                case .ignore, nil:
                     break
                 }
                 dragMode = nil
@@ -481,6 +503,7 @@ struct AnnotateEditor: View {
             let longSide = max(image.pixelSize.width, image.pixelSize.height)
             let diameter = max(24, longSide * 0.035)
             let callout = Annotation(figure: .callout(number: next, center: point, diameter: diameter), color: color, lineWidth: CGFloat(lineWidth))
+            history.record(annotations)
             annotations.append(callout)
             selectedID = callout.id
         default:
@@ -494,31 +517,54 @@ struct AnnotateEditor: View {
         let text = textDraft.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         let annotation = Annotation(figure: .text(text, origin: textDraft.origin), color: color, lineWidth: CGFloat(lineWidth))
+        history.record(annotations)
         annotations.append(annotation)
         selectedID = annotation.id
     }
 
-    private func updateSelection(_ change: (inout Annotation) -> Void) {
-        guard let index = annotations.firstIndex(where: { $0.id == selectedID }) else { return }
-        change(&annotations[index])
+    /// Applies a colour or width change to the selected annotation. Continuous
+    /// changes to the same property (dragging a slider) undo as one step.
+    private func updateSelection(coalescing property: String, _ change: (inout Annotation) -> Void) {
+        guard let selectedID, let index = annotations.firstIndex(where: { $0.id == selectedID }) else { return }
+        var updated = annotations[index]
+        change(&updated)
+        guard updated != annotations[index] else { return }
+        history.record(annotations, coalescingKey: "\(property)-\(selectedID)")
+        annotations[index] = updated
     }
 
     private func deleteSelection() {
+        guard annotations.contains(where: { $0.id == selectedID }) else { return }
+        history.record(annotations)
         annotations.removeAll { $0.id == selectedID }
         selectedID = nil
     }
 
     private func undo() {
-        guard !annotations.isEmpty else { return }
-        let removed = annotations.removeLast()
-        if removed.id == selectedID { selectedID = nil }
+        guard textDraft == nil, let previous = history.undo(from: annotations) else { return }
+        restore(previous)
+    }
+
+    private func redo() {
+        guard textDraft == nil, let next = history.redo(from: annotations) else { return }
+        restore(next)
+    }
+
+    private func restore(_ snapshot: [Annotation]) {
+        annotations = snapshot
+        draft = nil
+        if !snapshot.contains(where: { $0.id == selectedID }) {
+            selectedID = nil
+        }
     }
 
     private func reset() {
-        annotations = []
-        draft = nil
         textDraft = nil
+        draft = nil
         selectedID = nil
+        guard !annotations.isEmpty else { return }
+        history.record(annotations)
+        annotations = []
     }
 
     private func save() {

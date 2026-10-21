@@ -20,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.wheel.dismiss()
         }
         dragMonitor.start()
+        WelcomeView.presentIfNeeded()
     }
 
     private func showWheel(_ kind: WheelKind, at location: NSPoint, for urls: [URL]) {
@@ -38,7 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .convert:
             ConversionCatalog.formats(for: urls, tools: .detect()).map(WheelItem.convert)
         case .tools:
-            ImageTool.available(for: urls).map(WheelItem.tool)
+            FileTool.available(for: urls).map(WheelItem.tool)
         case .actions:
             FileAction.allCases
                 .filter { $0 != .addToShelf || shelves.hasShelves }

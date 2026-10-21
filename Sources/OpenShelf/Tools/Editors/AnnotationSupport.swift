@@ -54,6 +54,85 @@ enum AnnotationPreviewImage {
     }
 }
 
+/// Snapshot-based undo and redo for editors whose state is a small value, such
+/// as a list of annotations.
+struct EditHistory<Snapshot> {
+    private(set) var undoStack: [Snapshot] = []
+    private(set) var redoStack: [Snapshot] = []
+    private var coalescingKey: AnyHashable?
+    let limit: Int
+
+    init(limit: Int = 100) {
+        self.limit = limit
+    }
+
+    var canUndo: Bool { !undoStack.isEmpty }
+    var canRedo: Bool { !redoStack.isEmpty }
+
+    /// Call with the state as it was just before a change. Consecutive changes
+    /// with the same non-nil `coalescingKey` (e.g. dragging a width slider) undo
+    /// as one step.
+    mutating func record(_ snapshot: Snapshot, coalescingKey key: AnyHashable? = nil) {
+        if let key, key == coalescingKey { return }
+        coalescingKey = key
+        undoStack.append(snapshot)
+        if undoStack.count > limit {
+            undoStack.removeFirst(undoStack.count - limit)
+        }
+        redoStack.removeAll()
+    }
+
+    /// Ends any run of coalesced changes, so the next change gets its own step.
+    mutating func endCoalescing() {
+        coalescingKey = nil
+    }
+
+    /// Returns the state to restore, given the current one.
+    mutating func undo(from current: Snapshot) -> Snapshot? {
+        coalescingKey = nil
+        guard let previous = undoStack.popLast() else { return nil }
+        redoStack.append(current)
+        return previous
+    }
+
+    mutating func redo(from current: Snapshot) -> Snapshot? {
+        coalescingKey = nil
+        guard let next = redoStack.popLast() else { return nil }
+        undoStack.append(current)
+        return next
+    }
+}
+
+/// Undo and redo buttons with ⌘Z and ⇧⌘Z.
+struct UndoRedoButtons: View {
+    let canUndo: Bool
+    let canRedo: Bool
+    let undo: () -> Void
+    let redo: () -> Void
+
+    var body: some View {
+        HStack(spacing: 2) {
+            Button(action: undo) {
+                Image(systemName: "arrow.uturn.backward")
+            }
+            .keyboardShortcut("z", modifiers: .command)
+            .disabled(!canUndo)
+            .help("Undo (⌘Z)")
+            .accessibilityLabel("Undo")
+
+            Button(action: redo) {
+                Image(systemName: "arrow.uturn.forward")
+            }
+            .keyboardShortcut("z", modifiers: [.command, .shift])
+            .disabled(!canRedo)
+            .help("Redo (⇧⌘Z)")
+            .accessibilityLabel("Redo")
+        }
+        .buttonStyle(.borderless)
+        .font(.system(size: 13, weight: .medium))
+    }
+}
+
 /// An invisible button that gives an editor a keyboard shortcut, such as ⌫ to
 /// delete the selection.
 struct AnnotationShortcutButton: View {

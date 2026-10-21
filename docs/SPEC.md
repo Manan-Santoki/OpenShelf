@@ -81,24 +81,36 @@ the pointer shows "Converting to JPG · 1 of 3 saved" with a cancel button.
 
 ### 2.4 Tools wheel
 
-Compress · Metadata · Edit · Annotate · Add BG · Crop · Redact. Each opens a
-small editor window that zooms out of the drop point; saving writes a suffixed
-copy beside the original ("Name Cropped.jpg") and closes with a toast, so
-results can be dragged straight back into a wheel.
+Tools depend on the dragged files. Editors open in a small window that zooms
+out of the drop point; saving writes a suffixed copy beside the original
+("Name Cropped.jpg") and closes with a toast, so results can be dragged straight
+back into a wheel. One-click tools run with the progress toast instead.
+
+**Images:** Compress · Metadata · Edit · Annotate · Add BG · Crop · Redact ·
+Read QR (+ Combine for several files)
 
 - **Crop:** dimmed outside area, 8 handles, aspect presets (Free, 1:1, 16:9,
   9:16, 4:3, 3:4), live W × H fields in px. Reset / Apply.
 - **Add BG:** gradient and solid swatches, custom image and colour; Padding,
   Corners and Shadow sliders in px; ratio Auto, 1:1, 16:9, 4:5. Saves PNG.
 - **Annotate:** draw, arrow, box, highlight, text, numbered callouts; colours
-  and stroke width; select, move, delete, undo.
-- **Redact:** drag regions; black box, pixelate or blur; strips metadata.
+  and stroke width; select, move, delete; full undo/redo.
+- **Redact:** drag regions; black box, pixelate or blur; strips metadata;
+  undo/redo.
 - **Edit:** exposure, brightness, contrast, saturation, warmth, vibrance,
   sharpness, vignette; rotate and flip.
 - **Compress:** quality or target size, JPEG/HEIC, max dimension; estimated
-  result size; works on several images.
+  result size; several images at once.
 - **Metadata:** grouped EXIF/GPS/camera details with a location warning; remove
-  all metadata into a clean copy; works on several images.
+  all metadata into a clean copy; several images at once.
+- **Read QR** (one click): decodes QR and other 2D codes and copies the text.
+
+**PDFs:** Combine (PDFs and images, one click) · Pages (reorder, rotate,
+delete) · Split (every page, every N pages, or ranges) · Compress (light,
+balanced, strong) · Metadata (edit or remove).
+
+**Video:** Trim · Speed (0.25×–4×, optional pitch keeping) · Crop · Compress
+(resolution and quality) · Mute (one click). **Audio:** Trim · Speed.
 
 ## 3. Shelves
 
@@ -146,7 +158,7 @@ New Shelf · Close All Shelves · Settings… · Quit.
    Images via ImageIO/Core Image, audio/video via AVFoundation (ffmpeg optional
    for formats Apple frameworks lack), PDF via PDFKit, text/RTF/DOCX via
    NSAttributedString.
-2. ~~Tools wheel~~ (done for images, §2.4; PDF and video tools next) — hub shows the file size until a wedge is hovered. Tools:
+2. ~~Tools wheel~~ (done, §2.4) — hub shows the file size until a wedge is hovered. Tools:
    compress (quality or target size), crop, metadata view/strip, redact,
    annotate, add background, edit (adjustments), trim/split video & audio,
    PDF merge/split/reorder, QR decode. Tools that need input open a small
@@ -157,6 +169,7 @@ New Shelf · Close All Shelves · Settings… · Quit.
    - *Add background:* gradient and solid swatches or a custom image; padding,
      corner radius and shadow sliders; output ratio (Auto, 1:1, 16:9, 4:5).
 3. Keyboard control of an open wheel (arrows + Return).
+4. Notarized builds and a Homebrew cask.
 4. Shelf auto-hide: docked shelves slide into a slim tab and reveal on hover.
 5. Rubber-band selection and type-to-select in expanded shelves.
 6. Shelf persistence across relaunches (security-scoped bookmarks).

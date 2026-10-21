@@ -18,6 +18,9 @@ struct EditorChrome<Content: View>: View {
     let title: String
     let primaryTitle: String
     var isPrimaryEnabled = true
+    /// Whether Esc closes the editor. Editors turn this off while Esc has a more
+    /// local meaning, such as ending text entry.
+    var closesOnEscape = true
     let actions: EditorActions
     var onReset: (() -> Void)?
     let onPrimary: () -> Void
@@ -37,7 +40,7 @@ struct EditorChrome<Content: View>: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
-                    .keyboardShortcut(.cancelAction)
+                    .keyboardShortcut(closesOnEscape ? .cancelAction : nil)
                     .help("Close without saving")
                     .accessibilityLabel("Close")
                     Spacer()
