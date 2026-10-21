@@ -115,6 +115,6 @@ struct UnreadableMediaError: LocalizedError, Equatable {
 
     var errorDescription: String? {
         let file = url.map { "“\($0.lastPathComponent)”" } ?? "one of these files"
-        return "macOS can’t read \(file). Installing ffmpeg in Settings → Extra formats may help."
+        return "macOS can’t read \(file). Installing ffmpeg in Settings → Extra Formats may help."
     }
 }
