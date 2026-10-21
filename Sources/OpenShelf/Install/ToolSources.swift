@@ -25,11 +25,28 @@ enum FFmpegSource {
     /// What both zips together come to, for the Install button.
     static let approximateSize = "55 MB"
 
+    /// OpenShelf's copy of the build server's zips, on a fixed GitHub release,
+    /// for when the build server is down: `ffmpeg-arm64.zip`,
+    /// `ffprobe-amd64.zip`…, each with a shasum-style `.sha256` beside it.
+    /// They're the vendor's own signed zips, unmodified, and go through
+    /// exactly the same checks, so the mirror is only a way to fetch them:
+    /// nothing it serves can run unless the vendor signed it.
+    static let mirrorBase = URL(string: "https://github.com/Manan-Santoki/OpenShelf/releases/download/tools-ffmpeg/")!
+
     /// The latest release build of `tool` ("ffmpeg" or "ffprobe"). It
     /// redirects to a versioned folder, e.g. …/download/macos/arm64/1783011502_8.1.2/ffmpeg.zip.
     static func latestURL(of tool: String, for architecture: MachineArchitecture) -> URL {
-        let platform = architecture == .arm64 ? "arm64" : "amd64"
-        return URL(string: "https://\(host)/redirect/latest/macos/\(platform)/release/\(tool).zip")!
+        URL(string: "https://\(host)/redirect/latest/macos/\(platform(architecture))/release/\(tool).zip")!
+    }
+
+    /// `tool` on the mirror, e.g. …/tools-ffmpeg/ffprobe-arm64.zip.
+    static func mirrorURL(of tool: String, for architecture: MachineArchitecture, base: URL = mirrorBase) -> URL {
+        base.appendingPathComponent("\(tool)-\(platform(architecture)).zip")
+    }
+
+    /// The build server's name for the processor family, which the mirror shares.
+    private static func platform(_ architecture: MachineArchitecture) -> String {
+        architecture == .arm64 ? "arm64" : "amd64"
     }
 
     /// Another file of the same build as `download` (the redirect's target),

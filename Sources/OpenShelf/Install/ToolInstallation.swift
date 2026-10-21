@@ -69,6 +69,8 @@ struct InstallProgress: Equatable, Sendable {
     var fraction: Double?
     /// "12 of 55 MB", "Checking the signature…"
     var detail: String
+    /// Where it's coming from, for the status line under the progress.
+    var source: InstallSource? = nil
 }
 
 /// The steps of downloading, checking and installing a tool. Every download
@@ -103,23 +105,81 @@ enum ToolInstallation {
         let ffprobeZip = staging.appendingPathComponent("ffprobe.zip")
         try await download(ffprobeURL, to: ffprobeZip, label: "ffprobe", part: 1, of: 2, report: report)
 
+        let zips = [
+            FFmpegZip(name: "ffmpeg", file: ffmpegZip, checksum: FFmpegSource.checksumURL(for: resolved), listedAs: resolved.lastPathComponent),
+            FFmpegZip(name: "ffprobe", file: ffprobeZip, checksum: FFmpegSource.checksumURL(for: ffprobeURL), listedAs: ffprobeURL.lastPathComponent),
+        ]
+        let paths = try await installVerified(zips, staging: staging, into: locations, report: report)
+        let version = FFmpegSource.version(fromDownloadURL: resolved) ?? "latest"
+        return InstalledTools.Entry(version: version, paths: paths, source: resolved.absoluteString)
+    }
+
+    /// Installs ffmpeg and ffprobe from OpenShelf's mirror of the build
+    /// server (`FFmpegSource.mirrorBase`), checked exactly as if they came
+    /// from the build server itself.
+    static func installFFmpegFromMirror(
+        _ base: URL = FFmpegSource.mirrorBase,
+        architecture: MachineArchitecture = .current,
+        into locations: InstallLocations,
+        report: @escaping Report
+    ) async throws -> InstalledTools.Entry {
+        let staging = try makeStagingFolder(in: locations.tools)
+        defer { try? FileManager.default.removeItem(at: staging) }
+
+        var zips: [FFmpegZip] = []
+        for (part, name) in ["ffmpeg", "ffprobe"].enumerated() {
+            let url = FFmpegSource.mirrorURL(of: name, for: architecture, base: base)
+            let file = staging.appendingPathComponent("\(name).zip")
+            // GitHub serves release files from its storage hosts, so the
+            // redirect's target isn't pinned; nothing is derived from it, and
+            // the signature decides what the file is.
+            let resolved = try await download(url, to: file, label: name, part: part, of: 2, report: report)
+            guard resolved.isFileURL || resolved.scheme == "https" else {
+                throw DownloadError.untrustedLocation(resolved.host ?? resolved.absoluteString)
+            }
+            zips.append(FFmpegZip(name: name, file: file, checksum: FFmpegSource.checksumURL(for: url), listedAs: url.lastPathComponent))
+        }
+        let paths = try await installVerified(zips, staging: staging, into: locations, report: report)
+        let source = FFmpegSource.mirrorURL(of: "ffmpeg", for: architecture, base: base)
+        return InstalledTools.Entry(version: "latest", paths: paths, source: source.absoluteString)
+    }
+
+    /// A downloaded zip of ffmpeg or ffprobe, and where its checksum is listed.
+    private struct FFmpegZip {
+        /// "ffmpeg" or "ffprobe": the program inside and its signing identifier.
+        var name: String
+        var file: URL
+        var checksum: URL
+        /// The file name the checksum file lists it under.
+        var listedAs: String
+    }
+
+    /// Checks both zips, unpacks them, checks the programs' signatures and
+    /// moves them into place, returning their paths. Nothing is moved unless
+    /// both pass.
+    private static func installVerified(
+        _ zips: [FFmpegZip],
+        staging: URL,
+        into locations: InstallLocations,
+        report: @escaping Report
+    ) async throws -> [String] {
         report(InstallProgress(step: .verifying, fraction: nil, detail: "Checking the download…"))
         var binaries: [(name: String, file: URL)] = []
-        for (name, zip, url) in [("ffmpeg", ffmpegZip, resolved), ("ffprobe", ffprobeZip, ffprobeURL)] {
+        for zip in zips {
             // The signature below is what proves who built it; the checksum,
             // when the server lists one, catches a damaged download early.
-            if let expected = try await publishedChecksum(at: FFmpegSource.checksumURL(for: url), for: url.lastPathComponent) {
-                try ToolIntegrity.verify(zip, sha256: expected, name: name)
+            if let expected = try await publishedChecksum(at: zip.checksum, for: zip.listedAs) {
+                try ToolIntegrity.verify(zip.file, sha256: expected, name: zip.name)
             }
-            let folder = staging.appendingPathComponent(name, isDirectory: true)
-            try await ProcessRunner.run(ditto, ["-x", "-k", zip.path, folder.path])
-            let binary = folder.appendingPathComponent(name)
+            let folder = staging.appendingPathComponent(zip.name, isDirectory: true)
+            try await ProcessRunner.run(ditto, ["-x", "-k", zip.file.path, folder.path])
+            let binary = folder.appendingPathComponent(zip.name)
             guard FileManager.default.fileExists(atPath: binary.path) else {
-                throw ConversionError.failed("The download didn’t contain \(name).")
+                throw ConversionError.failed("The download didn’t contain \(zip.name).")
             }
-            try ToolIntegrity.verifySignature(of: binary, identifier: name, teamID: FFmpegSource.teamID, name: name)
+            try ToolIntegrity.verifySignature(of: binary, identifier: zip.name, teamID: FFmpegSource.teamID, name: zip.name)
             try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binary.path)
-            binaries.append((name, binary))
+            binaries.append((zip.name, binary))
         }
 
         report(InstallProgress(step: .installing, fraction: nil, detail: "Installing…"))
@@ -129,8 +189,7 @@ enum ToolInstallation {
             try moveIntoPlace(binary, at: destination)
             paths.append(destination.path)
         }
-        let version = FFmpegSource.version(fromDownloadURL: resolved) ?? "latest"
-        return InstalledTools.Entry(version: version, paths: paths, source: resolved.absoluteString)
+        return paths
     }
 
     // MARK: LibreOffice

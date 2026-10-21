@@ -37,8 +37,11 @@ final class ToolInstaller {
 
     private(set) var tools: ExternalTools
     private(set) var installed: InstalledTools
-    private var progress: [ExtraTool: InstallProgress] = [:]
-    private var failures: [ExtraTool: String] = [:]
+    // Not private, so tests can lay out Settings in each state.
+    /// Homebrew's `brew`, offered when the download servers are down.
+    var homebrew: URL?
+    var progress: [ExtraTool: InstallProgress] = [:]
+    var failures: [ExtraTool: InstallFailure] = [:]
 
     @ObservationIgnored let locations: InstallLocations
     @ObservationIgnored private var jobs: [ExtraTool: Task<Void, Never>] = [:]
@@ -47,10 +50,22 @@ final class ToolInstaller {
         self.locations = locations
         tools = ExternalTools.current
         installed = InstalledTools.load(from: locations.record)
+        homebrew = Homebrew.find()
     }
 
     func status(of tool: ExtraTool) -> ToolStatus {
-        Self.status(of: tool, tools: tools, installed: installed, progress: progress[tool], failure: failures[tool], locations: locations)
+        Self.status(of: tool, tools: tools, installed: installed, progress: progress[tool], failure: failures[tool]?.message, locations: locations)
+    }
+
+    /// Why the last install failed, while Settings shows it.
+    func failure(of tool: ExtraTool) -> InstallFailure? {
+        failures[tool]
+    }
+
+    /// What to offer after a failed install, the first most prominently.
+    func offers(for tool: ExtraTool) -> [InstallOffer] {
+        guard let failure = failures[tool] else { return [] }
+        return InstallFallback.offers(after: failure.kind, homebrewInstalled: homebrew != nil)
     }
 
     /// Detects the tools again, e.g. when Settings comes forward after an
@@ -58,33 +73,41 @@ final class ToolInstaller {
     func refresh() {
         tools = ExternalTools.refresh()
         installed = InstalledTools.load(from: locations.record)
+        homebrew = Homebrew.find()
     }
 
+    /// Downloads `tool` from its publisher, or for ffmpeg from OpenShelf's
+    /// mirror when the publisher's server is down.
     func install(_ tool: ExtraTool) {
-        guard jobs[tool] == nil else { return }
-        failures[tool] = nil
-        progress[tool] = InstallProgress(step: .downloading, fraction: 0, detail: "Starting…")
         let locations = locations
-        let report: ToolInstallation.Report = { [weak self] update in
-            Task { @MainActor in
-                // Late updates from a finished or cancelled install are dropped.
-                guard let self, self.jobs[tool] != nil else { return }
-                self.progress[tool] = update
+        let sources = InstallFallback.automaticSources(for: tool)
+        let first = InstallProgress(step: .downloading, fraction: 0, detail: "Starting…", source: sources.first)
+        start(tool, from: .vendor, showing: first) { report in
+            try await InstallFallback.install(tool, from: sources) { source in
+                let sourced: ToolInstallation.Report = { update in
+                    var update = update
+                    update.source = source
+                    report(update)
+                }
+                if source == .mirror {
+                    sourced(InstallProgress(step: .downloading, fraction: 0, detail: "\(tool.downloadHost) isn’t responding. Trying the mirror…"))
+                }
+                return try await Self.download(tool, from: source, into: locations, report: sourced)
             }
         }
-        jobs[tool] = Task { [weak self] in
-            let outcome: Result<InstalledTools.Entry, Error>
-            do {
-                switch tool {
-                case .ffmpeg:
-                    outcome = .success(try await ToolInstallation.installFFmpeg(into: locations, report: report))
-                case .libreOffice:
-                    outcome = .success(try await ToolInstallation.installLibreOffice(into: locations, report: report))
-                }
-            } catch {
-                outcome = .failure(error)
-            }
-            self?.finish(tool, with: outcome)
+    }
+
+    /// Runs `brew install` for `tool`, when the download servers are down.
+    func installWithHomebrew(_ tool: ExtraTool) {
+        guard let brew = Homebrew.find() else {
+            refresh()
+            return
+        }
+        let first = InstallProgress(step: .installing, fraction: nil, detail: "Starting Homebrew…", source: .homebrew)
+        start(tool, from: .homebrew, showing: first) { report in
+            try await Homebrew.install(tool, using: brew, report: report)
+            // Homebrew keeps track of its own copies.
+            return nil
         }
     }
 
@@ -100,19 +123,79 @@ final class ToolInstaller {
             try installed.save(to: locations.record)
             failures[tool] = nil
         } catch {
-            failures[tool] = "Couldn’t remove \(tool.name): \(error.localizedDescription)"
+            failures[tool] = InstallFailure(message: "Couldn’t remove \(tool.name): \(error.localizedDescription)", kind: .other)
         }
         refresh()
     }
 
-    private func finish(_ tool: ExtraTool, with outcome: Result<InstalledTools.Entry, Error>) {
+    /// Runs an install in the background, showing its progress. `work`
+    /// returns what to record as OpenShelf's own copy, or nil for one
+    /// Homebrew manages.
+    private func start(
+        _ tool: ExtraTool,
+        from source: InstallSource,
+        showing first: InstallProgress,
+        work: @escaping @Sendable (@escaping ToolInstallation.Report) async throws -> InstalledTools.Entry?
+    ) {
+        guard jobs[tool] == nil else { return }
+        failures[tool] = nil
+        progress[tool] = first
+        let report: ToolInstallation.Report = { [weak self] update in
+            Task { @MainActor in
+                // Late updates from a finished or cancelled install are dropped.
+                guard let self, self.jobs[tool] != nil else { return }
+                self.progress[tool] = update
+            }
+        }
+        jobs[tool] = Task { [weak self] in
+            let outcome: Result<InstalledTools.Entry?, Error>
+            do {
+                outcome = .success(try await work(report))
+            } catch {
+                outcome = .failure(error)
+            }
+            self?.finish(tool, from: source, with: outcome)
+        }
+    }
+
+    private nonisolated static func download(
+        _ tool: ExtraTool,
+        from source: InstallSource,
+        into locations: InstallLocations,
+        report: @escaping ToolInstallation.Report
+    ) async throws -> InstalledTools.Entry {
+        switch (tool, source) {
+        case (.ffmpeg, .vendor):
+            try await ToolInstallation.installFFmpeg(into: locations, report: report)
+        case (.ffmpeg, .mirror):
+            try await ToolInstallation.installFFmpegFromMirror(into: locations, report: report)
+        case (.libreOffice, .vendor):
+            try await ToolInstallation.installLibreOffice(into: locations, report: report)
+        case (.libreOffice, .mirror), (_, .homebrew):
+            throw ConversionError.failed("\(tool.name) can’t be downloaded from there.")
+        }
+    }
+
+    private func finish(_ tool: ExtraTool, from source: InstallSource, with outcome: Result<InstalledTools.Entry?, Error>) {
         jobs[tool] = nil
         progress[tool] = nil
         switch outcome {
         case .success(let entry):
-            installed[tool] = entry
-            try? installed.save(to: locations.record)
+            if let entry {
+                installed[tool] = entry
+                try? installed.save(to: locations.record)
+            }
             refresh()
+            // brew can succeed without OpenShelf seeing the result, e.g.
+            // when IgnoredExternalTools hides Homebrew's copies.
+            guard tool.isInstalled(in: tools) else {
+                let isHidden = ExternalTools.ignoredTools.contains(tool.rawValue.lowercased())
+                let message = isHidden
+                    ? "Homebrew installed \(tool.name), but the IgnoredExternalTools setting hides Homebrew’s copy."
+                    : "Homebrew finished, but OpenShelf can’t find \(tool.name)."
+                fail(tool, InstallFailure(message: message, kind: .homebrew))
+                return
+            }
             ToastController.shared.show(
                 Toast(systemImage: "checkmark", title: "\(tool.name) installed", subtitle: tool.installedConfirmation),
                 for: .seconds(4)
@@ -120,14 +203,18 @@ final class ToolInstaller {
         case .failure(let error) where error is CancellationError:
             break
         case .failure(let error):
-            let message = error.localizedDescription
-            failures[tool] = message
-            ToastController.shared.show(
-                Toast(systemImage: "exclamationmark.triangle", title: "Couldn’t install \(tool.name)", subtitle: message),
-                for: .seconds(5)
-            )
+            fail(tool, InstallFallback.failure(after: error, from: source))
         }
     }
+
+    private func fail(_ tool: ExtraTool, _ failure: InstallFailure) {
+        failures[tool] = failure
+        ToastController.shared.show(
+            Toast(systemImage: "exclamationmark.triangle", title: "Couldn’t install \(tool.name)", subtitle: failure.message),
+            for: .seconds(5)
+        )
+    }
+
 
     // MARK: Decisions
 
