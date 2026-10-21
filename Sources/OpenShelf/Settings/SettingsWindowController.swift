@@ -17,11 +17,13 @@ final class SettingsWindowController: NSWindowController {
 
     private init() {
         let hostingController = NSHostingController(rootView: SettingsView())
-        // The window follows the form's height, e.g. when a warning appears.
-        hostingController.sizingOptions = .preferredContentSize
+        // The window sets the size; the form scrolls when it's taller than that.
+        hostingController.sizingOptions = []
         let window = NSWindow(contentViewController: hostingController)
         window.title = "OpenShelf Settings"
-        window.styleMask = [.titled, .closable]
+        window.styleMask = [.titled, .closable, .resizable]
+        window.contentMinSize = NSSize(width: SettingsView.width, height: 240)
+        window.contentMaxSize = NSSize(width: SettingsView.width, height: .greatestFiniteMagnitude)
         window.isReleasedWhenClosed = false
         // Open on the Space the user is on rather than switching to another.
         window.collectionBehavior = [.moveToActiveSpace]
@@ -37,7 +39,7 @@ final class SettingsWindowController: NSWindowController {
     func show() {
         guard let window else { return }
         if !window.isVisible {
-            window.center()
+            fitToScreen(window)
         }
         raise()
         guard !NSApp.isActive else { return }
@@ -60,6 +62,22 @@ final class SettingsWindowController: NSWindowController {
             try? await Task.sleep(for: .seconds(1))
             guard !Task.isCancelled else { return }
             self?.removeActivationObserver()
+        }
+    }
+
+    /// Sizes the window to show the whole form if the screen has room, else as
+    /// tall as the screen allows, and centres it.
+    private func fitToScreen(_ window: NSWindow) {
+        let screen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main
+        let available: CGFloat = (screen?.visibleFrame.height ?? 800) - 80
+        let height: CGFloat = min(SettingsView.idealHeight, available)
+        window.setContentSize(NSSize(width: SettingsView.width, height: height))
+        if let screen {
+            let visible = screen.visibleFrame
+            let size = window.frame.size
+            window.setFrameOrigin(NSPoint(x: visible.midX - size.width / 2, y: visible.midY - size.height / 2))
+        } else {
+            window.center()
         }
     }
 

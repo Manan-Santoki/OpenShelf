@@ -74,8 +74,15 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 460)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: Self.width)
+    }
+
+    static let width: CGFloat = 460
+
+    /// The height the whole form needs, without scrolling.
+    @MainActor
+    static var idealHeight: CGFloat {
+        NSHostingView(rootView: SettingsView().fixedSize(horizontal: false, vertical: true)).fittingSize.height
     }
 
     private func setOpensAtLogin(_ enabled: Bool) {

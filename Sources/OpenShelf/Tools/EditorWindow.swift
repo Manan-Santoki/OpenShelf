@@ -31,6 +31,8 @@ struct EditorChrome<Content: View>: View {
             ZStack {
                 Text(title)
                     .font(.system(size: 13, weight: .semibold))
+                    // Presses on the title move the window like the rest of the bar.
+                    .allowsHitTesting(false)
                 HStack {
                     Button(action: actions.close) {
                         Image(systemName: "xmark")

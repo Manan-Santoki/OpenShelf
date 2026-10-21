@@ -49,6 +49,8 @@ private struct ShelfHeader: View {
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+                // The title is where people grab a shelf; let presses reach the drag area.
+                .allowsHitTesting(false)
             Spacer(minLength: 0)
             if shelf.isExpanded {
                 HeaderButton(
