@@ -2,7 +2,7 @@ import AppKit
 import CoreImage
 import SwiftUI
 
-enum RedactionStyle: CaseIterable, Identifiable {
+enum RedactionStyle: CaseIterable, Identifiable, Hashable {
     case box, pixelate, blur
 
     var id: Self { self }
@@ -16,10 +16,19 @@ enum RedactionStyle: CaseIterable, Identifiable {
     }
 }
 
+/// How an area is hidden: each area keeps its own, so one image can mix a black
+/// box over a name with a blurred face.
+struct RedactionLook: Hashable {
+    var style: RedactionStyle
+    /// 0–100; ignored by the black box.
+    var strength: Double
+}
+
 struct RedactRegion: Identifiable, Equatable {
     let id = UUID()
     /// Image pixels, origin top-left.
     var rect: CGRect
+    var look: RedactionLook
 }
 
 /// Applies redactions with Core Image.
@@ -27,20 +36,40 @@ struct RedactRegion: Identifiable, Equatable {
 enum Redaction {
     private static let context = CIContext()
 
-    /// Returns `image` with `regions` (image pixels, origin top-left) hidden.
-    /// Strength (0–100) is relative to the image's size, so a downscaled preview
-    /// looks the same as the full-resolution result.
-    static func apply(to image: CGImage, regions: [CGRect], style: RedactionStyle, strength: Double) -> CGImage? {
-        guard !regions.isEmpty else { return image }
+    /// Returns `image` with each area (image pixels, origin top-left) hidden in
+    /// its own look. Strength is relative to the image's size, so a downscaled
+    /// preview looks the same as the full-resolution result.
+    static func apply(to image: CGImage, areas: [(rect: CGRect, look: RedactionLook)]) -> CGImage? {
+        guard !areas.isEmpty else { return image }
         let source = CIImage(cgImage: image)
+        var output = source
+        // One pass per look, each filtering the original so looks don't compound.
+        var looks: [RedactionLook] = []
+        for area in areas where !looks.contains(area.look) {
+            looks.append(area.look)
+        }
+        for look in looks {
+            let rects = areas.filter { $0.look == look }.map(\.rect)
+            output = hide(rects, in: source, over: output, look: look)
+        }
+        return context.createCGImage(output, from: source.extent)
+    }
+
+    /// Returns `image` with `regions` hidden in one look.
+    static func apply(to image: CGImage, regions: [CGRect], style: RedactionStyle, strength: Double) -> CGImage? {
+        let look = RedactionLook(style: style, strength: strength)
+        return apply(to: image, areas: regions.map { (rect: $0, look: look) })
+    }
+
+    private static func hide(_ regions: [CGRect], in source: CIImage, over background: CIImage, look: RedactionLook) -> CIImage {
         let extent = source.extent
         let longSide = max(extent.width, extent.height)
-        let amount = min(max(strength, 0), 100) / 100
+        let amount = min(max(look.strength, 0), 100) / 100
 
         // Filter the whole image once, then reveal it only inside the regions.
         // Clamping first keeps edges from fading to transparent.
         let covered: CIImage
-        switch style {
+        switch look.style {
         case .box:
             covered = CIImage(color: .black).cropped(to: extent)
         case .pixelate:
@@ -62,11 +91,10 @@ enum Redaction {
             let flipped = CGRect(x: region.minX, y: extent.height - region.maxY, width: region.width, height: region.height)
             mask = CIImage(color: .white).cropped(to: flipped).composited(over: mask)
         }
-        let output = covered.applyingFilter("CIBlendWithMask", parameters: [
-            kCIInputBackgroundImageKey: source,
+        return covered.applyingFilter("CIBlendWithMask", parameters: [
+            kCIInputBackgroundImageKey: background,
             kCIInputMaskImageKey: mask,
         ])
-        return context.createCGImage(output, from: extent)
     }
 }
 
@@ -94,8 +122,7 @@ struct RedactEditor: View {
 
     private struct PreviewKey: Equatable {
         var rects: [CGRect]
-        var style: RedactionStyle
-        var strength: Double
+        var looks: [RedactionLook]
     }
 
     init(image: EditableImage, actions: EditorActions) {
@@ -126,7 +153,8 @@ struct RedactEditor: View {
                     UndoRedoButtons(canUndo: history.canUndo, canRedo: history.canRedo, undo: undo, redo: redo)
                 }
 
-                EditorRow(label: "Style") {
+                // Applies to the selected area, or to new areas when none is selected.
+                EditorRow(label: selectedID == nil ? "Style" : "This area") {
                     Picker("Style", selection: $style) {
                         ForEach(RedactionStyle.allCases) { Text($0.title).tag($0) }
                     }
@@ -146,6 +174,15 @@ struct RedactEditor: View {
         .onChange(of: previewKey, initial: true) { _, key in
             renderPreview(for: key)
         }
+        .onChange(of: selectedID) { _, id in
+            // The controls show the selected area's look, ready to change it.
+            history.endCoalescing()
+            guard let region = regions.first(where: { $0.id == id }) else { return }
+            style = region.look.style
+            strength = region.look.strength
+        }
+        .onChange(of: style) { _, _ in updateSelectedLook(coalescing: "style") }
+        .onChange(of: strength) { _, _ in updateSelectedLook(coalescing: "strength") }
     }
 
     private var hint: String {
@@ -156,8 +193,21 @@ struct RedactEditor: View {
         }
     }
 
+    private var currentLook: RedactionLook {
+        RedactionLook(style: style, strength: strength)
+    }
+
     private var previewKey: PreviewKey {
-        PreviewKey(rects: regions.map(\.rect) + (draftRect.map { [$0] } ?? []), style: style, strength: strength)
+        PreviewKey(
+            rects: regions.map(\.rect) + (draftRect.map { [$0] } ?? []),
+            looks: regions.map(\.look) + (draftRect == nil ? [] : [currentLook])
+        )
+    }
+
+    private func updateSelectedLook(coalescing key: String) {
+        guard let index = regions.firstIndex(where: { $0.id == selectedID }), regions[index].look != currentLook else { return }
+        history.record(regions, coalescingKey: key)
+        regions[index].look = currentLook
     }
 
     private var preview: some View {
@@ -249,7 +299,7 @@ struct RedactEditor: View {
                 switch dragMode {
                 case .create:
                     if let draftRect, draftRect.width >= fit.imageLength(4), draftRect.height >= fit.imageLength(4) {
-                        let region = RedactRegion(rect: draftRect)
+                        let region = RedactRegion(rect: draftRect, look: currentLook)
                         history.record(regions)
                         regions.append(region)
                         selectedID = region.id
@@ -276,7 +326,8 @@ struct RedactEditor: View {
     private func renderPreview(for key: PreviewKey) {
         let factor = CGFloat(previewImage.width) / CGFloat(max(image.cgImage.width, 1))
         let scaled = key.rects.map { CGRect(x: $0.minX * factor, y: $0.minY * factor, width: $0.width * factor, height: $0.height * factor) }
-        renderedPreview = scaled.isEmpty ? nil : Redaction.apply(to: previewImage, regions: scaled, style: key.style, strength: key.strength)
+        let areas = zip(scaled, key.looks).map { (rect: $0, look: $1) }
+        renderedPreview = areas.isEmpty ? nil : Redaction.apply(to: previewImage, areas: areas)
     }
 
     private func deleteSelection() {
@@ -320,7 +371,7 @@ struct RedactEditor: View {
 
     private func save() {
         do {
-            guard let output = Redaction.apply(to: image.cgImage, regions: regions.map(\.rect), style: style, strength: strength) else {
+            guard let output = Redaction.apply(to: image.cgImage, areas: regions.map { (rect: $0.rect, look: $0.look) }) else {
                 throw EditableImageError.unwritable(image.url)
             }
             // Redacted copies shouldn't carry location or camera details either.
