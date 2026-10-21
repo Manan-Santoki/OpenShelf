@@ -1,0 +1,99 @@
+import Foundation
+
+/// The processor family to download builds for.
+enum MachineArchitecture: String, Sendable {
+    case arm64
+    case x86_64
+
+    /// This Mac's processor, even when OpenShelf itself runs under Rosetta.
+    static var current: MachineArchitecture {
+        var value: Int32 = 0
+        var size = MemoryLayout<Int32>.size
+        let found = sysctlbyname("hw.optional.arm64", &value, &size, nil, 0) == 0
+        return found && value == 1 ? .arm64 : .x86_64
+    }
+}
+
+/// ffmpeg and ffprobe from Martin Riedl's build server. Its static builds run
+/// without Homebrew, come for Apple silicon and Intel, are signed with his
+/// Developer ID and notarized, and each zip has a SHA-256 file beside it.
+/// (evermeet.cx, which ffmpeg.org links to, is Intel-only and unsigned.)
+enum FFmpegSource {
+    static let host = "ffmpeg.martin-riedl.de"
+    /// The Team ID of "Developer ID Application: Martin Riedl", read from his builds.
+    static let teamID = "KU3N25YGLU"
+    /// What both zips together come to, for the Install button.
+    static let approximateSize = "55 MB"
+
+    /// The latest release build of `tool` ("ffmpeg" or "ffprobe"). It
+    /// redirects to a versioned folder, e.g. …/download/macos/arm64/1783011502_8.1.2/ffmpeg.zip.
+    static func latestURL(of tool: String, for architecture: MachineArchitecture) -> URL {
+        let platform = architecture == .arm64 ? "arm64" : "amd64"
+        return URL(string: "https://\(host)/redirect/latest/macos/\(platform)/release/\(tool).zip")!
+    }
+
+    /// Another file of the same build as `download` (the redirect's target),
+    /// so ffprobe always matches the ffmpeg just downloaded.
+    static func sibling(_ fileName: String, of download: URL) -> URL {
+        download.deletingLastPathComponent().appendingPathComponent(fileName)
+    }
+
+    /// Where the build server publishes a file's SHA-256.
+    static func checksumURL(for download: URL) -> URL {
+        download.deletingLastPathComponent().appendingPathComponent(download.lastPathComponent + ".sha256")
+    }
+
+    /// The version in a versioned download URL: "1783011502_8.1.2" → "8.1.2".
+    static func version(fromDownloadURL url: URL) -> String? {
+        let folder = url.deletingLastPathComponent().lastPathComponent
+        guard let separator = folder.firstIndex(of: "_") else { return nil }
+        let version = folder[folder.index(after: separator)...]
+        return version.isEmpty ? nil : String(version)
+    }
+
+    /// Only files from the build server itself, over HTTPS, are accepted.
+    static func isTrusted(_ url: URL) -> Bool {
+        url.scheme == "https" && url.host == host
+    }
+}
+
+/// LibreOffice from The Document Foundation's own download server. Its index
+/// lists the current versions, MirrorBrain publishes each file's SHA-256 next
+/// to it (the file itself may come from a mirror), and the app inside the
+/// disk image is signed by the Foundation and notarized.
+enum LibreOfficeSource {
+    static let stableIndex = URL(string: "https://download.documentfoundation.org/libreoffice/stable/")!
+    /// The Team ID of "Developer ID Application: The Document Foundation".
+    static let teamID = "7P5S3ZLCN7"
+    static let bundleIdentifier = "org.libreoffice.script"
+    /// The disk image's size (285 MB for 26.8 on Apple silicon), for the Install button.
+    static let approximateSize = "300 MB"
+
+    /// The versions in the stable index ("26.8.1/", "26.2.6/", …), newest first.
+    static func versions(inIndex html: String) -> [String] {
+        let pattern = #"href="(\d+(?:\.\d+)+)/""#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+        let range = NSRange(html.startIndex..., in: html)
+        let found = regex.matches(in: html, range: range).compactMap { match -> String? in
+            Range(match.range(at: 1), in: html).map { String(html[$0]) }
+        }
+        return Array(Set(found)).sorted { $0.compare($1, options: .numeric) == .orderedDescending }
+    }
+
+    /// The disk image for `version`, e.g. …/26.8.1/mac/aarch64/LibreOffice_26.8.1_MacOS_aarch64.dmg.
+    /// Intel builds sit in "x86_64" but are named "x86-64".
+    static func diskImageURL(version: String, architecture: MachineArchitecture) -> URL {
+        let folder = architecture == .arm64 ? "aarch64" : "x86_64"
+        let suffix = architecture == .arm64 ? "aarch64" : "x86-64"
+        return stableIndex
+            .appendingPathComponent(version)
+            .appendingPathComponent("mac")
+            .appendingPathComponent(folder)
+            .appendingPathComponent("LibreOffice_\(version)_MacOS_\(suffix).dmg")
+    }
+
+    /// The SHA-256 MirrorBrain serves for a file on the main server.
+    static func checksumURL(for diskImage: URL) -> URL {
+        diskImage.deletingLastPathComponent().appendingPathComponent(diskImage.lastPathComponent + ".sha256")
+    }
+}

@@ -45,6 +45,8 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            ExtraFormatsSection(installer: .shared)
+
             Section("Shelves") {
                 Toggle("Remove files from a shelf after dragging them out", isOn: $preferences.removeAfterDragOut)
                 Toggle("Restore shelves when OpenShelf opens", isOn: $preferences.restoresShelves)

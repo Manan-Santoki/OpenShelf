@@ -14,6 +14,7 @@ final class SettingsWindowController: NSWindowController {
 
     private var activationObserver: (any NSObjectProtocol)?
     private var activationTimeout: Task<Void, Never>?
+    private var keyObserver: (any NSObjectProtocol)?
 
     private init() {
         let hostingController = NSHostingController(rootView: SettingsView())
@@ -28,6 +29,15 @@ final class SettingsWindowController: NSWindowController {
         // Open on the Space the user is on rather than switching to another.
         window.collectionBehavior = [.moveToActiveSpace]
         super.init(window: window)
+        // Someone who just ran `brew install ffmpeg` and comes back should see
+        // it right away, without restarting OpenShelf.
+        keyObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main
+        ) { _ in
+            MainActor.assumeIsolated {
+                ToolInstaller.shared.refresh()
+            }
+        }
     }
 
     @available(*, unavailable)
@@ -39,6 +49,8 @@ final class SettingsWindowController: NSWindowController {
     func show() {
         guard let window else { return }
         if !window.isVisible {
+            // Before measuring: a missing tool's row is taller than an installed one's.
+            ToolInstaller.shared.refresh()
             fitToScreen(window)
         }
         raise()
