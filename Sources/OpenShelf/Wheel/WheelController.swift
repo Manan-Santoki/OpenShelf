@@ -6,8 +6,8 @@ import SwiftUI
 @MainActor
 @Observable
 final class WheelModel {
-    var actions: [WheelAction] = []
-    var highlighted: WheelAction?
+    var items: [WheelItem] = []
+    var highlighted: WheelItem?
     /// What the hub shows while no wedge is hovered, e.g. "1.2 MB" or "3 files".
     var dragSummary = ""
     var isPresented = false
@@ -17,7 +17,7 @@ final class WheelModel {
 @MainActor
 final class WheelController {
     /// Called when files are dropped on a wedge.
-    var onDrop: ((WheelAction, [URL]) -> Void)?
+    var onDrop: ((WheelItem, [URL]) -> Void)?
 
     let model = WheelModel()
     private let dropView = WheelDropView()
@@ -25,13 +25,17 @@ final class WheelController {
     private var dismissTask: Task<Void, Never>?
     private var summarizedURLs: [URL] = []
 
-    func present(_ kind: WheelKind, actions: [WheelAction], at location: NSPoint) {
+    /// Shows `items` around `location`, or swaps them in place if the wheel is
+    /// already open (e.g. when ⌥ is added to switch from Convert to Tools).
+    func present(_ items: [WheelItem], at location: NSPoint) {
         dismissTask?.cancel()
-        model.actions = actions
+        let isSwitching = panel.isVisible && model.isPresented
+        model.items = items
         model.highlighted = nil
         model.dragSummary = ""
         summarizedURLs = []
-        dropView.geometry = WheelGeometry(wedgeCount: actions.count)
+        dropView.geometry = WheelGeometry(wedgeCount: items.count)
+        guard !isSwitching else { return }
 
         let side = WheelGeometry.panelSide
         var frame = NSRect(x: location.x - side / 2, y: location.y - side / 2, width: side, height: side)
@@ -91,16 +95,16 @@ final class WheelController {
         dropView.onHover = { [weak self] wedge, urls in
             guard let self else { return }
             updateSummary(for: urls)
-            let highlighted = wedge.flatMap { self.model.actions[safe: $0] }
+            let highlighted = wedge.flatMap { self.model.items[safe: $0] }
             if highlighted != model.highlighted, highlighted != nil {
                 NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
             }
             model.highlighted = highlighted
         }
         dropView.onDrop = { [weak self] wedge, urls in
-            guard let self, let action = model.actions[safe: wedge] else { return }
+            guard let self, let item = model.items[safe: wedge] else { return }
             dismiss(after: .zero)
-            onDrop?(action, urls)
+            onDrop?(item, urls)
         }
 
         // Size the container first: autoresizing can't grow a subview from a zero-sized superview.

@@ -38,11 +38,14 @@ this spec; it does not contain or derive from any other app's code or assets.
 
 ### 2.1 Wheels
 
-| Wheel | Default trigger | Status |
+| Wheel | Default trigger | Contents |
 |---|---|---|
-| Actions | ⌃ Control | v0.1 |
-| Convert | ⇧ Shift | planned (§6) |
-| Tools | ⇧⌥ Shift-Option | planned (§6) |
+| Convert | ⇧ Shift | Output formats for the dragged files (§2.3) |
+| Tools | ⇧⌥ Shift-Option | Image tools that open an editor (§2.4) |
+| Actions | ⌃ Control | File actions and shelves (§2.2) |
+
+Adding a key mid-drag switches wheels in place (⇧ → ⇧⌥ swaps Convert for Tools).
+If a wheel has nothing for the dragged files, a toast says so instead.
 
 ### 2.2 Actions wheel
 
@@ -55,6 +58,47 @@ this spec; it does not contain or derive from any other app's code or assets.
 | Move | Ask for a destination folder and move the files there |
 | Copy Path | Copy POSIX paths, one per line |
 | Terminal | Open Terminal at the file's folder (or the folder itself) |
+
+### 2.3 Convert wheel
+
+Wedges are chosen by file type; only formats every dragged file supports are
+offered, and the file's own format is left out. Results are saved beside the
+original and never overwrite (`Name.jpg`, `Name 2.jpg`, …). A progress toast by
+the pointer shows "Converting to JPG · 1 of 3 saved" with a cancel button.
+
+| Input | Outputs | Engine |
+|---|---|---|
+| Image | PNG, JPG, WEBP*, HEIC, TIFF, AVIF, BMP, PDF, DOCX, ZIP | ImageIO, PDF context, hand-built DOCX |
+| PDF | DOCX, JPG, PNG, TXT, ZIP | PDFKit (pages at 300 dpi; scanned PDFs become image DOCX) |
+| Text / RTF / DOCX / HTML / Markdown | PDF, DOCX, TXT, RTF, HTML, ZIP | NSAttributedString, AppKit printing |
+| Audio | MP3*, M4A, WAV, AIFF, FLAC, ZIP | AVFoundation, afconvert |
+| Video | MP4, MOV, M4A, GIF*, MP3*, ZIP | AVFoundation, ffmpeg |
+| SRT / VTT | TXT, SRT, VTT, ZIP | built in |
+| ZIP / TAR / GZ / 7Z / RAR | Unzip into a folder | ditto, bsdtar, gzip |
+| Folders, other files | ZIP | ditto / zip |
+
+\* Needs `ffmpeg` or `cwebp` (Homebrew); hidden when not installed.
+
+### 2.4 Tools wheel
+
+Compress · Metadata · Edit · Annotate · Add BG · Crop · Redact. Each opens a
+small editor window that zooms out of the drop point; saving writes a suffixed
+copy beside the original ("Name Cropped.jpg") and closes with a toast, so
+results can be dragged straight back into a wheel.
+
+- **Crop:** dimmed outside area, 8 handles, aspect presets (Free, 1:1, 16:9,
+  9:16, 4:3, 3:4), live W × H fields in px. Reset / Apply.
+- **Add BG:** gradient and solid swatches, custom image and colour; Padding,
+  Corners and Shadow sliders in px; ratio Auto, 1:1, 16:9, 4:5. Saves PNG.
+- **Annotate:** draw, arrow, box, highlight, text, numbered callouts; colours
+  and stroke width; select, move, delete, undo.
+- **Redact:** drag regions; black box, pixelate or blur; strips metadata.
+- **Edit:** exposure, brightness, contrast, saturation, warmth, vibrance,
+  sharpness, vignette; rotate and flip.
+- **Compress:** quality or target size, JPEG/HEIC, max dimension; estimated
+  result size; works on several images.
+- **Metadata:** grouped EXIF/GPS/camera details with a location warning; remove
+  all metadata into a clean copy; works on several images.
 
 ## 3. Shelves
 
@@ -96,13 +140,13 @@ New Shelf · Close All Shelves · Settings… · Quit.
 
 ## 6. Roadmap
 
-1. **Convert wheel** — wedges chosen by input type (e.g. PDF → DOCX/JPG/PNG/TXT;
+1. ~~Convert wheel~~ (done, §2.3) — wedges chosen by input type (e.g. PDF → DOCX/JPG/PNG/TXT;
    image → PNG/WEBP/HEIC/TIFF/AVIF/BMP/PDF/DOCX). Output is saved beside the
    original as a new file and never overwrites (`Name.jpg`, `Name 2.jpg`, …).
    Images via ImageIO/Core Image, audio/video via AVFoundation (ffmpeg optional
    for formats Apple frameworks lack), PDF via PDFKit, text/RTF/DOCX via
    NSAttributedString.
-2. **Tools wheel** — hub shows the file size until a wedge is hovered. Tools:
+2. ~~Tools wheel~~ (done for images, §2.4; PDF and video tools next) — hub shows the file size until a wedge is hovered. Tools:
    compress (quality or target size), crop, metadata view/strip, redact,
    annotate, add background, edit (adjustments), trim/split video & audio,
    PDF merge/split/reorder, QR decode. Tools that need input open a small

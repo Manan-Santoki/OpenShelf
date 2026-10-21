@@ -9,8 +9,9 @@ import Carbon.HIToolbox
 /// primary button is down and the drag pasteboard has changed since it went down.
 @MainActor
 final class DragMonitor {
-    /// Called with the wheel to show and the pointer location in screen coordinates.
-    var onTrigger: ((WheelKind, NSPoint) -> Void)?
+    /// Called with the wheel to show, the pointer location in screen coordinates
+    /// and the files being dragged.
+    var onTrigger: ((WheelKind, NSPoint, [URL]) -> Void)?
     /// Called when the primary button is released or Esc is pressed after a trigger.
     var onDragEnded: (() -> Void)?
 
@@ -69,15 +70,16 @@ final class DragMonitor {
             return activeInterval
         }
 
-        let matcher = TriggerMatcher(triggers: [.actions: preferences.trigger(for: .actions)])
+        let matcher = TriggerMatcher(triggers: preferences.triggers)
         let wheel = matcher.wheel(for: NSEvent.modifierFlags)
         if wheel != pendingWheel {
             pendingWheel = wheel
             pendingSince = .now
         } else if let wheel, wheel != activeWheel, let pendingSince, pendingSince.duration(to: .now) >= settleDelay {
             // A tap is enough: the wheel stays open after the keys are released.
+            // Pressing another trigger mid-drag switches to that wheel.
             activeWheel = wheel
-            onTrigger?(wheel, NSEvent.mouseLocation)
+            onTrigger?(wheel, NSEvent.mouseLocation, draggedFileURLs)
         }
         return activeInterval
     }
@@ -85,6 +87,11 @@ final class DragMonitor {
     private var isDraggingFiles: Bool {
         dragPasteboard.changeCount != changeCountAtMouseDown
             && dragPasteboard.types?.contains(.fileURL) == true
+    }
+
+    private var draggedFileURLs: [URL] {
+        let objects = dragPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true])
+        return objects as? [URL] ?? []
     }
 
     private func resetDrag() {

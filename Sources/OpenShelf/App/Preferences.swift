@@ -8,16 +8,21 @@ final class Preferences {
     static let shared = Preferences()
 
     private enum Key {
-        static let actionsTrigger = "actionsWheelTrigger"
         static let removeAfterDragOut = "removeAfterDragOut"
+
+        static func trigger(_ kind: WheelKind) -> String {
+            switch kind {
+            case .convert: "convertWheelTrigger"
+            case .tools: "toolsWheelTrigger"
+            case .actions: "actionsWheelTrigger"
+            }
+        }
     }
 
     @ObservationIgnored private let defaults: UserDefaults
 
-    /// Modifier keys that open the Actions wheel during a file drag.
-    var actionsTrigger: NSEvent.ModifierFlags {
-        didSet { defaults.set(Int(actionsTrigger.rawValue), forKey: Key.actionsTrigger) }
-    }
+    /// Modifier keys that open each wheel during a file drag.
+    private(set) var triggers: [WheelKind: NSEvent.ModifierFlags]
 
     /// Remove files from a shelf once they have been dragged out of it.
     var removeAfterDragOut: Bool {
@@ -26,16 +31,42 @@ final class Preferences {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        let storedTrigger = NSEvent.ModifierFlags(rawValue: UInt(defaults.integer(forKey: Key.actionsTrigger)))
-            .intersection(TriggerKey.relevantFlags)
-        actionsTrigger = storedTrigger.isEmpty ? .control : storedTrigger
+        var triggers: [WheelKind: NSEvent.ModifierFlags] = [:]
+        for kind in WheelKind.allCases {
+            let stored = NSEvent.ModifierFlags(rawValue: UInt(defaults.integer(forKey: Key.trigger(kind))))
+                .intersection(TriggerKey.relevantFlags)
+            triggers[kind] = stored.isEmpty ? Self.defaultTrigger(for: kind) : stored
+        }
+        self.triggers = triggers
         removeAfterDragOut = defaults.bool(forKey: Key.removeAfterDragOut)
     }
 
-    func trigger(for kind: WheelKind) -> NSEvent.ModifierFlags {
+    static func defaultTrigger(for kind: WheelKind) -> NSEvent.ModifierFlags {
         switch kind {
-        case .actions: actionsTrigger
+        case .convert: .shift
+        case .tools: [.shift, .option]
+        case .actions: .control
         }
+    }
+
+    func trigger(for kind: WheelKind) -> NSEvent.ModifierFlags {
+        triggers[kind] ?? Self.defaultTrigger(for: kind)
+    }
+
+    func setTrigger(_ flags: NSEvent.ModifierFlags, for kind: WheelKind) {
+        triggers[kind] = flags
+        defaults.set(Int(flags.rawValue), forKey: Key.trigger(kind))
+    }
+
+    /// Wheels whose trigger is also used by another wheel; only one of them can open.
+    var conflictingWheels: Set<WheelKind> {
+        var conflicts: Set<WheelKind> = []
+        for kind in WheelKind.allCases {
+            for other in WheelKind.allCases where other != kind && trigger(for: other) == trigger(for: kind) {
+                conflicts.insert(kind)
+            }
+        }
+        return conflicts
     }
 }
 

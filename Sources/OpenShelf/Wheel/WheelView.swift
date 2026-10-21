@@ -8,19 +8,19 @@ struct WheelView: View {
     private let rimWidth: CGFloat = 9
 
     var body: some View {
-        let geometry = WheelGeometry(wedgeCount: model.actions.count)
+        let geometry = WheelGeometry(wedgeCount: model.items.count)
         let discDiameter = (geometry.outerRadius + rimWidth) * 2
 
         ZStack {
             GlassDisc()
                 .frame(width: discDiameter, height: discDiameter)
 
-            ForEach(Array(model.actions.enumerated()), id: \.element) { index, action in
+            ForEach(Array(model.items.enumerated()), id: \.element.id) { index, item in
                 PetalView(
-                    action: action,
+                    item: item,
                     geometry: geometry,
                     index: index,
-                    isHighlighted: model.highlighted == action
+                    isHighlighted: model.highlighted == item
                 )
                 // Petals bloom outward one after another.
                 .scaleEffect(model.isPresented || reduceMotion ? 1 : 0.5)
@@ -68,7 +68,7 @@ private struct GlassDisc: View {
 }
 
 private struct PetalView: View {
-    let action: WheelAction
+    let item: WheelItem
     let geometry: WheelGeometry
     let index: Int
     let isHighlighted: Bool
@@ -95,11 +95,14 @@ private struct PetalView: View {
             shape.stroke(.white.opacity(isHighlighted ? 0.55 : 0.4), lineWidth: 0.8)
 
             VStack(spacing: 4) {
-                Image(systemName: action.systemImage)
-                    .font(.system(size: 17, weight: .semibold))
-                    .symbolRenderingMode(.hierarchical)
-                Text(action.title.uppercased())
-                    .font(.system(size: 9.5, weight: .bold))
+                if let systemImage = item.systemImage {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 17, weight: .semibold))
+                        .symbolRenderingMode(.hierarchical)
+                }
+                Text(item.title.uppercased())
+                    // Format names stand alone, so they get a larger label.
+                    .font(.system(size: item.systemImage == nil ? 13 : 9.5, weight: .bold))
                     .tracking(0.4)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)

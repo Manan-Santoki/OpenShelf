@@ -10,12 +10,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Keeps the app out of the Dock when launched without the bundle's LSUIElement (e.g. `swift run`).
         NSApp.setActivationPolicy(.accessory)
 
-        wheel.onDrop = { [weak self] action, urls in
-            self?.perform(action, on: urls)
+        wheel.onDrop = { [weak self] item, urls in
+            self?.perform(item.command, on: urls)
         }
-        dragMonitor.onTrigger = { [weak self] kind, location in
-            guard let self else { return }
-            wheel.present(kind, actions: actions(for: kind), at: location)
+        dragMonitor.onTrigger = { [weak self] kind, location, urls in
+            self?.showWheel(kind, at: location, for: urls)
         }
         dragMonitor.onDragEnded = { [weak self] in
             self?.wheel.dismiss()
@@ -23,14 +22,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         dragMonitor.start()
     }
 
-    private func actions(for kind: WheelKind) -> [WheelAction] {
+    private func showWheel(_ kind: WheelKind, at location: NSPoint, for urls: [URL]) {
+        let items = items(for: kind, urls: urls)
+        guard !items.isEmpty else {
+            wheel.dismiss(after: .zero)
+            let title = kind == .convert ? "No conversions for this file" : "No tools for this file yet"
+            ToastController.shared.show(Toast(systemImage: "nosign", title: title), near: location)
+            return
+        }
+        wheel.present(items, at: location)
+    }
+
+    private func items(for kind: WheelKind, urls: [URL]) -> [WheelItem] {
         switch kind {
+        case .convert:
+            ConversionCatalog.formats(for: urls, tools: .detect()).map(WheelItem.convert)
+        case .tools:
+            ImageTool.available(for: urls).map(WheelItem.tool)
         case .actions:
-            WheelAction.allCases.filter { $0 != .addToShelf || shelves.hasShelves }
+            FileAction.allCases
+                .filter { $0 != .addToShelf || shelves.hasShelves }
+                .map(WheelItem.action)
         }
     }
 
-    private func perform(_ action: WheelAction, on urls: [URL]) {
+    private func perform(_ command: WheelCommand, on urls: [URL]) {
+        switch command {
+        case .action(let action):
+            perform(action, on: urls)
+        case .convert(let format):
+            ConversionRunner.shared.convert(urls, to: format)
+        case .tool(let tool):
+            ToolLauncher.open(tool, with: urls)
+        }
+    }
+
+    private func perform(_ action: FileAction, on urls: [URL]) {
         let toasts = ToastController.shared
         let count = urls.count == 1 ? "“\(urls[0].lastPathComponent)”" : "\(urls.count) files"
         switch action {

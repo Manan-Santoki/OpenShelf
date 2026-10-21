@@ -8,13 +8,24 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section {
-                LabeledContent("Actions wheel") {
-                    TriggerPicker(flags: $preferences.actionsTrigger)
+                ForEach(WheelKind.allCases, id: \.self) { kind in
+                    LabeledContent {
+                        TriggerPicker(flags: Binding(
+                            get: { preferences.trigger(for: kind) },
+                            set: { preferences.setTrigger($0, for: kind) }
+                        ))
+                    } label: {
+                        Text(kind.title)
+                        if preferences.conflictingWheels.contains(kind) {
+                            Text("Same keys as another wheel")
+                                .foregroundStyle(.red)
+                        }
+                    }
                 }
             } header: {
                 Text("Wheels")
             } footer: {
-                Text("Start dragging any file, then tap \(TriggerKey.describe(preferences.actionsTrigger)) to open the wheel. Drop on a wedge to run it, or press Esc to cancel.")
+                Text("Start dragging any file, then tap the keys to open a wheel. Drop on a wedge to run it, or press Esc to cancel.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

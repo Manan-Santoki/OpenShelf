@@ -2,18 +2,22 @@
 
 An open-source macOS menu-bar utility for working with files mid-drag.
 
-Start dragging any file, tap **⌃ Control**, and a wheel of actions appears under
-the pointer. Drop the file on a wedge to run it — or on **Shelf** to park it on a
-small floating shelf you can drag it back out of later.
+Start dragging any file and tap a key — a wheel appears under the pointer. Drop
+the file on a wedge and it's done, saved right next to the original.
 
-- **Actions wheel:** Shelf · Add to Shelf · AirDrop · Copy · Move · Copy Path · Terminal
+- **⇧ Convert wheel:** images, PDFs, documents, audio, video, subtitles and
+  archives into the formats that make sense for them (JPG, PNG, HEIC, AVIF,
+  WEBP, PDF, DOCX, TXT, MP3, WAV, GIF, ZIP, …)
+- **⇧⌥ Tools wheel:** Crop, Add Background, Annotate, Redact, Edit, Compress,
+  Metadata — each in a small focused editor
+- **⌃ Actions wheel:** Shelf · Add to Shelf · AirDrop · Copy · Move · Copy Path · Terminal
 - **Shelves:** stacked preview, expandable grid/list, multi-select, drag out to
   any app, Quick Look (Space), dock to the left/right screen edge, multiple shelves
 - Works system-wide with **no Accessibility permission**
 - No network access, no telemetry, no dependencies
 
-See [docs/SPEC.md](docs/SPEC.md) for the full behaviour and roadmap (convert and
-tools wheels are next).
+See [docs/SPEC.md](docs/SPEC.md) for the full behaviour and roadmap. Optional:
+`brew install ffmpeg webp` adds MP3, GIF and WebP output.
 
 ## Tech stack
 
@@ -21,7 +25,7 @@ tools wheels are next).
 |---|---|
 | Language | Swift 6 (strict concurrency) |
 | UI | SwiftUI for views; AppKit for panels, drag sessions, menu bar, Quick Look |
-| Frameworks | QuickLookThumbnailing, Quartz, ServiceManagement, Observation |
+| Frameworks | ImageIO, Core Image, PDFKit, AVFoundation, QuickLookThumbnailing, Quartz, ServiceManagement, Observation |
 | Build | `make` (calls `swiftc` directly) · `Package.swift` for SwiftPM/Xcode |
 | Tests | Swift Testing |
 | Minimum OS | macOS 14 Sonoma |
@@ -45,7 +49,9 @@ You can also open `Package.swift` in Xcode.
 Sources/OpenShelf/
   App/            entry point, app delegate, preferences
   DragDetection/  system-wide drag + modifier polling
-  Wheel/          wheel geometry, overlay panel, SwiftUI rendering
+  Wheel/          wheel items, geometry, overlay panel, SwiftUI rendering
+  Convert/        format catalog, converters, progress runner
+  Tools/          image tools, editor window host, editors
   Shelf/          shelf model, floating panel, docking, layout
   Shelf/Views/    SwiftUI shelf UI and the AppKit drag source
   Support/        file actions, Quick Look
