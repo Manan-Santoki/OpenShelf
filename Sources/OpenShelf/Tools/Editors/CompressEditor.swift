@@ -210,6 +210,20 @@ enum ImageCompressor {
         try data.writeNew(to: url)
         return url
     }
+
+    /// Compresses and saves each image; images that wouldn't get smaller are
+    /// left alone and counted.
+    static func run(_ images: [EditableImage], options: CompressOptions) throws -> SaveOutcome {
+        var outcome = SaveOutcome(saved: [], savedLabel: "compressed", unchangedLabel: "can’t get smaller")
+        for image in images {
+            if let url = try save(image, options: options) {
+                outcome.saved.append(url)
+            } else {
+                outcome.unchanged += 1
+            }
+        }
+        return outcome
+    }
 }
 
 /// The "Compress" tool: smaller copies of one or more images.
@@ -236,11 +250,18 @@ struct CompressEditor: View {
 
     private var totalOriginalSize: Int64 { originalSizes.reduce(0, +) }
 
+    /// For a single image the estimate is the real result, so a copy that
+    /// wouldn't be smaller is known before anything is saved.
+    private var isKnownNotSmaller: Bool {
+        guard images.count == 1, let estimate else { return false }
+        return !ImageCompressor.isWorthSaving(Int(estimate), originalSize: originalSizes[0])
+    }
+
     var body: some View {
         EditorChrome(
             title: "Compress",
             primaryTitle: isWorking ? "Compressing…" : "Compress",
-            isPrimaryEnabled: !isWorking,
+            isPrimaryEnabled: !isWorking && !isKnownNotSmaller,
             actions: actions,
             onReset: { options = CompressOptions() },
             onPrimary: compress
@@ -284,20 +305,13 @@ struct CompressEditor: View {
                     Spacer(minLength: 0)
                 }
 
-                if let formatNote {
-                    Label(formatNote, systemImage: "info.circle")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
                 sizeSummary
 
+                // The result of the last click takes the place of the format note.
                 if let notice {
-                    Label(notice, systemImage: "checkmark.circle")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
+                    EditorStatusLine(message: notice, systemImage: "checkmark.circle", tint: .orange)
+                } else {
+                    EditorStatusLine(message: formatNote)
                 }
             }
         }
@@ -398,27 +412,16 @@ struct CompressEditor: View {
         let images = images
         let options = options
         Task {
-            let result = await Task.detached(priority: .userInitiated) { () -> Result<[URL?], Error> in
-                Result { try images.map { try ImageCompressor.save($0, options: options) } }
+            let result = await Task.detached(priority: .userInitiated) {
+                Result { try ImageCompressor.run(images, options: options) }
             }.value
             isWorking = false
             switch result {
-            case .success(let outcomes):
-                let saved = outcomes.compactMap { $0 }
-                let skipped = outcomes.count - saved.count
-                if saved.isEmpty {
-                    notice = CompressError.notSmaller(count: skipped).localizedDescription
-                    actions.failed(CompressError.notSmaller(count: skipped))
-                } else {
-                    actions.saved(saved)
-                    if skipped > 0 {
-                        ToastController.shared.show(Toast(
-                            systemImage: "checkmark",
-                            title: "Saved \(saved.count) of \(outcomes.count)",
-                            subtitle: "\(skipped) already as small as \(skipped == 1 ? "it gets" : "they get") — not saved"
-                        ))
-                    }
+            case .success(let outcome):
+                if !outcome.savedAnything {
+                    notice = CompressError.notSmaller(count: outcome.unchanged).localizedDescription
                 }
+                actions.finished(outcome)
             case .failure(let error):
                 actions.failed(error)
             }

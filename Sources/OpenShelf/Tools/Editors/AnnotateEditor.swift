@@ -371,7 +371,7 @@ struct AnnotateEditor: View {
                     .focused($isTextFieldFocused)
                     .onSubmit(commitText)
                     .onExitCommand(perform: commitText)
-                    .onAppear { isTextFieldFocused = true }
+                    .onAppear(perform: focusTextField)
                     .offset(x: origin.x - 3, y: origin.y)
                 }
             }
@@ -511,9 +511,22 @@ struct AnnotateEditor: View {
         }
     }
 
+    /// Puts the cursor in a text field that was just placed, so typing starts
+    /// right away. The field only joins the window once this update is done
+    /// (focusing it any sooner is ignored and the first keystrokes are lost),
+    /// and keystrokes only reach a key window of the active app.
+    private func focusTextField() {
+        actions.focus()
+        Task { @MainActor in
+            guard textDraft != nil else { return }
+            isTextFieldFocused = true
+        }
+    }
+
     private func commitText() {
         guard let textDraft else { return }
         self.textDraft = nil
+        isTextFieldFocused = false
         let text = textDraft.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         let annotation = Annotation(figure: .text(text, origin: textDraft.origin), color: color, lineWidth: CGFloat(lineWidth))

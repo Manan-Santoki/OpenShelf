@@ -22,11 +22,18 @@ struct PDFCompressEditor: View {
 
     private var totalOriginal: Int64 { originalSizes.reduce(0, +) }
 
+    /// For a single PDF the estimate is the real result, so a copy that
+    /// wouldn't be smaller is known before anything is saved.
+    private var isKnownNotSmaller: Bool {
+        guard urls.count == 1, let estimate else { return false }
+        return !ImageCompressor.isWorthSaving(Int(estimate), originalSize: originalSizes[0])
+    }
+
     var body: some View {
         EditorChrome(
             title: "Compress PDF",
             primaryTitle: isWorking ? "Compressing…" : "Compress",
-            isPrimaryEnabled: !isWorking,
+            isPrimaryEnabled: !isWorking && !isKnownNotSmaller,
             actions: actions,
             onReset: { level = .balanced },
             onPrimary: compress
@@ -52,12 +59,7 @@ struct PDFCompressEditor: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 sizeSummary
-                if let notice {
-                    Label(notice, systemImage: "checkmark.circle")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                EditorStatusLine(message: notice, systemImage: "checkmark.circle", tint: .orange)
                 Spacer(minLength: 0)
             }
         }
@@ -124,26 +126,15 @@ struct PDFCompressEditor: View {
         let level = level
         Task {
             let result = await Task.detached(priority: .userInitiated) {
-                Result { try urls.map { try PDFTools.compress($0, level: level) } }
+                Result { try PDFTools.compress(urls, level: level) }
             }.value
             isWorking = false
             switch result {
-            case .success(let outcomes):
-                let saved = outcomes.compactMap { $0 }
-                let skipped = outcomes.count - saved.count
-                if saved.isEmpty {
-                    notice = PDFToolError.notSmaller(count: skipped).localizedDescription
-                    actions.failed(PDFToolError.notSmaller(count: skipped))
-                } else {
-                    actions.saved(saved)
-                    if skipped > 0 {
-                        ToastController.shared.show(Toast(
-                            systemImage: "checkmark",
-                            title: "Saved \(saved.count) of \(outcomes.count)",
-                            subtitle: "\(skipped) already as small as \(skipped == 1 ? "it gets" : "they get") — not saved"
-                        ))
-                    }
+            case .success(let outcome):
+                if !outcome.savedAnything {
+                    notice = PDFToolError.notSmaller(count: outcome.unchanged).localizedDescription
                 }
+                actions.finished(outcome)
             case .failure(let error):
                 actions.failed(error)
             }

@@ -11,6 +11,8 @@ struct AddBackgroundEditor: View {
     /// A smaller copy of the image so the live preview stays fast.
     private let previewSource: CGImage
     private let gradientSwatches: [CGImage]
+    /// Whether the background shows through the image itself.
+    private let isTransparent: Bool
 
     @State private var choice = BackgroundChoice.gradient(0)
     @State private var customColor = Color(red: 0.96, green: 0.62, blue: 0.45)
@@ -25,12 +27,14 @@ struct AddBackgroundEditor: View {
         self.actions = actions
         previewSource = BackgroundRenderer.downscaled(image.cgImage, maxDimension: 900) ?? image.cgImage
         gradientSwatches = GradientStyle.all.compactMap { BackgroundRenderer.swatch(for: .gradient($0)) }
+        isTransparent = image.isTransparent
     }
 
     var body: some View {
         EditorChrome(
             title: "Add BG",
             primaryTitle: "Save with Background",
+            isPrimaryEnabled: composition.changesImage(of: image.pixelSize, isTransparent: isTransparent),
             actions: actions,
             onReset: reset,
             onPrimary: save
@@ -340,6 +344,15 @@ struct BackgroundComposition {
     var cornerRadius: CGFloat
     var shadow: CGFloat
     var ratio: CanvasRatio
+
+    /// Whether the result would look any different from the image: only with
+    /// a margin, rounded corners, or see-through areas for the background to
+    /// show through. (A shadow with no margin falls behind the image.)
+    func changesImage(of imageSize: CGSize, isTransparent: Bool) -> Bool {
+        let canvas = canvasSize(for: imageSize)
+        let sameSize = canvas.width.rounded() == imageSize.width && canvas.height.rounded() == imageSize.height
+        return !sameSize || cornerRadius.rounded() > 0 || isTransparent
+    }
 
     func canvasSize(for imageSize: CGSize) -> CGSize {
         let padded = CGSize(width: imageSize.width + 2 * padding, height: imageSize.height + 2 * padding)

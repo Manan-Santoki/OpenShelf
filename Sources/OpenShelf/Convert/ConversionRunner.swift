@@ -87,10 +87,9 @@ final class ConversionRunner {
         } else if let failure = failures.first {
             let title = failures.count == 1 ? "Something went wrong" : "\(failures.count) files failed"
             toasts.show(Toast(systemImage: "exclamationmark.triangle", title: title, subtitle: failure), for: .seconds(4))
-        } else if saved.count == 1 {
-            toasts.show(Toast(systemImage: "checkmark", title: "Saved", subtitle: saved[0].lastPathComponent))
         } else {
-            toasts.show(Toast(systemImage: "checkmark", title: "Saved \(saved.count) files", subtitle: savedSubtitle))
+            // Worded like the editors' confirmations.
+            toasts.show(SaveOutcome(saved: saved, detail: savedSubtitle).toast)
         }
     }
 }

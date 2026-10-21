@@ -273,6 +273,19 @@ enum PDFTools {
         return destination
     }
 
+    /// Compresses each PDF; files that wouldn't get smaller are left alone and counted.
+    static func compress(_ urls: [URL], level: PDFCompressionLevel) throws -> SaveOutcome {
+        var outcome = SaveOutcome(saved: [], savedLabel: "compressed", unchangedLabel: "can’t get smaller")
+        for url in urls {
+            if let destination = try compress(url, level: level) {
+                outcome.saved.append(destination)
+            } else {
+                outcome.unchanged += 1
+            }
+        }
+        return outcome
+    }
+
     // MARK: Metadata
 
     static func info(for url: URL) -> PDFInfo? {
@@ -304,8 +317,9 @@ enum PDFTools {
         )
     }
 
-    /// Writes a copy with `fields` as the document info, or with all info removed
-    /// when `fields` is nil ("<name> Clean.pdf").
+    /// Writes a copy with `fields` as the document info ("<name> Metadata.pdf"),
+    /// or with all info removed when `fields` is nil ("<name> Clean.pdf", as the
+    /// image Metadata tool names its copies).
     static func saveMetadata(_ url: URL, fields: PDFMetadataFields?) throws -> URL {
         let document = try open(url)
         if let fields, !fields.isEmpty {
@@ -331,15 +345,30 @@ enum PDFTools {
             }
             attributes[PDFDocumentAttribute.modificationDateAttribute] = Date()
             document.documentAttributes = attributes
-            let destination = OutputNaming.destination(for: url, suffix: "Edited", pathExtension: "pdf")
+            let destination = OutputNaming.destination(for: url, suffix: MetadataSuffix.edited, pathExtension: "pdf")
             try write(document, to: destination)
             return destination
         }
 
         document.documentAttributes = [:]
-        let destination = OutputNaming.destination(for: url, suffix: "Clean", pathExtension: "pdf")
+        let destination = OutputNaming.destination(for: url, suffix: MetadataSuffix.removed, pathExtension: "pdf")
         try write(document, to: destination)
         return destination
+    }
+
+    /// Writes clean copies of the PDFs that have document info; the rest are
+    /// left alone and counted, since a copy would be identical.
+    static func removeMetadata(_ urls: [URL]) throws -> SaveOutcome {
+        var outcome = SaveOutcome(saved: [], savedLabel: "cleaned", unchangedLabel: "already clean")
+        for url in urls {
+            // An unreadable file goes through, so its error is reported.
+            guard info(for: url)?.hasMetadata ?? true else {
+                outcome.unchanged += 1
+                continue
+            }
+            outcome.saved.append(try saveMetadata(url, fields: nil))
+        }
+        return outcome
     }
 
     // MARK: Helpers

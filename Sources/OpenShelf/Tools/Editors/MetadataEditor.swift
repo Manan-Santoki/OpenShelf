@@ -206,6 +206,15 @@ enum MetadataReader {
     }
 }
 
+/// How the Metadata tools name their copies, for images and PDFs alike.
+enum MetadataSuffix {
+    /// A copy with the metadata removed: "Photo Clean.jpg", "Report Clean.pdf".
+    static let removed = "Clean"
+    /// A PDF with edited document info: "Report Metadata.pdf". Distinct from the
+    /// Pages editor's "Edited" so the two copies can't be confused.
+    static let edited = "Metadata"
+}
+
 /// Writes copies of images without their metadata.
 enum MetadataStripper {
     /// Formats whose metadata ImageIO can't reliably drop without re-encoding
@@ -226,7 +235,7 @@ enum MetadataStripper {
             try? FileManager.default.removeItem(at: url)
         }
         let type = EditableImage.writableTypes.contains(image.type) ? image.type : .png
-        let url = OutputNaming.destination(for: image.url, suffix: "Clean", pathExtension: image.pathExtension(for: type))
+        let url = OutputNaming.destination(for: image.url, suffix: MetadataSuffix.removed, pathExtension: image.pathExtension(for: type))
         var pixels = image.cgImage
         if !keepsOrientationAndProfile {
             pixels = sRGB(pixels) ?? pixels
@@ -238,6 +247,25 @@ enum MetadataStripper {
             throw StripError.couldNotRemove(file: image.url.lastPathComponent, fields: leftovers)
         }
         return url
+    }
+
+    /// Whether the file at `url` has anything for `strip` to remove.
+    static func hasIdentifyingMetadata(at url: URL) -> Bool {
+        !leftoverMetadata(at: url).isEmpty
+    }
+
+    /// Saves clean copies of the images that have identifying metadata; the
+    /// rest are left alone and counted, since a copy would be identical.
+    static func run(_ images: [EditableImage], keepsOrientationAndProfile: Bool) throws -> SaveOutcome {
+        var outcome = SaveOutcome(saved: [], savedLabel: "cleaned", unchangedLabel: "already clean")
+        for image in images {
+            guard hasIdentifyingMetadata(at: image.url) else {
+                outcome.unchanged += 1
+                continue
+            }
+            outcome.saved.append(try strip(image, keepsOrientationAndProfile: keepsOrientationAndProfile))
+        }
+        return outcome
     }
 
     enum StripError: LocalizedError {
@@ -310,7 +338,7 @@ enum MetadataStripper {
         guard let source = CGImageSourceCreateWithURL(image.url as CFURL, nil),
               let typeIdentifier = CGImageSourceGetType(source)
         else { return nil }
-        let url = OutputNaming.destination(for: image.url, suffix: "Clean", pathExtension: image.pathExtension(for: image.type))
+        let url = OutputNaming.destination(for: image.url, suffix: MetadataSuffix.removed, pathExtension: image.pathExtension(for: image.type))
         guard (try? SaveError.checkWritable(url)) != nil,
               let destination = CGImageDestinationCreateWithURL(url as CFURL, typeIdentifier, 1, nil)
         else { return nil }
@@ -354,17 +382,33 @@ struct MetadataEditor: View {
     @State private var keepsOrientationAndProfile = true
     @State private var isWorking = false
     @State private var didCopy = false
+    /// How many of the images have camera, date, location or other details to remove.
+    private let identifiableCount: Int
 
     init(images: [EditableImage], actions: EditorActions) {
         self.images = images
         self.actions = actions
+        identifiableCount = images.filter { MetadataStripper.hasIdentifyingMetadata(at: $0.url) }.count
+    }
+
+    private var explanation: String {
+        if identifiableCount == 0 {
+            return images.count == 1
+                ? "No camera, date, location or other details to remove."
+                : "None of these have camera, date, location or other details to remove."
+        }
+        let clean = images.count - identifiableCount
+        if clean == 0 {
+            return "Saves a copy without camera, date, location and other details."
+        }
+        return "Saves clean copies of \(identifiableCount) of \(images.count); \(clean) \(clean == 1 ? "is" : "are") already clean."
     }
 
     var body: some View {
         EditorChrome(
             title: "Metadata",
             primaryTitle: isWorking ? "Removing…" : "Remove Metadata",
-            isPrimaryEnabled: !isWorking,
+            isPrimaryEnabled: !isWorking && identifiableCount > 0,
             actions: actions,
             onPrimary: removeMetadata
         ) {
@@ -377,7 +421,7 @@ struct MetadataEditor: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Toggle("Keep orientation and colour profile", isOn: $keepsOrientationAndProfile)
                         .font(.system(size: 12))
-                    Text("Saves a copy without camera, date, location and other details.")
+                    Text(explanation)
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -390,12 +434,12 @@ struct MetadataEditor: View {
         let images = images
         let keeps = keepsOrientationAndProfile
         Task {
-            let result = await Task.detached(priority: .userInitiated) { () -> Result<[URL], Error> in
-                Result { try images.map { try MetadataStripper.strip($0, keepsOrientationAndProfile: keeps) } }
+            let result = await Task.detached(priority: .userInitiated) {
+                Result { try MetadataStripper.run(images, keepsOrientationAndProfile: keeps) }
             }.value
             isWorking = false
             switch result {
-            case .success(let urls): actions.saved(urls)
+            case .success(let outcome): actions.finished(outcome)
             case .failure(let error): actions.failed(error)
             }
         }

@@ -16,6 +16,24 @@ struct AdjustSettings: Equatable, Sendable {
     var quarterTurns = 0
     var flipsHorizontally = false
     var flipsVertically = false
+
+    /// Whether these settings change the image at all. A slider that reads 0
+    /// is no change, and turns and flips that cancel out (four turns, or both
+    /// flips plus a half turn) leave the image as it was.
+    var changesImage: Bool {
+        let sliders: [Double] = [exposure, brightness, contrast, saturation, warmth, vibrance, sharpness, vignette]
+        if sliders.contains(where: { $0.rounded() != 0 }) { return true }
+        return !keepsOrientation
+    }
+
+    /// Whether the turns and flips together leave the image the way up it was.
+    var keepsOrientation: Bool {
+        // One flip on its own always mirrors the image.
+        guard flipsHorizontally == flipsVertically else { return false }
+        // Flipping both ways is the same as a half turn.
+        let turns: Int = quarterTurns + (flipsHorizontally ? 2 : 0)
+        return ((turns % 4) + 4) % 4 == 0
+    }
 }
 
 /// Applies `AdjustSettings` with Core Image.
@@ -108,7 +126,7 @@ struct AdjustEditor: View {
         EditorChrome(
             title: "Edit Image",
             primaryTitle: isSaving ? "Saving…" : "Save",
-            isPrimaryEnabled: !isSaving && settings != AdjustSettings(),
+            isPrimaryEnabled: !isSaving && settings.changesImage,
             actions: actions,
             onReset: { settings = AdjustSettings() },
             onPrimary: save

@@ -23,9 +23,13 @@ struct PDFMetadataEditor: View {
     private var originalFields: PDFMetadataFields { singleInfo?.fields ?? PDFMetadataFields() }
     private var hasLockedFile: Bool { infos.contains { $0?.isLocked ?? true } }
 
+    /// Saving is only offered when the copy would differ from the original.
     private var canSave: Bool {
         guard !isWorking, !hasLockedFile else { return false }
-        return isSingle ? fields != originalFields || (fields.isEmpty && singleInfo?.hasMetadata == true) : true
+        if isSingle {
+            return fields != originalFields || (fields.isEmpty && singleInfo?.hasMetadata == true)
+        }
+        return infos.contains { $0?.hasMetadata == true }
     }
 
     var body: some View {
@@ -138,15 +142,21 @@ struct PDFMetadataEditor: View {
     private func save() {
         isWorking = true
         let urls = urls
-        // nil removes everything; used for batches and for a cleared single form.
+        // nil removes everything; used for a cleared single form.
         let fields: PDFMetadataFields? = isSingle && !fields.isEmpty ? fields : nil
+        let isSingle = isSingle
         Task {
             let result = await Task.detached(priority: .userInitiated) {
-                Result { try urls.map { try PDFTools.saveMetadata($0, fields: fields) } }
+                Result {
+                    // A batch only strips, skipping files that are already clean.
+                    isSingle
+                        ? SaveOutcome(saved: [try PDFTools.saveMetadata(urls[0], fields: fields)])
+                        : try PDFTools.removeMetadata(urls)
+                }
             }.value
             isWorking = false
             switch result {
-            case .success(let saved): actions.saved(saved)
+            case .success(let outcome): actions.finished(outcome)
             case .failure(let error): actions.failed(error)
             }
         }

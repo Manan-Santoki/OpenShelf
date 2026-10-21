@@ -47,18 +47,23 @@ struct ResizeRule: Equatable, Sendable {
         }
         return CGSize(width: max(1, target.width.rounded()), height: max(1, target.height.rounded()))
     }
+
+    /// Whether an image of `size` would come out a different size.
+    func changes(_ size: CGSize) -> Bool {
+        targetSize(for: size) != size
+    }
+
+    /// Why an image is left as it is, as in "1 resized · 2 already smaller".
+    var unchangedLabel: String {
+        allowsEnlarging ? "already that size" : "already smaller"
+    }
 }
 
 enum ResizeError: LocalizedError, Equatable {
-    case unchanged(count: Int)
     case failed
 
     var errorDescription: String? {
         switch self {
-        case .unchanged(let count):
-            count == 1
-                ? "The image is already that size — nothing saved. Turn on “Allow enlarging” to make it bigger."
-                : "These \(count) images are already that size — nothing saved."
         case .failed:
             "The image couldn’t be resized."
         }
@@ -99,20 +104,20 @@ enum ImageResizer {
         return destination
     }
 
-    /// Resizes and saves each image; images whose size wouldn't change are skipped.
-    static func run(_ images: [EditableImage], rule: ResizeRule) throws -> (saved: [URL], skipped: Int) {
-        var saved: [URL] = []
-        var skipped = 0
+    /// Resizes and saves each image; images whose size wouldn't change are
+    /// left alone and counted.
+    static func run(_ images: [EditableImage], rule: ResizeRule) throws -> SaveOutcome {
+        var outcome = SaveOutcome(saved: [], savedLabel: "resized", unchangedLabel: rule.unchangedLabel)
         for image in images {
             let target = rule.targetSize(for: image.pixelSize)
             guard target != image.pixelSize else {
-                skipped += 1
+                outcome.unchanged += 1
                 continue
             }
             guard let resized = resize(image.cgImage, to: target) else { throw ResizeError.failed }
-            saved.append(try save(resized, for: image))
+            outcome.saved.append(try save(resized, for: image))
         }
-        return (saved, skipped)
+        return outcome
     }
 }
 
@@ -135,11 +140,24 @@ struct ResizeEditor: View {
 
     private var first: EditableImage? { images.first }
 
+    /// The rule as it will be applied: with proportions kept, height follows width.
+    private var effectiveRule: ResizeRule {
+        var rule = rule
+        if rule.mode == .exact && keepsProportions { rule.height = 0 }
+        return rule
+    }
+
+    /// How many of the images the current rule would change.
+    private var changingCount: Int {
+        let rule = effectiveRule
+        return images.filter { rule.changes($0.pixelSize) }.count
+    }
+
     var body: some View {
         EditorChrome(
             title: "Resize",
             primaryTitle: "Resize",
-            isPrimaryEnabled: !isWorking && first.map { rule.targetSize(for: $0.pixelSize) != $0.pixelSize } ?? false,
+            isPrimaryEnabled: !isWorking && changingCount > 0,
             actions: actions,
             onReset: reset,
             onPrimary: save
@@ -260,12 +278,19 @@ struct ResizeEditor: View {
 
     private var summary: String {
         guard let first else { return "" }
+        let rule = effectiveRule
         let target = rule.targetSize(for: first.pixelSize)
-        let line = "\(Int(first.pixelSize.width)) × \(Int(first.pixelSize.height))  →  \(Int(target.width)) × \(Int(target.height)) px"
+        var line = "\(Int(first.pixelSize.width)) × \(Int(first.pixelSize.height))  →  \(Int(target.width)) × \(Int(target.height)) px"
         if target == first.pixelSize {
-            return line + "  (no change)"
+            line += "  (no change)"
         }
-        return images.count > 1 ? line + "\nThe same rule applies to each image." : line
+        guard images.count > 1 else { return line }
+        let changing = changingCount
+        let unchanged = images.count - changing
+        if unchanged == 0 {
+            return line + "\nThe same rule applies to each image."
+        }
+        return line + "\n\(changing) of \(images.count) will be resized · \(unchanged) \(rule.unchangedLabel)"
     }
 
     private func presetButton(_ title: String, action: @escaping () -> Void) -> some View {
@@ -288,17 +313,14 @@ struct ResizeEditor: View {
     private func save() {
         isWorking = true
         let images = images
-        var rule = rule
-        if rule.mode == .exact && keepsProportions { rule.height = 0 }
+        let rule = effectiveRule
         Task.detached {
             let result = Result { try ImageResizer.run(images, rule: rule) }
             await MainActor.run {
                 isWorking = false
                 switch result {
-                case .success(let outcome) where outcome.saved.isEmpty:
-                    actions.failed(ResizeError.unchanged(count: outcome.skipped))
                 case .success(let outcome):
-                    actions.saved(outcome.saved)
+                    actions.finished(outcome)
                 case .failure(let error):
                     actions.failed(error)
                 }

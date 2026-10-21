@@ -6,10 +6,19 @@ import SwiftUI
 struct EditorActions {
     /// Closes the editor without saving.
     let close: () -> Void
-    /// Closes the editor and confirms which files were written.
-    let saved: ([URL]) -> Void
+    /// Confirms what a save did. Closes the editor once anything was written;
+    /// keeps it open when every file was left as it was.
+    let finished: (SaveOutcome) -> Void
     /// Reports an error without closing.
     let failed: (Error) -> Void
+    /// Makes the editor's window key, activating the app if needed, so typing
+    /// goes to the editor.
+    let focus: () -> Void
+
+    /// Closes the editor and confirms which files were written.
+    func saved(_ urls: [URL]) {
+        finished(SaveOutcome(saved: urls))
+    }
 }
 
 /// Standard frame for tool editors: a close button and title on top, the
@@ -52,9 +61,12 @@ struct EditorChrome<Content: View>: View {
             .frame(height: 40)
             .background(WindowDragArea())
 
+            // Pinned to the top, so content that grows or shrinks (a status
+            // message, say) never shifts the controls above it.
             content
                 .padding(.horizontal, 16)
                 .padding(.bottom, 14)
+                .frame(maxHeight: .infinity, alignment: .top)
 
             Divider().opacity(0.6)
 
@@ -112,6 +124,32 @@ struct EditorSlider: View {
     }
 }
 
+/// A status message under an editor's controls, in a row of fixed height:
+/// room for `lines` lines is kept even with no message, so one appearing after
+/// a click doesn't move anything the pointer is aiming at.
+struct EditorStatusLine: View {
+    var message: String?
+    var systemImage = "info.circle"
+    var tint = Color.secondary
+    var lines = 2
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            // Reserves the height of `lines` lines in this font.
+            Text(String(repeating: "\n", count: max(lines - 1, 0)))
+                .hidden()
+                .accessibilityHidden(true)
+            if let message {
+                Label(message, systemImage: systemImage)
+                    .foregroundStyle(tint)
+                    .lineLimit(lines)
+            }
+        }
+        .font(.system(size: 11))
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 /// Floating window that hosts one tool editor. It zooms in from the point where
 /// the file was dropped and shrinks away when closed.
 @MainActor
@@ -127,14 +165,16 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
         let controller = EditorWindowController(size: size)
         let actions = EditorActions(
             close: { [weak controller] in controller?.dismiss() },
-            saved: { [weak controller] urls in
-                controller?.dismiss()
-                let subtitle = urls.count == 1 ? urls[0].lastPathComponent : "\(urls.count) files"
-                ToastController.shared.show(Toast(systemImage: "checkmark", title: "Saved", subtitle: subtitle))
+            finished: { [weak controller] outcome in
+                if outcome.savedAnything { controller?.dismiss() }
+                // A mixed or empty result has more to read than "Saved".
+                let duration: Duration = outcome.unchanged > 0 ? .seconds(3) : .seconds(1.8)
+                ToastController.shared.show(outcome.toast, for: duration)
             },
             failed: { error in
                 ToastController.shared.show(Toast(systemImage: "exclamationmark.triangle", title: "Couldn’t save", subtitle: error.localizedDescription))
-            }
+            },
+            focus: { [weak controller] in controller?.focus() }
         )
         controller.install(EditorContainer(model: controller.model, content: content(actions)), near: location)
         open.append(controller)
@@ -179,9 +219,17 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
         // Grow out of the drop point.
         let anchor = CGPoint(x: location.x - frame.minX, y: frame.maxY - location.y)
         model.anchor = UnitPoint(x: anchor.x / frame.width, y: anchor.y / frame.height)
-        NSApp.activate()
-        window.makeKeyAndOrderFront(nil)
+        focus()
         model.isPresented = true
+    }
+
+    /// Makes the editor the key window of the active app. OpenShelf is usually
+    /// in the background when an editor opens (files come from Finder), and
+    /// keystrokes go to the active app's key window, not to ours.
+    func focus() {
+        guard let window else { return }
+        if !NSApp.isActive { NSApp.activate() }
+        if !window.isKeyWindow { window.makeKeyAndOrderFront(nil) }
     }
 
     func dismiss() {
