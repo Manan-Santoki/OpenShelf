@@ -25,6 +25,8 @@ final class Shelf: Identifiable {
     var dockedEdge: ShelfEdge?
     /// An item the expanded view should scroll into view, e.g. after type-select.
     var scrollTarget: ShelfItem.ID?
+    /// Whether files are being dragged over the shelf, for the drop highlight.
+    var isDropTargeted = false
     /// Whether the shelf has ever held items, so an emptied shelf can close itself
     /// while a freshly created empty one stays open.
     private(set) var hasHadItems = false

@@ -3,7 +3,6 @@ import SwiftUI
 struct ShelfView: View {
     let shelf: Shelf
     let close: () -> Void
-    @State private var isDropTargeted = false
     @State private var isShown = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -33,13 +32,8 @@ struct ShelfView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: shelf.items.map(\.id))
-        .background { ShelfBackground(dockedEdge: shelf.dockedEdge, isDropTargeted: isDropTargeted) }
-        .dropDestination(for: URL.self) { urls, _ in
-            let files = urls.filter(\.isFileURL)
-            guard !files.isEmpty else { return false }
-            withAnimation(.snappy) { shelf.add(files) }
-            return true
-        } isTargeted: { isDropTargeted = $0 }
+        // Drops are taken by the window's ShelfDropView, which adds them at once.
+        .background { ShelfBackground(dockedEdge: shelf.dockedEdge, isDropTargeted: shelf.isDropTargeted) }
     }
 }
 

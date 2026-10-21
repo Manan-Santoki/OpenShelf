@@ -56,7 +56,8 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
         panel.keyDownHandler = { [weak self] event in self?.handleKeyDown(event) ?? false }
         panel.contentView = hostingContainer(
             for: ShelfView(shelf: shelf, close: { [weak self] in self?.dismiss() }),
-            size: panel.frame.size
+            size: panel.frame.size,
+            in: ShelfDropView(shelf: shelf)
         )
 
         if let restoringFrame {
