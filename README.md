@@ -66,6 +66,12 @@ any app that lets you drag files, and **keep holding** while you tap a key.
    Return. (⌃ or ⌘ plus an arrow is a macOS shortcut, ⌃→ switches desktops,
    so the arrows wait until those keys are up.)
 
+Wheels with more than seven options show the everyday ones first, six at a
+time. Rest on **More**, the wedge at about 10 o'clock, for a moment to turn the
+page; **Back** in the same place turns back. Dropping on More or Back turns the
+page too and keeps the wheel open, so you can click the option you want. With
+the keyboard, choose More or Back and press Return.
+
 **Without dragging:** select files in Finder and press **⌃⌥Space**. The Convert
 wheel opens at the pointer; use the arrow keys and **Return** (or click a
 wedge), **Tab** to switch to Tools and Actions, **Esc** to close. The first

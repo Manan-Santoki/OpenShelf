@@ -24,7 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.showWheel(kind, at: location, for: urls)
         }
         dragMonitor.onDragEnded = { [weak self] in
-            self?.wheel.dismiss()
+            self?.wheel.dragDidEnd()
         }
         dragMonitor.onStep = { [weak self] direction in
             self?.wheel.step(direction)
@@ -94,9 +94,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func items(for kind: WheelKind, urls: [URL]) -> [WheelItem] {
         switch kind {
         case .convert:
-            ConversionCatalog.formats(for: urls, tools: .detect()).map(WheelItem.convert)
+            WheelOrdering.formats(ConversionCatalog.formats(for: urls, tools: .detect()), for: urls).map(WheelItem.convert)
         case .tools:
-            FileTool.available(for: urls).map(WheelItem.tool)
+            WheelOrdering.tools(FileTool.available(for: urls)).map(WheelItem.tool)
         case .actions:
             FileAction.allCases
                 .filter { $0 != .addToShelf || shelves.hasShelves }

@@ -2,7 +2,7 @@ import Foundation
 
 /// An entry on the Tools wheel. Which tools appear depends on the dragged files.
 enum FileTool: CaseIterable, Hashable {
-    // Images, in wheel order (clockwise from 12 o'clock).
+    // Images. `WheelOrdering` sets their order on the wheel.
     case compress
     case metadata
     case edit
@@ -115,7 +115,7 @@ enum FileTool: CaseIterable, Hashable {
         )
     }
 
-    /// Tools that apply to every file in `urls`, in wheel order.
+    /// Tools that apply to every file in `urls`; `WheelOrdering` orders long lists for the wheel.
     static func available(for urls: [URL]) -> [FileTool] {
         guard !urls.isEmpty else { return [] }
         let kinds = Set(urls.map { FileKind(url: $0) })

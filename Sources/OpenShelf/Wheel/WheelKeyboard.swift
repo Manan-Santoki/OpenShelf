@@ -6,16 +6,33 @@ enum WheelStepDirection: Equatable {
 
 /// Moves a wheel's highlight one wedge at a time, wrapping around.
 enum WheelKeyboardNavigator {
-    /// The wedge to highlight after one step from `current`. With nothing
-    /// highlighted yet, clockwise starts at wedge 0 and counter-clockwise at the
-    /// last wedge.
-    static func step(from current: Int?, count: Int, direction: WheelStepDirection) -> Int? {
+    /// The wedge to highlight after one step from `current`, passing over
+    /// wedges that can't be chosen. With nothing highlighted yet, clockwise
+    /// starts at wedge 0 and counter-clockwise at the last wedge. Nil when no
+    /// wedge can be chosen.
+    static func step(
+        from current: Int?,
+        count: Int,
+        direction: WheelStepDirection,
+        isSelectable: (Int) -> Bool = { _ in true }
+    ) -> Int? {
         guard count > 0 else { return nil }
-        guard let current, (0..<count).contains(current) else {
-            return direction == .clockwise ? 0 : count - 1
-        }
         let offset = direction == .clockwise ? 1 : -1
-        return (current + offset + count) % count
+        // One step before the first wedge to try.
+        var index: Int = direction == .clockwise ? -1 : count
+        if let current, (0..<count).contains(current) {
+            index = current
+        }
+        for _ in 0..<count {
+            index = (index + offset + count) % count
+            if isSelectable(index) { return index }
+        }
+        return nil
+    }
+
+    /// One step over a page of `slots`, skipping empty ones.
+    static func step(from current: Int?, in slots: [WheelSlot], direction: WheelStepDirection) -> Int? {
+        step(from: current, count: slots.count, direction: direction) { !slots[$0].isEmpty }
     }
 }
 

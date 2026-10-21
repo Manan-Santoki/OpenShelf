@@ -28,6 +28,7 @@ final class DragMonitor {
     var onArrowsBlocked: (() -> Void)?
     /// Called when Return is pressed with a wheel open, with the dragged files.
     /// Returns whether something ran; if so, the rest of the drag is ignored.
+    /// Turning a paged wheel's page doesn't count, so the drag carries on.
     var onConfirm: (([URL]) -> Bool)?
 
     private let preferences: Preferences

@@ -79,13 +79,14 @@ enum OutputFormat: String, CaseIterable, Hashable, Sendable {
 
 /// Which conversions apply to which files.
 ///
-/// Wheels stay at 12 wedges or fewer (the largest, images, has 10). PAGES is
-/// never offered: it's Apple's private format.
+/// Wheels stay at 12 items or fewer (the largest, images, has 10); more than
+/// seven are shown over two pages, in `WheelOrdering`'s order. PAGES is never
+/// offered: it's Apple's private format.
 enum ConversionCatalog {
     /// The most wedges a wheel shows; the last one is always ZIP.
     static let maxWedges = 12
 
-    /// Formats every file in `urls` can be converted to, in wheel order.
+    /// Formats every file in `urls` can be converted to; `WheelOrdering` orders long lists for the wheel.
     static func formats(for urls: [URL], tools: ExternalTools) -> [OutputFormat] {
         guard let first = urls.first else { return [] }
         var common = formats(for: first, tools: tools)

@@ -7,8 +7,19 @@ import SwiftUI
 @MainActor
 @Observable
 final class WheelModel {
-    var items: [WheelItem] = []
-    var highlighted: WheelItem?
+    /// Every item on the wheel, across all its pages.
+    private(set) var items: [WheelItem] = []
+    /// The page showing, from 0.
+    private(set) var page = 0
+    /// What each wedge shows on the current page.
+    private(set) var slots: [WheelSlot] = []
+    /// Changes when a different set of items is shown, so the new wheel's
+    /// petals start afresh instead of morphing out of the previous wheel's.
+    private(set) var itemsID = 0
+    /// Index in `slots` of the highlighted wedge.
+    var highlightedSlot: Int?
+    /// Index of the More or Back wedge filling up while the pointer rests on it.
+    var dwellingSlot: Int?
     /// What the hub shows while no wedge is hovered, e.g. "1.2 MB" or "3 files".
     var dragSummary = ""
     /// A short instruction that replaces the label for a moment.
@@ -16,6 +27,22 @@ final class WheelModel {
     /// Which wheel is showing, named in the label when opened from the keyboard.
     var wheelName: String?
     var isPresented = false
+
+    var pageCount: Int { WheelPaging.pageCount(forItemCount: items.count) }
+
+    var highlighted: WheelSlot? { highlightedSlot.flatMap { slots[safe: $0] } }
+
+    /// Shows `items` from their first page.
+    func show(_ items: [WheelItem]) {
+        if items != self.items { itemsID += 1 }
+        self.items = items
+        showPage(0)
+    }
+
+    func showPage(_ page: Int) {
+        self.page = page
+        slots = WheelPaging.slots(for: items, page: page)
+    }
 }
 
 /// Owns the overlay panel that shows a wheel under the pointer during a drag,
@@ -44,6 +71,10 @@ final class WheelController {
     private var hintTask: Task<Void, Never>?
     private var keyboardSession: KeyboardSession?
     private var resignKeyObserver: (any NSObjectProtocol)?
+    /// Resting on More or Back turns the page; the task checks back once the
+    /// rest has lasted long enough.
+    private var pageTurnDwell = PageTurnDwell()
+    private var dwellTask: Task<Void, Never>?
 
     /// A wheel opened by shortcut for Finder's selection, driven by keys and clicks.
     private struct KeyboardSession {
@@ -68,18 +99,20 @@ final class WheelController {
 
     /// Shows `items` around `location`, or swaps them in place if the wheel is
     /// already open (e.g. when ⌥ is added to switch from Convert to Tools).
+    /// Either way the wheel starts on its first page.
     func present(_ items: [WheelItem], at location: NSPoint) {
         dismissTask?.cancel()
         let isSwitching = panel.isVisible && model.isPresented
-        model.items = items
-        model.highlighted = nil
+        model.show(items)
+        model.highlightedSlot = nil
         model.dragSummary = ""
         model.hint = nil
         model.wheelName = nil
         summarizedURLs = []
         hasHoverReading = false
         endAbsorbingDrop()
-        dropView.geometry = WheelGeometry(wedgeCount: items.count)
+        cancelDwell()
+        updateDropTargets()
         guard !isSwitching else { return }
 
         let side = WheelGeometry.panelSide
@@ -96,18 +129,27 @@ final class WheelController {
     /// the mouse-up reach the panel before it disappears.
     func dismiss(after delay: Duration = .milliseconds(200)) {
         endKeyboardMode()
+        cancelDwell()
         guard panel.isVisible else { return }
         dismissTask?.cancel()
         dismissTask = Task { [weak self] in
             try? await Task.sleep(for: delay)
             guard let self, !Task.isCancelled else { return }
             model.isPresented = false
-            model.highlighted = nil
+            model.highlightedSlot = nil
             endAbsorbingDrop()
             try? await Task.sleep(for: .milliseconds(160))
             guard !Task.isCancelled else { return }
             panel.orderOut(nil)
         }
+    }
+
+    /// The drag that summoned the wheel is over (the button came up, or Esc).
+    /// Hides the wheel, unless the files were dropped on More or Back, which
+    /// leaves it open to finish with a click or the keys.
+    func dragDidEnd() {
+        guard !isInKeyboardMode else { return }
+        dismiss()
     }
 
     /// Shows a short instruction in the wheel's label for a moment.
@@ -122,25 +164,86 @@ final class WheelController {
         }
     }
 
-    /// Moves the highlight one wedge with the keyboard.
+    /// Moves the highlight one wedge with the keyboard, over More or Back too
+    /// but not empty wedges.
     func step(_ direction: WheelStepDirection) {
         guard model.isPresented, !isAbsorbingDrop else { return }
-        let current = model.highlighted.flatMap { model.items.firstIndex(of: $0) }
-        guard let next = WheelKeyboardNavigator.step(from: current, count: model.items.count, direction: direction) else { return }
-        setHighlight(model.items[next])
+        guard let next = WheelKeyboardNavigator.step(from: model.highlightedSlot, in: model.slots, direction: direction) else { return }
+        setHighlight(next)
     }
 
     /// Runs the highlighted wedge on `urls`, as if they were dropped on it, and
-    /// hides the wheel. Returns false when nothing is highlighted.
+    /// hides the wheel. On More or Back it turns the page instead, keeping the
+    /// highlight there so Return again turns back. Returns whether a wedge ran.
     func confirmHighlighted(with urls: [URL]) -> Bool {
         guard model.isPresented, !isAbsorbingDrop, !urls.isEmpty else { return false }
-        guard let item = model.highlighted else {
+        guard let slot = model.highlightedSlot, let highlighted = model.highlighted else {
             showHint("Choose a wedge with the arrow keys")
+            return false
+        }
+        guard let item = highlighted.item else {
+            turnPage(from: slot)
             return false
         }
         absorbNextDrop()
         onDrop?(item, urls)
         return true
+    }
+
+    // MARK: Pages
+
+    /// Turns to the page that the More or Back wedge at `slot` leads to. The
+    /// highlight stays on that wedge, which now shows Back or More.
+    private func turnPage(from slot: Int) {
+        guard let page = model.slots[safe: slot]?.targetPage else { return }
+        // More and Back share a wedge, so a pointer resting there is now on the
+        // other one; it has to leave and come back to turn again.
+        let isPointerOnSlot = hasHoverReading && lastHoverWedge == slot
+        pageTurnDwell.pageDidTurn(isOnPageTurn: isPointerOnSlot, at: ContinuousClock.now)
+        dwellTask?.cancel()
+        dwellTask = nil
+        model.dwellingSlot = nil
+        model.showPage(page)
+        updateDropTargets()
+        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+    }
+
+    /// Follows the pointer for the dwell on More and Back: resting there fills
+    /// the wedge's ring, and the page turns once it's full.
+    private func updateDwell(pointerSlot slot: Int?) {
+        let isOnPageTurn = slot.flatMap { model.slots[safe: $0]?.targetPage } != nil
+        let wasPending = pageTurnDwell.isPending
+        if pageTurnDwell.update(isOnPageTurn: isOnPageTurn, at: ContinuousClock.now), let slot {
+            turnPage(from: slot)
+            return
+        }
+        guard pageTurnDwell.isPending, let slot else {
+            cancelDwell(resettingState: false)
+            return
+        }
+        model.dwellingSlot = slot
+        guard !wasPending else { return }
+        // Pointer readings stop while it rests, so check back on a timer.
+        dwellTask = Task { [weak self] in
+            try? await Task.sleep(for: PageTurnDwell.delay)
+            while let self, !Task.isCancelled, self.pageTurnDwell.isPending {
+                self.updateDwell(pointerSlot: slot)
+                try? await Task.sleep(for: .milliseconds(10))
+            }
+        }
+    }
+
+    private func cancelDwell(resettingState: Bool = true) {
+        if resettingState { pageTurnDwell = PageTurnDwell() }
+        dwellTask?.cancel()
+        dwellTask = nil
+        model.dwellingSlot = nil
+    }
+
+    /// Tells the drop view where the wedges are and which ones take files.
+    private func updateDropTargets() {
+        dropView.geometry = WheelGeometry(wedgeCount: model.slots.count)
+        dropView.emptySlots = Set(model.slots.indices.filter { model.slots[$0].isEmpty })
     }
 
     // MARK: Keyboard mode
@@ -170,7 +273,43 @@ final class WheelController {
             taps: ModifierTapTracker(alreadyHeld: NSEvent.modifierFlags)
         )
         showKeyboardWheel(first, at: location)
+        let hint = available.count > 1 ? "Arrows choose · Return runs · Tab switches wheel" : "Arrows choose · Return runs"
+        takeKeyboard(hint: hint)
+        return true
+    }
 
+    /// After files were dropped on More or Back, keeps the wheel open on its
+    /// new page as a keyboard wheel for those files, so a click or Return can
+    /// finish what the drag started.
+    private func holdOpenAfterDrop(of urls: [URL]) {
+        // A keyboard wheel that had files dropped on it already has its own.
+        guard !isInKeyboardMode else { return }
+        var itemsByKind: [WheelKind: [WheelItem]] = [:]
+        for kind in WheelCycle.order {
+            itemsByKind[kind] = itemsProvider?(kind, urls) ?? []
+        }
+        let available = WheelCycle.available { !(itemsByKind[$0] ?? []).isEmpty }
+        // The wheel showing is the one with exactly these items; no two wheels share any.
+        guard let kind = available.first(where: { itemsByKind[$0] == model.items }) else {
+            dismiss(after: .zero)
+            return
+        }
+        // The drag's end may already have asked for the wheel to go.
+        dismissTask?.cancel()
+        keyboardSession = KeyboardSession(
+            urls: urls,
+            itemsByKind: itemsByKind,
+            available: available,
+            kind: kind,
+            taps: ModifierTapTracker(alreadyHeld: NSEvent.modifierFlags)
+        )
+        updateSummary(for: urls)
+        model.wheelName = kind.shortTitle
+        takeKeyboard(hint: "Click to run · Esc closes")
+    }
+
+    /// Lets the open wheel take keys and clicks for the keyboard session.
+    private func takeKeyboard(hint: String) {
         dropView.isKeyboardMode = true
         panel.acceptsKeyboard = true
         panel.keyHandler = { [weak self] event in self?.handleKey(event) ?? false }
@@ -188,9 +327,7 @@ final class WheelController {
                 self.dismiss(after: .zero)
             }
         }
-        let hint = available.count > 1 ? "Arrows choose · Return runs · Tab switches wheel" : "Arrows choose · Return runs"
         showHint(hint)
-        return true
     }
 
     /// Leaves keyboard mode. A drag-triggered wheel calls this with
@@ -211,8 +348,9 @@ final class WheelController {
         }
         if hidingWheel {
             dismissTask?.cancel()
+            cancelDwell()
             model.isPresented = false
-            model.highlighted = nil
+            model.highlightedSlot = nil
             panel.orderOut(nil)
         }
     }
@@ -225,7 +363,7 @@ final class WheelController {
         updateSummary(for: session.urls)
         model.wheelName = kind.shortTitle
         // Start on the first wedge so Return does something straight away.
-        setHighlight(items.first)
+        setHighlight(items.isEmpty ? nil : 0)
     }
 
     private func handleKey(_ event: NSEvent) -> Bool {
@@ -261,8 +399,13 @@ final class WheelController {
         return true
     }
 
+    /// Runs the highlighted wedge, or turns the page when it's More or Back.
     private func runHighlighted() {
-        guard let session = keyboardSession, let item = model.highlighted else { return }
+        guard let session = keyboardSession, let slot = model.highlightedSlot, let highlighted = model.highlighted else { return }
+        guard let item = highlighted.item else {
+            turnPage(from: slot)
+            return
+        }
         dismiss(after: .zero)
         onDrop?(item, session.urls)
     }
@@ -274,8 +417,9 @@ final class WheelController {
     private func absorbNextDrop() {
         dismissTask?.cancel()
         isAbsorbingDrop = true
+        cancelDwell()
         model.isPresented = false
-        model.highlighted = nil
+        model.highlightedSlot = nil
         dropView.isAbsorbingDrop = true
         // Windows let drags pass through fully transparent pixels, so keep a
         // nearly invisible fill over the whole panel.
@@ -301,11 +445,13 @@ final class WheelController {
         dropView.layer?.backgroundColor = nil
     }
 
-    private func setHighlight(_ item: WheelItem?) {
-        if item != model.highlighted, item != nil {
+    /// Highlights the wedge at `slot`; an empty wedge or nil clears the highlight.
+    private func setHighlight(_ slot: Int?) {
+        let slot = slot.flatMap { model.slots[safe: $0]?.isEmpty == false ? $0 : nil }
+        if slot != model.highlightedSlot, slot != nil {
             NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
         }
-        model.highlighted = item
+        model.highlightedSlot = slot
     }
 
     /// Summarises the dragged files for the hub: the size of a single file (or of
@@ -341,33 +487,47 @@ final class WheelController {
         dropView.onHover = { [weak self] wedge, urls in
             guard let self else { return }
             updateSummary(for: urls)
+            updateDwell(pointerSlot: wedge)
             guard !hasHoverReading || wedge != lastHoverWedge else { return }
             hasHoverReading = true
             lastHoverWedge = wedge
-            setHighlight(wedge.flatMap { self.model.items[safe: $0] })
+            setHighlight(wedge)
         }
         dropView.onDrop = { [weak self] wedge, urls in
-            guard let self, let item = model.items[safe: wedge] else { return }
-            dismiss(after: .zero)
-            onDrop?(item, urls)
+            guard let self, let slot = model.slots[safe: wedge] else { return }
+            switch slot {
+            case .item(let item):
+                dismiss(after: .zero)
+                onDrop?(item, urls)
+            case .more, .back:
+                // Nothing runs; the wheel stays open on the other page.
+                turnPage(from: wedge)
+                setHighlight(wedge)
+                holdOpenAfterDrop(of: urls)
+            case .empty:
+                break
+            }
         }
         dropView.onAbsorbedDrop = { [weak self] in
             self?.dismiss(after: .zero)
         }
         dropView.onPointerMoved = { [weak self] wedge in
             guard let self, isInKeyboardMode else { return }
+            updateDwell(pointerSlot: wedge)
             guard !hasHoverReading || wedge != lastHoverWedge else { return }
             hasHoverReading = true
             lastHoverWedge = wedge
-            if let wedge { setHighlight(model.items[safe: wedge]) }
+            if let wedge, model.slots[safe: wedge]?.isEmpty == false { setHighlight(wedge) }
         }
         dropView.onClick = { [weak self] wedge in
             guard let self, isInKeyboardMode else { return }
-            guard let wedge, let item = model.items[safe: wedge] else {
+            guard let wedge, let slot = model.slots[safe: wedge] else {
                 dismiss(after: .zero)
                 return
             }
-            setHighlight(item)
+            // An empty wedge belongs to the wheel but does nothing.
+            guard !slot.isEmpty else { return }
+            setHighlight(wedge)
             runHighlighted()
         }
 
@@ -409,6 +569,8 @@ final class WheelPanel: NSPanel {
 /// wedges; in keyboard mode it also handles hover and clicks.
 final class WheelDropView: NSView {
     var geometry = WheelGeometry(wedgeCount: 0)
+    /// Wedges that are only placeholders on a paged wheel; files can't be dropped there.
+    var emptySlots: Set<Int> = []
     var onHover: ((Int?, [URL]) -> Void)?
     var onDrop: ((Int, [URL]) -> Void)?
     /// While set, any drop is accepted and discarded (see `absorbNextDrop`).
@@ -457,8 +619,9 @@ final class WheelDropView: NSView {
         return true
     }
 
+    /// The wedge under a drag, if it takes files.
     private func wedge(for info: any NSDraggingInfo) -> Int? {
-        wedge(atWindowPoint: info.draggingLocation)
+        wedge(atWindowPoint: info.draggingLocation).flatMap { emptySlots.contains($0) ? nil : $0 }
     }
 
     private func wedge(atWindowPoint windowPoint: NSPoint) -> Int? {
