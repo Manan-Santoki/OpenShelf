@@ -115,7 +115,7 @@ struct MissingToolAdviceTests {
         #expect(title("a.xls", "b.ods", tool: .libreOffice) == "XLS and ODS need LibreOffice")
         #expect(title("a.pptx", "b.xls", tool: .libreOffice) == "These files need LibreOffice")
         let toast = MissingToolAdvice.toast(for: urls("a.ogg"), needing: .ffmpeg, tools: none)
-        #expect(toast.subtitle == "Install it in Settings → Extra formats")
+        #expect(toast.subtitle == "Install it in Settings → Extra Formats")
     }
 
     @Test func toastLinesFitTheToast() {

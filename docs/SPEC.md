@@ -41,7 +41,7 @@ this spec; it does not contain or derive from any other app's code or assets.
 - Stays on top of everything, on every Space, including full-screen apps.
 
 - Without a drag: a global shortcut (default ⌃⌥Space, set or turned off in
-  Settings → Keyboard; registered with Carbon hot keys, so no Accessibility
+  Settings → Wheels; registered with Carbon hot keys, so no Accessibility
   permission) opens the Convert wheel at the pointer for the files selected in
   Finder (read over Apple Events, which asks for Automation permission once).
   Arrows move the highlight (starting on the first wedge), Return runs it,
@@ -206,11 +206,21 @@ New Shelf · Close All Shelves · Settings… · Quit.
 
 ## 5. Settings
 
-- Trigger keys per wheel (any combination of ⌃ ⌥ ⇧ ⌘, at least one).
-- Remove files from a shelf after dragging them out (default off).
-- Restore shelves when OpenShelf opens (default on).
-- Hide docked shelves to the screen edge (default on).
-- Open at login.
+Toolbar tabs, like System apps; the window keeps its width, takes each tab's
+height (scrolling when the screen is shorter) and opens on the tab used last.
+
+- General: open at login; show the welcome guide.
+- Wheels: trigger keys per wheel (any combination of ⌃ ⌥ ⇧ ⌘, at least one),
+  and the shortcut for Finder's selection.
+- Shelves: remove files from a shelf after dragging them out (default off);
+  restore shelves when OpenShelf opens (default on); hide docked shelves to the
+  screen edge (default on).
+- Extra Formats: install or remove ffmpeg and LibreOffice. ffmpeg comes from
+  its build server, then OpenShelf's GitHub mirror of the same signed zips;
+  when every download source is down, Install with Homebrew is offered if
+  Homebrew is installed. A failed checksum or signature never falls through
+  to another source.
+- Updates: automatic checks and installs.
 
 ## 6. Roadmap
 

@@ -27,7 +27,7 @@ the file on a wedge and it's done, saved right next to the original.
   only genuine OpenShelf releases are accepted
 - **Extra formats, one click away:** ffmpeg adds MP3, OGG, WebP, MKV, WebM,
   AVI and WMV; LibreOffice adds PowerPoint, XLS and ODS. Install either from
-  Settings → Extra formats (no Homebrew or administrator needed), or use the
+  Settings → Extra Formats (no Homebrew or administrator needed), or use the
   copies you already have from Homebrew
 
 See [docs/SPEC.md](docs/SPEC.md) for the full behaviour and roadmap.
@@ -80,7 +80,7 @@ wheel opens at the pointer; use the arrow keys and **Return** (or click a
 wedge), **Tab** to switch to Tools and Actions, **Esc** to close. The first
 time, macOS asks whether OpenShelf may control Finder; that's only used to read
 which files are selected. Change or turn off the shortcut in Settings →
-Keyboard.
+Wheels.
 
 Tip: on a trackpad, press the key *after* the drag has started. Holding ⌃
 before you click turns the click into a right-click.
@@ -114,12 +114,15 @@ one archive.
 
 ¹ Needs LibreOffice. ² Needs ffmpeg (`brew install webp` also adds WebP).
 
-Both are free and optional. Install them from **Settings → Extra formats**: one
+Both are free and optional. Install them from **Settings → Extra Formats**: one
 click downloads the official build (ffmpeg from
 [ffmpeg.martin-riedl.de](https://ffmpeg.martin-riedl.de), LibreOffice from
 [libreoffice.org](https://www.libreoffice.org)), checks its checksum and its
 publisher's code signature, and installs it for you alone, without an
-administrator password. Copies from Homebrew (`brew install ffmpeg`,
+administrator password. When ffmpeg's server is down, the same signed build
+comes from OpenShelf's mirror on GitHub, checked the same way; when that's
+down too (or libreoffice.org is), and you have Homebrew, **Install with
+Homebrew** runs `brew install` for you. Copies from Homebrew (`brew install ffmpeg`,
 `brew install --cask libreoffice`) are used too and take precedence. Without
 them those wedges are hidden, and dragging a file only they can open (an MKV,
 a PowerPoint deck) says which one it needs. GIFs from video are made without
@@ -190,11 +193,17 @@ from the menu bar, or turn automatic checks and installs on or off in Settings.
 
 ### Settings
 
-Click the OpenShelf wheel in the menu bar → **Settings…** to change the key for
-each wheel, install or remove the extra formats (ffmpeg and LibreOffice), remove
-files from a shelf after dragging them out, restore shelves at launch, hide
-docked shelves at the screen edge, control updates, or open OpenShelf at login.
-**How to Use OpenShelf** in the same menu shows the welcome guide again.
+Click the OpenShelf wheel in the menu bar → **Settings…** (⌘,). It opens on the
+tab you used last:
+
+- **General:** open OpenShelf at login, and show the welcome guide again (also
+  in the menu as **How to Use OpenShelf**)
+- **Wheels:** the keys that open each wheel while dragging, and the shortcut
+  for Finder's selection
+- **Shelves:** remove files from a shelf after dragging them out, restore
+  shelves at launch, hide docked shelves at the screen edge
+- **Extra Formats:** install or remove ffmpeg and LibreOffice
+- **Updates:** automatic checks and installs, and Check Now
 
 ffmpeg and ffprobe that OpenShelf installs live in
 `~/Library/Application Support/OpenShelf/Tools`; LibreOffice goes to

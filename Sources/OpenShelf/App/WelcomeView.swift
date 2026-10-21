@@ -4,7 +4,7 @@ import SwiftUI
 /// First-launch introduction to the three drag gestures. Also available from
 /// the menu bar as "How to Use OpenShelf".
 struct WelcomeView: View {
-    static let windowSize = CGSize(width: 460, height: 600)
+    static let windowSize = CGSize(width: 460, height: 630)
     private static let shownKey = "hasShownWelcome"
 
     let actions: EditorActions
@@ -54,6 +54,8 @@ struct WelcomeView: View {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
 
+                ExtraFormatsHint()
+
                 Toggle("Open OpenShelf at login", isOn: $opensAtLogin)
                     .onChange(of: opensAtLogin) { _, enabled in
                         do {
@@ -69,6 +71,21 @@ struct WelcomeView: View {
             }
             .padding(.top, 4)
         }
+    }
+}
+
+/// Points to Settings → Extra Formats, for formats macOS can't make itself.
+private struct ExtraFormatsHint: View {
+    var body: some View {
+        HStack(spacing: 4) {
+            Text("MP3, MKV, PowerPoint and more:")
+                .foregroundStyle(.secondary)
+            Button("Add Extra Formats…") {
+                SettingsWindowController.shared.show(tab: .extraFormats)
+            }
+            .buttonStyle(.link)
+        }
+        .font(.caption)
     }
 }
 

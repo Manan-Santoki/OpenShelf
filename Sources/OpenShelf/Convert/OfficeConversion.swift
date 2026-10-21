@@ -1,7 +1,7 @@
 import Foundation
 
 /// Office formats macOS can't read or write itself (PowerPoint, XLS, ODS…),
-/// converted by LibreOffice when it's installed (Settings → Extra formats).
+/// converted by LibreOffice when it's installed (Settings → Extra Formats).
 enum OfficeConversion {
     /// How long LibreOffice gets before the conversion is abandoned.
     static let timeout: Duration = .seconds(120)

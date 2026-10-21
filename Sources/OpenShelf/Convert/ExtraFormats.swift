@@ -1,7 +1,7 @@
 import Foundation
 
 /// A free tool that adds formats macOS can't handle itself, as presented in
-/// Settings → Extra formats and in messages that point there.
+/// Settings → Extra Formats and in messages that point there.
 enum ExtraTool: String, CaseIterable, Identifiable, Sendable {
     case ffmpeg
     case libreOffice
@@ -69,7 +69,7 @@ enum ExtraTool: String, CaseIterable, Identifiable, Sendable {
 /// Pure decisions, so they can be tested without a drag.
 enum MissingToolAdvice {
     /// The second line of every "needs …" message.
-    static let installHint = "Install it in Settings → Extra formats"
+    static let installHint = "Install it in Settings → Extra Formats"
 
     /// The tool whose absence leaves these files with nothing but ZIP on the
     /// Convert wheel, when installing it would offer real conversions. Nil
@@ -111,7 +111,7 @@ enum MissingToolAdvice {
             let kind = FileKind(url: url)
             return (kind == .audio || kind == .video) && MediaFormats.isAVFoundationReadable(url)
         }
-        return isNativeMedia ? "More formats in Settings → Extra formats" : nil
+        return isNativeMedia ? "More formats in Settings → Extra Formats" : nil
     }
 
     /// How a format is known to people: "PowerPoint", "WebM", "MKV"; empty
