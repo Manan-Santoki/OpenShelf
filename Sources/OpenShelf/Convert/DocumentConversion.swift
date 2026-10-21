@@ -6,8 +6,13 @@ enum PDFConversion {
     /// Page images are rendered at print resolution.
     private static let renderDPI = 300.0
 
-    static func convert(_ source: URL, to format: OutputFormat) throws -> [URL] {
+    /// - Parameters:
+    ///   - original: Where results are saved and what they're named after, when
+    ///     `source` is an intermediate PDF (e.g. made from slides).
+    ///   - pageLabel: How numbered image files are labelled ("Page 2", "Slide 2").
+    static func convert(_ source: URL, to format: OutputFormat, savingNextTo original: URL? = nil, pageLabel: String = "Page") throws -> [URL] {
         guard let document = PDFDocument(url: source) else { throw ConversionError.unreadable(source) }
+        let original = original ?? source
         // A locked PDF opens, but every page renders blank and has no text.
         guard !document.isLocked else {
             throw ConversionError.failed("“\(source.lastPathComponent)” is password-protected. Remove the password in Preview first.")
@@ -19,12 +24,12 @@ enum PDFConversion {
             guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 throw ConversionError.failed("“\(source.lastPathComponent)” has no text to extract (it looks like a scan).")
             }
-            let destination = OutputNaming.destination(for: source, pathExtension: "txt")
+            let destination = OutputNaming.destination(for: original, pathExtension: "txt")
             try text.write(to: destination, atomically: true, encoding: .utf8)
             return [destination]
 
         case .docx:
-            let destination = OutputNaming.destination(for: source, pathExtension: "docx")
+            let destination = OutputNaming.destination(for: original, pathExtension: "docx")
             let text = NSMutableAttributedString()
             for index in 0..<document.pageCount {
                 if let page = document.page(at: index)?.attributedString {
@@ -48,28 +53,94 @@ enum PDFConversion {
             let type = format.imageIOType!
             let pages = renderPages(of: document, dpi: renderDPI)
             return try pages.enumerated().map { index, image in
-                let suffix = pages.count == 1 ? nil : "Page \(index + 1)"
-                let destination = OutputNaming.destination(for: source, suffix: suffix, pathExtension: format.rawValue)
+                let suffix = pages.count == 1 ? nil : "\(pageLabel) \(index + 1)"
+                let destination = OutputNaming.destination(for: original, suffix: suffix, pathExtension: format.rawValue)
                 try EditableImage.write(image, to: destination, type: type, quality: 0.92)
                 return destination
             }
+
+        case .md:
+            let pages = try pageTexts(of: document, source: source)
+            let markdown = pages.map { page in
+                DocumentStructure.markdown(PDFText.paragraphs(fromPageText: page).map { .paragraph([TextRun(text: $0)]) })
+            }
+            .joined(separator: "\n---\n\n")
+            let destination = OutputNaming.destination(for: original, pathExtension: "md")
+            try markdown.write(to: destination, atomically: true, encoding: .utf8)
+            return [destination]
+
+        case .epub:
+            // A chapter per page: text where the page has some, the page image where it doesn't.
+            var chapters: [EpubChapter] = []
+            var images: [String: Data] = [:]
+            for index in 0..<document.pageCount {
+                guard let page = document.page(at: index) else { continue }
+                let text = page.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let body: String
+                if text.isEmpty, let image = renderPage(page, dpi: 150), let jpeg = jpegData(image) {
+                    let name = "page\(index + 1).jpg"
+                    images[name] = jpeg
+                    body = #"<p><img src="images/\#(name)" alt="Page \#(index + 1)"/></p>"#
+                } else {
+                    body = DocumentStructure.xhtml(PDFText.paragraphs(fromPageText: text).map { .paragraph([TextRun(text: $0)]) })
+                }
+                chapters.append(EpubChapter(title: "Page \(index + 1)", bodyXHTML: body))
+            }
+            let destination = OutputNaming.destination(for: original, pathExtension: "epub")
+            try EpubWriter.write(title: original.deletingPathExtension().lastPathComponent, chapters: chapters, images: images, to: destination)
+            return [destination]
+
+        case .pptx:
+            let first = document.page(at: 0).map(displaySize) ?? CGSize(width: 720, height: 540)
+            let destination = OutputNaming.destination(for: original, pathExtension: "pptx")
+            try PptxWriter.write(slides: renderPages(of: document, dpi: 160), slideSize: first, to: destination)
+            return [destination]
+
+        case .xlsx:
+            let pages = try pageTexts(of: document, source: source)
+            let sheets = pages.enumerated().map { index, text in
+                (name: "Page \(index + 1)", table: PDFText.rows(fromPageText: text))
+            }
+            let destination = OutputNaming.destination(for: original, pathExtension: "xlsx")
+            try XlsxWriter.write(sheets: sheets, to: destination)
+            return [destination]
 
         default:
             throw ConversionError.unsupported("PDF to \(format.title)")
         }
     }
 
+    /// Each page's text, refusing PDFs that have none (scans).
+    private static func pageTexts(of document: PDFDocument, source: URL) throws -> [String] {
+        let pages = (0..<document.pageCount).map { document.page(at: $0)?.string ?? "" }
+        guard pages.contains(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
+            throw ConversionError.failed("“\(source.lastPathComponent)” has no text to extract (it looks like a scan).")
+        }
+        return pages
+    }
+
+    private static func displaySize(of page: PDFPage) -> CGSize {
+        let bounds = page.bounds(for: .mediaBox)
+        return page.rotation % 180 == 0 ? bounds.size : CGSize(width: bounds.height, height: bounds.width)
+    }
+
+    private static func jpegData(_ image: CGImage) -> Data? {
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(data, "public.jpeg" as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(destination, image, [kCGImageDestinationLossyCompressionQuality: 0.85] as CFDictionary)
+        return CGImageDestinationFinalize(destination) ? data as Data : nil
+    }
+
+    private static func renderPage(_ page: PDFPage, dpi: Double) -> CGImage? {
+        let size = displaySize(of: page)
+        let pixels = CGSize(width: size.width * dpi / 72, height: size.height * dpi / 72)
+        var rect = CGRect(origin: .zero, size: pixels)
+        return page.thumbnail(of: pixels, for: .mediaBox).cgImage(forProposedRect: &rect, context: nil, hints: nil)
+    }
+
     private static func renderPages(of document: PDFDocument, dpi: Double) -> [CGImage] {
         (0..<document.pageCount).compactMap { index in
-            guard let page = document.page(at: index) else { return nil }
-            let bounds = page.bounds(for: .mediaBox)
-            let rotated = page.rotation % 180 != 0
-            let size = CGSize(
-                width: (rotated ? bounds.height : bounds.width) * dpi / 72,
-                height: (rotated ? bounds.width : bounds.height) * dpi / 72
-            )
-            var rect = CGRect(origin: .zero, size: size)
-            return page.thumbnail(of: size, for: .mediaBox).cgImage(forProposedRect: &rect, context: nil, hints: nil)
+            document.page(at: index).flatMap { renderPage($0, dpi: dpi) }
         }
     }
 }
@@ -88,10 +159,18 @@ enum DocumentConversion {
 
         if isPlainText(source) {
             let string = try readPlainText(source)
-            if format == .pdf {
+            let isMarkdown = ["md", "markdown"].contains(source.pathExtension.lowercased())
+            switch format {
+            case .pdf:
                 try PlainTextPDF.write(string, to: destination)
-            } else {
-                try write(NSAttributedString(string: string, attributes: [.font: bodyFont]), as: format, to: destination)
+            case .md:
+                // Plain text is already valid Markdown.
+                try string.write(to: destination, atomically: true, encoding: .utf8)
+            case .epub:
+                let blocks = isMarkdown ? DocumentStructure.blocks(fromMarkdown: string) : DocumentStructure.blocks(fromPlainText: string)
+                try writeEpub(blocks, source: source, to: destination)
+            default:
+                try write(NSAttributedString(string: string, attributes: [.font: bodyFont]), as: format, source: source, to: destination)
             }
             return destination
         }
@@ -103,13 +182,18 @@ enum DocumentConversion {
                 if format == .pdf {
                     try printPDF(text, to: destination)
                 } else {
-                    try write(text, as: format, to: destination)
+                    try write(text, as: format, source: source, to: destination)
                 }
             }
         } else {
-            try write(readRich(source), as: format, to: destination)
+            try write(readRich(source), as: format, source: source, to: destination)
         }
         return destination
+    }
+
+    private static func writeEpub(_ blocks: [TextBlock], source: URL, to destination: URL) throws {
+        let title = source.deletingPathExtension().lastPathComponent
+        try EpubWriter.write(title: title, chapters: [EpubChapter(title: title, bodyXHTML: DocumentStructure.xhtml(blocks))], to: destination)
     }
 
     static func isPlainText(_ url: URL) -> Bool {
@@ -117,9 +201,13 @@ enum DocumentConversion {
     }
 
     /// Writes everything except PDF.
-    private static func write(_ text: NSAttributedString, as format: OutputFormat, to destination: URL) throws {
+    private static func write(_ text: NSAttributedString, as format: OutputFormat, source: URL, to destination: URL) throws {
         let range = NSRange(location: 0, length: text.length)
         switch format {
+        case .md:
+            try DocumentStructure.markdown(DocumentStructure.blocks(from: text)).write(to: destination, atomically: true, encoding: .utf8)
+        case .epub:
+            try writeEpub(DocumentStructure.blocks(from: text), source: source, to: destination)
         case .txt:
             try text.string.write(to: destination, atomically: true, encoding: .utf8)
         case .docx:
@@ -251,5 +339,54 @@ enum PlainTextPDF {
             location += visible.length
         } while location < text.length
         context.closePDF()
+    }
+}
+
+/// Turning a PDF page's extracted text into paragraphs and table rows.
+enum PDFText {
+    /// Joins wrapped lines into paragraphs. A line much shorter than the
+    /// page's longest line usually ends a paragraph; blank lines always do.
+    /// Pages of short lines (lists, records, verse) keep every line apart.
+    static func paragraphs(fromPageText text: String) -> [String] {
+        let lines = text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
+            .components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+        let longest = lines.map(\.count).max() ?? 0
+        guard longest >= 60 else { return lines.filter { !$0.isEmpty } }
+        var paragraphs: [String] = []
+        var current = ""
+        for line in lines {
+            if line.isEmpty {
+                if !current.isEmpty { paragraphs.append(current) }
+                current = ""
+                continue
+            }
+            if current.isEmpty {
+                current = line
+            } else if current.hasSuffix("-") {
+                // Re-join a word hyphenated across lines.
+                current = String(current.dropLast()) + line
+            } else {
+                current += " " + line
+            }
+            if Double(line.count) < Double(longest) * 0.6 {
+                paragraphs.append(current)
+                current = ""
+            }
+        }
+        if !current.isEmpty { paragraphs.append(current) }
+        return paragraphs
+    }
+
+    /// One row per line, cells split at tabs or runs of two or more spaces.
+    static func rows(fromPageText text: String) -> Table {
+        text.replacingOccurrences(of: "\r\n", with: "\n")
+            .components(separatedBy: "\n")
+            .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+            .map { line in
+                line.trimmingCharacters(in: .whitespaces)
+                    .split(separator: /\t| {2,}/)
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
+            }
     }
 }

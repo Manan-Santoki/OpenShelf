@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>OpenShelf · Convert, edit and share files mid-drag on your Mac</title>
-<meta name="description" content="OpenShelf is a free, open-source Mac app. Start dragging any file, tap a key, and drop it on a wheel to convert it, edit it or put it on a floating shelf. Everything runs on your Mac.">
+<meta name="description" content="OpenShelf is a free, open-source Mac app. Start dragging any file, tap a key, and drop it on a wheel to convert it (images, PDFs, documents, spreadsheets, audio, video), edit it or put it on a floating shelf. Everything runs on your Mac.">
 <meta property="og:title" content="OpenShelf: drag, tap, done.">
 <meta property="og:description" content="A free, open-source Mac app that turns every file drag into a launcher: convert, edit and share files without opening another app.">
 <meta property="og:image" content="https://openshelf.msantoki.com/assets/icon.png">
@@ -225,7 +225,7 @@ footer a:hover { color: var(--ink); }
         </div>
         <div class="card">
           <div class="kbdrow"><kbd>⇧⌥</kbd><h3>Tools</h3></div>
-          <p>Crop, compress, annotate, redact, trim, split PDFs. Each tool opens a small focused editor and saves a copy.</p>
+          <p>Crop, resize, remove backgrounds, annotate, trim, merge, split PDFs. Each tool opens a small focused editor and saves a copy.</p>
           <img src="/assets/wheel-tools.webp" alt="The Tools wheel for a photo, with Crop highlighted" loading="lazy" width="608" height="608">
         </div>
         <div class="card">
@@ -240,7 +240,8 @@ footer a:hover { color: var(--ink); }
           <ul class="ticks">
             <li><b>The label above the wheel</b> shows the file size, then exactly what the hovered wedge will do.</li>
             <li><b>A small card by the pointer</b> shows progress for long jobs. Click × to cancel.</li>
-            <li><b>Keyboard too:</b> open a wheel, let go of the key, then use the arrow keys and Return. Esc cancels.</li>
+            <li><b>No drag needed:</b> select files in Finder and press <b>⌃⌥Space</b>. Arrow keys choose, Tab switches wheels, Return runs it.</li>
+            <li><b>Keyboard mid-drag too:</b> open a wheel, let go of the key, then use the arrow keys and Return. Esc cancels.</li>
             <li><b>Your keys:</b> change the key for each wheel in Settings.</li>
           </ul>
         </div>
@@ -256,19 +257,21 @@ footer a:hover { color: var(--ink); }
   <section id="formats">
     <div class="wrap">
       <div class="eyebrow">Convert</div>
-      <h2>Every everyday format.</h2>
+      <h2>Every everyday format, and then some.</h2>
       <p class="section-lede">Drag several files at once to convert them together. Mixed selections only show the formats every file supports.</p>
       <div class="formats">
         <div class="frow"><div class="from">Images<small>JPG, PNG, HEIC, SVG, …</small></div><div class="chips"><span class="chip">PNG</span><span class="chip">JPG</span><span class="chip">HEIC</span><span class="chip">AVIF</span><span class="chip opt">WEBP</span><span class="chip">TIFF</span><span class="chip">BMP</span><span class="chip">PDF</span><span class="chip">DOCX</span><span class="chip">ZIP</span></div></div>
-        <div class="frow"><div class="from">PDF<small>all pages, 300 dpi</small></div><div class="chips"><span class="chip">DOCX</span><span class="chip">JPG</span><span class="chip">PNG</span><span class="chip">TXT</span><span class="chip">ZIP</span></div></div>
-        <div class="frow"><div class="from">Documents<small>TXT, RTF, DOCX, HTML, MD</small></div><div class="chips"><span class="chip">PDF</span><span class="chip">DOCX</span><span class="chip">TXT</span><span class="chip">RTF</span><span class="chip">HTML</span><span class="chip">ZIP</span></div></div>
-        <div class="frow"><div class="from">Audio</div><div class="chips"><span class="chip opt">MP3</span><span class="chip">M4A</span><span class="chip">WAV</span><span class="chip">AIFF</span><span class="chip">FLAC</span><span class="chip">ZIP</span></div></div>
-        <div class="frow"><div class="from">Video</div><div class="chips"><span class="chip">MP4</span><span class="chip">MOV</span><span class="chip">M4A</span><span class="chip opt">GIF</span><span class="chip opt">MP3</span><span class="chip">ZIP</span></div></div>
+        <div class="frow"><div class="from">PDF<small>all pages, 300 dpi</small></div><div class="chips"><span class="chip">DOCX</span><span class="chip">PPTX</span><span class="chip">XLSX</span><span class="chip">EPUB</span><span class="chip">MD</span><span class="chip">JPG</span><span class="chip">PNG</span><span class="chip">TXT</span><span class="chip">ZIP</span></div></div>
+        <div class="frow"><div class="from">Documents<small>TXT, RTF, RTFD, DOCX, HTML, MD</small></div><div class="chips"><span class="chip">PDF</span><span class="chip">DOCX</span><span class="chip">EPUB</span><span class="chip">MD</span><span class="chip">TXT</span><span class="chip">RTF</span><span class="chip">HTML</span><span class="chip">ZIP</span></div></div>
+        <div class="frow"><div class="from">Spreadsheets<small>CSV, TSV, XLSX, XLS, ODS</small></div><div class="chips"><span class="chip">XLSX</span><span class="chip">CSV</span><span class="chip">TSV</span><span class="chip">PDF</span><span class="chip opt">ODS</span><span class="chip">ZIP</span></div></div>
+        <div class="frow"><div class="from">Slides<small>PPT, PPTX, ODP</small></div><div class="chips"><span class="chip opt">PDF</span><span class="chip opt">JPG</span><span class="chip opt">PNG</span><span class="chip">ZIP</span></div></div>
+        <div class="frow"><div class="from">Audio<small>MP3, M4A, WAV, FLAC, OGG, Opus, WMA, …</small></div><div class="chips"><span class="chip opt">MP3</span><span class="chip">M4A</span><span class="chip">WAV</span><span class="chip">AIFF</span><span class="chip">FLAC</span><span class="chip opt">OGG</span><span class="chip opt">OPUS</span><span class="chip opt">WMA</span><span class="chip">ZIP</span></div></div>
+        <div class="frow"><div class="from">Video<small>MP4, MOV, MKV, WebM, AVI, WMV, …</small></div><div class="chips"><span class="chip">MP4</span><span class="chip">MOV</span><span class="chip opt">MKV</span><span class="chip opt">WEBM</span><span class="chip opt">AVI</span><span class="chip opt">WMV</span><span class="chip opt">GIF</span><span class="chip">M4A</span><span class="chip opt">MP3</span><span class="chip">ZIP</span></div></div>
         <div class="frow"><div class="from">Subtitles<small>SRT, VTT</small></div><div class="chips"><span class="chip">TXT</span><span class="chip">SRT</span><span class="chip">VTT</span></div></div>
         <div class="frow"><div class="from">Archives<small>ZIP, TAR, GZ, 7Z, RAR</small></div><div class="chips"><span class="chip">Unzip into a folder</span></div></div>
-        <div class="frow"><div class="from">Folders &amp; anything else</div><div class="chips"><span class="chip">ZIP</span></div></div>
+        <div class="frow"><div class="from">Folders &amp; anything else</div><div class="chips"><span class="chip">ZIP</span><span class="chip">TAR</span><span class="chip">TAR.GZ</span></div></div>
       </div>
-      <p class="fnote">Dashed formats use free tools you can add with <code>brew install ffmpeg webp</code>; they're hidden until then.</p>
+      <p class="fnote">Dashed formats use free tools: audio and video ones need <code>brew install ffmpeg webp</code>, slides and ODS need <code>brew install --cask libreoffice</code>. They stay hidden until the tool is installed.</p>
     </div>
   </section>
 
@@ -287,9 +290,9 @@ footer a:hover { color: var(--ink); }
         </div>
       </div>
       <div class="tools-grid">
-        <div class="card"><h3>Images</h3><p>Crop · Add Background · Annotate · Redact · Edit · Compress · Metadata · Read QR · Combine into PDF</p></div>
+        <div class="card"><h3>Images</h3><p>Crop · Resize · Remove Background · Add Background · Annotate · Redact · Edit · Compress · Metadata · Read QR · Combine into PDF</p></div>
         <div class="card"><h3>PDFs</h3><p>Combine · Reorder, rotate and delete pages · Split · Compress · Edit or remove metadata</p></div>
-        <div class="card"><h3>Video &amp; audio</h3><p>Trim · Speed · Crop · Compress · Mute</p></div>
+        <div class="card"><h3>Video &amp; audio</h3><p>Trim · Split · Merge · Speed · Crop · Rotate · Compress · Mute</p></div>
       </div>
       <div class="split" style="margin-top:44px">
         <div>
@@ -383,7 +386,7 @@ footer a:hover { color: var(--ink); }
 // Hero wheel: the same rounded-wedge geometry as the app, drawn in SVG.
 const WHEELS = {
   convert: { title: "Convert", items: ["PNG", "HEIC", "WEBP", "PDF", "DOCX", "AVIF", "TIFF", "ZIP"] },
-  tools: { title: "Tools", items: ["Crop", "Compress", "Annotate", "Redact", "Edit", "Metadata", "Add BG", "Read QR"] },
+  tools: { title: "Tools", items: ["Crop", "Resize", "Remove BG", "Compress", "Annotate", "Redact", "Edit", "Add BG"] },
   actions: { title: "Actions", items: ["Shelf", "AirDrop", "Copy", "Move", "Path", "Terminal"] },
 };
 const CX = 250, CY = 270, INNER = 76, OUTER = 196, GAP = 14, CORNER = 22;

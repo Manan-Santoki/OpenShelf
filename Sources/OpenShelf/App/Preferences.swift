@@ -11,6 +11,7 @@ final class Preferences {
         static let removeAfterDragOut = "removeAfterDragOut"
         static let restoresShelves = "restoresShelves"
         static let hidesDockedShelves = "hidesDockedShelves"
+        static let openWheelShortcut = "openWheelShortcut"
 
         static func trigger(_ kind: WheelKind) -> String {
             switch kind {
@@ -41,6 +42,11 @@ final class Preferences {
         didSet { defaults.set(hidesDockedShelves, forKey: Key.hidesDockedShelves) }
     }
 
+    /// The global shortcut that opens a wheel for Finder's selection; nil is off.
+    var openWheelShortcut: KeyCombo? {
+        didSet { defaults.set(Self.encode(openWheelShortcut), forKey: Key.openWheelShortcut) }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         var triggers: [WheelKind: NSEvent.ModifierFlags] = [:]
@@ -53,6 +59,23 @@ final class Preferences {
         removeAfterDragOut = defaults.bool(forKey: Key.removeAfterDragOut)
         restoresShelves = defaults.object(forKey: Key.restoresShelves) as? Bool ?? true
         hidesDockedShelves = defaults.object(forKey: Key.hidesDockedShelves) as? Bool ?? true
+        openWheelShortcut = Self.decode(defaults.string(forKey: Key.openWheelShortcut))
+    }
+
+    /// Stored as JSON, or "off" when the shortcut is turned off.
+    nonisolated static func encode(_ combo: KeyCombo?) -> String {
+        guard let combo, let data = try? JSONEncoder().encode(combo) else { return "off" }
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    /// Nothing stored (or something unreadable) means the default shortcut.
+    nonisolated static func decode(_ stored: String?) -> KeyCombo? {
+        guard let stored else { return .defaultOpenWheel }
+        guard stored != "off" else { return nil }
+        guard let combo = try? JSONDecoder().decode(KeyCombo.self, from: Data(stored.utf8)), combo.isValid else {
+            return .defaultOpenWheel
+        }
+        return combo
     }
 
     static func defaultTrigger(for kind: WheelKind) -> NSEvent.ModifierFlags {

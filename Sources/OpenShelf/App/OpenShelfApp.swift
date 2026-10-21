@@ -20,6 +20,7 @@ struct OpenShelfApp: App {
                 }
             }
             Divider()
+            openWheelButton
             Button("How to Use OpenShelf") { WelcomeView.present() }
             SettingsLink { Text("Settings…") }
                 .keyboardShortcut(",")
@@ -33,6 +34,16 @@ struct OpenShelfApp: App {
 
         Settings {
             SettingsView()
+        }
+    }
+
+    /// Shows the global shortcut next to the item when it can be expressed.
+    @ViewBuilder private var openWheelButton: some View {
+        let button = Button("Open Wheel for Finder Selection") { appDelegate.openWheelForFinderSelection() }
+        if let combo = Preferences.shared.openWheelShortcut, let key = combo.keyEquivalent {
+            button.keyboardShortcut(key, modifiers: combo.eventModifiers)
+        } else {
+            button
         }
     }
 }

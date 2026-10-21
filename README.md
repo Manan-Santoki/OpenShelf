@@ -9,12 +9,14 @@ the file on a wedge and it's done, saved right next to the original.
 
 <p align="center"><img src="docs/images/wheels.png" alt="The Convert, Tools and Actions wheels" width="900"></p>
 
-- **⇧ Convert wheel:** images, PDFs, documents, audio, video, subtitles and
-  archives into the formats that make sense for them (JPG, PNG, HEIC, AVIF,
-  WEBP, PDF, DOCX, TXT, MP3, WAV, GIF, ZIP, …)
-- **⇧⌥ Tools wheel:** for images — Crop, Add Background, Annotate, Redact,
-  Edit, Compress, Metadata, Read QR; for PDFs — Combine, Pages, Split,
-  Compress, Metadata; for video and audio — Trim, Speed, Crop, Compress, Mute
+- **⇧ Convert wheel:** images, PDFs, documents, spreadsheets, slides, audio,
+  video, subtitles and archives into the formats that make sense for them (JPG,
+  PNG, HEIC, AVIF, WEBP, PDF, DOCX, Markdown, EPUB, PPTX, XLSX, CSV, MP3, OGG,
+  MKV, WebM, GIF, ZIP, TAR.GZ, …)
+- **⇧⌥ Tools wheel:** for images — Crop, Resize, Remove Background, Add
+  Background, Annotate, Redact, Edit, Compress, Metadata, Read QR; for PDFs —
+  Combine, Pages, Split, Compress, Metadata; for video and audio — Trim,
+  Speed, Crop, Rotate, Split, Merge, Compress, Mute
 - **⌃ Actions wheel:** Shelf · Add to Shelf · AirDrop · Copy · Move · Copy Path · Terminal
 - **Shelves:** stacked preview, expandable grid/list, multi-select, drag out to
   any app, Quick Look (Space), dock to the left/right screen edge, multiple shelves
@@ -64,6 +66,13 @@ any app that lets you drag files, and **keep holding** while you tap a key.
    Return. (⌃ or ⌘ plus an arrow is a macOS shortcut, ⌃→ switches desktops,
    so the arrows wait until those keys are up.)
 
+**Without dragging:** select files in Finder and press **⌃⌥Space**. The Convert
+wheel opens at the pointer; use the arrow keys and **Return** (or click a
+wedge), **Tab** to switch to Tools and Actions, **Esc** to close. The first
+time, macOS asks whether OpenShelf may control Finder; that's only used to read
+which files are selected. Change or turn off the shortcut in Settings →
+Keyboard.
+
 Tip: on a trackpad, press the key *after* the drag has started. Holding ⌃
 before you click turns the click into a right-click.
 
@@ -78,27 +87,38 @@ A small card next to the pointer shows progress; click its **×** to cancel.
 
 | Drag a… | Convert to |
 |---|---|
-| Image (JPG, PNG, HEIC, …) | PNG, JPG, WEBP, HEIC, TIFF, AVIF, BMP, PDF, DOCX, ZIP |
-| PDF | DOCX, JPG, PNG, TXT, ZIP |
-| Document (TXT, RTF, DOCX, HTML, Markdown) | PDF, DOCX, TXT, RTF, HTML, ZIP |
-| Audio | MP3, M4A, WAV, AIFF, FLAC, ZIP |
-| Video | MP4, MOV, M4A, GIF, MP3, ZIP |
+| Image (JPG, PNG, HEIC, SVG, …) | PNG, JPG, WEBP, HEIC, TIFF, AVIF, BMP, PDF, DOCX, ZIP |
+| PDF | DOCX, JPG, PNG, TXT, Markdown, EPUB, PPTX, XLSX, ZIP |
+| Document (TXT, RTF, RTFD, DOCX, DOC, ODT, HTML, Markdown) | PDF, DOCX, TXT, Markdown, EPUB, HTML, RTF, ZIP |
+| Spreadsheet (CSV, TSV, XLSX) | XLSX, CSV, TSV, PDF, ODS¹, ZIP |
+| Spreadsheet (XLS, ODS)¹ | XLSX, CSV, PDF, ODS, ZIP |
+| Slides (PPTX, PPT, ODP)¹ | PDF, JPG, PNG (one image per slide), ZIP |
+| Audio (MP3, M4A, WAV, AIFF, FLAC, OGG², Opus², WMA², …) | MP3², M4A, WAV, AIFF, FLAC, OGG², Opus², WMA², ZIP |
+| Video (MP4, MOV, MKV², WebM², AVI², WMV², …) | MP4, MOV, M4A, GIF², MP3², MKV², WebM², AVI², WMV², ZIP |
 | Subtitles (SRT, VTT) | TXT, SRT, VTT, ZIP |
 | Archive (ZIP, TAR, GZ, 7Z, RAR) | Unzip into a folder |
-| Folder or anything else | ZIP |
+| Folder or anything else | ZIP, TAR, TAR.GZ |
 
 Drag several files at once to convert them all; mixed selections show only the
-formats every file supports. MP3, GIF and WebP need `brew install ffmpeg webp`.
+formats every file supports. Several files sent to ZIP, TAR or TAR.GZ go into
+one archive.
+
+¹ Needs LibreOffice: `brew install --cask libreoffice`. Without it, those wedges
+are hidden. Keynote files can't be converted.
+² Needs ffmpeg: `brew install ffmpeg` (`brew install webp` also adds WebP).
+Formats macOS can't play itself (OGG, Opus, WMA, MKV, WebM, AVI, WMV) are only
+offered when ffmpeg is installed. Apple's Pages format isn't offered.
 
 ### Tools (⇧⌥)
 
 | Drag a… | Tools |
 |---|---|
-| Image | **Compress** · **Metadata** · **Edit** · **Annotate** · **Add BG** · **Crop** · **Redact** · **Read QR** |
+| Image | **Compress** · **Metadata** · **Edit** · **Annotate** · **Add BG** · **Crop** · **Resize** · **Remove BG** · **Redact** · **Read QR** |
 | Several images or PDFs | **Combine** into one PDF |
 | PDF | **Pages** (reorder, rotate, delete) · **Split** · **Compress** · **Metadata** |
-| Video | **Trim** · **Speed** · **Crop** · **Compress** · **Mute** |
-| Audio | **Trim** · **Speed** |
+| Video | **Trim** · **Speed** · **Crop** · **Rotate** · **Split** · **Compress** · **Mute** |
+| Audio | **Trim** · **Speed** · **Split** |
+| Several videos, or several audio files | **Merge** into one file |
 
 Most tools open a small editor. Make your changes and press the button at the
 bottom right (or Return); a copy is saved next to the original with a suffix,
@@ -197,7 +217,7 @@ Sources/OpenShelf/
   Tools/          tool list, launcher, editor window host
   Tools/Editors/  image editors (crop, add background, annotate, …)
   Tools/PDF/      PDF tools (combine, pages, split, compress, metadata)
-  Tools/Media/    video and audio tools (trim, speed, crop, compress, mute)
+  Tools/Media/    video and audio tools (trim, speed, crop, rotate, split, merge, compress, mute)
   Shelf/          shelf model, floating panel, docking, layout
   Shelf/Views/    SwiftUI shelf UI and the AppKit drag source
   Support/        file actions, Quick Look

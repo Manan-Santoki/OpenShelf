@@ -51,6 +51,17 @@ enum MediaTools {
 
     /// The part of a video or audio file within `range`.
     static func trim(_ url: URL, range: CMTimeRange, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
+        try await exportRange(url, range: range, suffix: "Trimmed", progress: progress)
+    }
+
+    /// Writes `range` of a video or audio file as "<name> <suffix>", without
+    /// re-encoding when the container allows it.
+    static func exportRange(
+        _ url: URL,
+        range: CMTimeRange,
+        suffix: String,
+        progress: @escaping @Sendable (Double) -> Void
+    ) async throws -> URL {
         let asset = AVURLAsset(url: url)
         let isVideo = try await !asset.loadTracks(withMediaType: .video).isEmpty
         let session: AVAssetExportSession
@@ -70,7 +81,7 @@ enum MediaTools {
         }
 
         session.timeRange = range
-        let destination = OutputNaming.destination(for: url, suffix: "Trimmed", pathExtension: output.pathExtension)
+        let destination = OutputNaming.destination(for: url, suffix: suffix, pathExtension: output.pathExtension)
         try await export(session, to: destination, fileType: output.fileType, progress: progress)
         return destination
     }
@@ -261,7 +272,12 @@ enum MediaTools {
         fileType: AVFileType,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws {
-        session.outputURL = destination
+        // Write to a hidden file first and move it into place only when it's
+        // complete, so a cancelled or failed export never leaves a partial file
+        // where the user can see it (sessions can finish writing after a cancel).
+        let partial = destination.deletingLastPathComponent()
+            .appendingPathComponent(".openshelf-\(UUID().uuidString.prefix(8))-\(destination.lastPathComponent)")
+        session.outputURL = partial
         session.outputFileType = fileType
         // The session is thread-safe for these calls but isn't marked Sendable.
         let box = MediaExportBox(session: session)
@@ -282,14 +298,30 @@ enum MediaTools {
             box.session.cancelExport()
         }
         if Task.isCancelled {
-            try? FileManager.default.removeItem(at: destination)
+            discardPartial(partial)
             throw CancellationError()
         }
         guard box.session.status == .completed else {
-            try? FileManager.default.removeItem(at: destination)
+            discardPartial(partial)
             throw box.session.error ?? MediaToolError.failed("Export failed.")
         }
+        do {
+            try FileManager.default.moveItem(at: partial, to: destination)
+        } catch {
+            discardPartial(partial)
+            throw SaveError.from(error, writing: destination)
+        }
         progress(1)
+    }
+
+    /// Removes a partial export now and again shortly after, in case the
+    /// session was still finishing the file.
+    private static func discardPartial(_ url: URL) {
+        try? FileManager.default.removeItem(at: url)
+        Task.detached {
+            try? await Task.sleep(for: .seconds(2))
+            try? FileManager.default.removeItem(at: url)
+        }
     }
 
     /// Keeps MP4, M4V and MOV; anything else becomes MOV.

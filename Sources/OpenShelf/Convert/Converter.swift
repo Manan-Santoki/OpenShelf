@@ -39,6 +39,10 @@ enum Converter {
         switch format {
         case .zip:
             return [try await ArchiveConversion.zip([source])]
+        case .tar:
+            return [try await ArchiveConversion.tar([source], gzip: false)]
+        case .tgz:
+            return [try await ArchiveConversion.tar([source], gzip: true)]
         case .extract:
             return [try await ArchiveConversion.extract(source)]
         default:
@@ -52,6 +56,10 @@ enum Converter {
             return try PDFConversion.convert(source, to: format)
         case .document:
             return [try await DocumentConversion.convert(source, to: format)]
+        case .spreadsheet:
+            return try await SpreadsheetConversion.convert(source, to: format, tools: tools)
+        case .presentation:
+            return try await OfficeConversion.convert(source, to: format, tools: tools)
         case .audio, .video:
             return [try await MediaConversion.convert(source, to: format, tools: tools, progress: progress)]
         case .subtitle:

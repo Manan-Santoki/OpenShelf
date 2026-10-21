@@ -40,6 +40,16 @@ this spec; it does not contain or derive from any other app's code or assets.
   their own UI (shelf, AirDrop, Terminal) don't toast.
 - Stays on top of everything, on every Space, including full-screen apps.
 
+- Without a drag: a global shortcut (default ⌃⌥Space, set or turned off in
+  Settings → Keyboard; registered with Carbon hot keys, so no Accessibility
+  permission) opens the Convert wheel at the pointer for the files selected in
+  Finder (read over Apple Events, which asks for Automation permission once).
+  Arrows move the highlight (starting on the first wedge), Return runs it,
+  clicking a wedge runs it, Tab / ⇧Tab or tapping a wheel's trigger keys
+  switches wheels (the label above names the wheel), Esc or clicking elsewhere
+  closes. Starting a drag closes it. If Finder isn't in front or nothing is
+  selected, a toast says "Select files in Finder first".
+
 ### 2.1 Wheels
 
 | Wheel | Default trigger | Contents |
@@ -72,16 +82,27 @@ the pointer shows "Converting to JPG · 1 of 3 saved" with a cancel button.
 
 | Input | Outputs | Engine |
 |---|---|---|
-| Image | PNG, JPG, WEBP*, HEIC, TIFF, AVIF, BMP, PDF, DOCX, ZIP | ImageIO, PDF context, hand-built DOCX |
-| PDF | DOCX, JPG, PNG, TXT, ZIP | PDFKit (pages at 300 dpi; scanned PDFs become image DOCX) |
-| Text / RTF / DOCX / HTML / Markdown | PDF, DOCX, TXT, RTF, HTML, ZIP | NSAttributedString, AppKit printing |
-| Audio | MP3*, M4A, WAV, AIFF, FLAC, ZIP | AVFoundation, afconvert |
-| Video | MP4, MOV, M4A, GIF*, MP3*, ZIP | AVFoundation, ffmpeg |
+| Image (incl. SVG) | PNG, JPG, WEBP†, HEIC, TIFF, AVIF, BMP, PDF, DOCX, ZIP | ImageIO, PDF context, hand-built DOCX |
+| PDF | DOCX, JPG, PNG, TXT, MD, EPUB, PPTX, XLSX, ZIP | PDFKit (pages at 300 dpi; scanned PDFs become image DOCX/EPUB/PPTX; TXT/MD/XLSX refuse scans); hand-built EPUB 3, PresentationML (one picture per slide) and SpreadsheetML (one sheet per page, cells split at tabs/wide gaps) |
+| Text / RTF / RTFD / DOCX / DOC / ODT / HTML / Markdown | PDF, DOCX, TXT, MD, EPUB, HTML, RTF, ZIP | NSAttributedString, AppKit printing, Core Text; Markdown and EPUB from detected headings, lists, bold/italic and links |
+| CSV / TSV / XLSX | XLSX, CSV, TSV, PDF, ODS‡, ZIP | Built-in RFC 4180 parser, SpreadsheetML writer/reader, Core Text table PDF (landscape, repeated header) |
+| XLS / ODS | XLSX, CSV, PDF, ODS‡, ZIP | LibreOffice‡ |
+| PPTX / PPT / ODP | PDF‡, JPG‡, PNG‡, ZIP | LibreOffice‡ → PDF → page images ("Name Slide 2.jpg") |
+| Audio | MP3†, M4A, WAV, AIFF, FLAC, OGG†, OPUS†, WMA†, ZIP | AVFoundation, afconvert; ffmpeg† for MP3/OGG/Opus/WMA and for sources macOS can't decode (OGG, Opus, WMA, MKA, APE, AC3) |
+| Video | MP4, MOV, M4A, GIF†, MP3†, MKV†, WEBM†, AVI†, WMV†, ZIP | AVFoundation; ffmpeg† (H.264/AAC, VP9/Opus, MPEG-4/MP3, WMV2/WMA2; MKV copies streams when it can) and for sources macOS can't open (MKV, WebM, AVI, WMV, FLV, MPEG, …) |
 | SRT / VTT | TXT, SRT, VTT, ZIP | built in |
 | ZIP / TAR / GZ / 7Z / RAR | Unzip into a folder | ditto, bsdtar, gzip |
-| Folders, other files | ZIP | ditto / zip |
+| Folders, other files | ZIP, TAR, TAR.GZ | ditto / zip / bsdtar |
 
-\* Needs `ffmpeg` or `cwebp` (Homebrew); hidden when not installed.
+† Needs `ffmpeg` (or `cwebp` for WebP) from Homebrew; hidden when not installed.
+OGG uses Vorbis when ffmpeg has libvorbis, otherwise Opus in an Ogg container.
+Silent videos never offer audio outputs (MP4/MOV checked directly, other
+containers with ffprobe).
+‡ Needs LibreOffice (`brew install --cask libreoffice`), run headless with a
+private profile and a 120-second limit; hidden when not installed.
+
+Not offered: Apple Pages (private format) and Keynote (no converter can read it).
+Wheels hold at most 12 wedges (the largest, images, has 10).
 
 ### 2.4 Tools wheel
 
@@ -90,8 +111,8 @@ out of the drop point; saving writes a suffixed copy beside the original
 ("Name Cropped.jpg") and closes with a toast, so results can be dragged straight
 back into a wheel. One-click tools run with the progress toast instead.
 
-**Images:** Compress · Metadata · Edit · Annotate · Add BG · Crop · Redact ·
-Read QR (+ Combine for several files)
+**Images:** Compress · Metadata · Edit · Annotate · Add BG · Crop · Resize ·
+Remove BG · Redact · Read QR (+ Combine for several files)
 
 - **Crop:** dimmed outside area, 8 handles, aspect presets (Free, 1:1, 16:9,
   9:16, 4:3, 3:4), live W × H fields in px. Reset / Apply.
@@ -107,14 +128,32 @@ Read QR (+ Combine for several files)
   result size; several images at once.
 - **Metadata:** grouped EXIF/GPS/camera details with a location warning; remove
   all metadata into a clean copy; several images at once.
+- **Resize:** by percent, longest side (presets 1080, 1920, 3840 px) or exact
+  W × H with proportions locked or free; never enlarges unless "Allow
+  enlarging" is on; Lanczos scaling; same format, metadata kept with the new
+  dimensions; several images at once ("Name Resized.jpg").
+- **Remove BG:** Vision foreground segmentation cuts out the subject(s);
+  before/after preview on a checkerboard; saves a transparent PNG ("Name No
+  Background.png"); explains when no clear subject is found.
 - **Read QR** (one click): decodes QR and other 2D codes and copies the text.
 
 **PDFs:** Combine (PDFs and images, one click) · Pages (reorder, rotate,
 delete) · Split (every page, every N pages, or ranges) · Compress (light,
 balanced, strong) · Metadata (edit or remove).
 
-**Video:** Trim · Speed (0.25×–4×, optional pitch keeping) · Crop · Compress
-(resolution and quality) · Mute (one click). **Audio:** Trim · Speed.
+**Video:** Trim · Speed (0.25×–4×, optional pitch keeping) · Crop · Rotate
+(left, right, 180° without re-encoding; flip re-encodes) · Split · Compress
+(resolution and quality) · Mute (one click). **Audio:** Trim · Speed · Split.
+
+- **Split:** into 2–20 equal parts, every N seconds or minutes, or at chosen
+  times ("0:30, 1:15"); shows the parts before exporting; each part is
+  exported without re-encoding where the container allows ("Name Part 1.mp4").
+- **Merge** (several videos, or several audio files): reorder by dragging,
+  remove entries; videos join into "Merged.mp4" at the first clip's size, with
+  other shapes letterboxed and turned upright; audio joins into "Merged.m4a".
+
+Media exports are written to a hidden file and moved into place only when
+complete, so a cancelled or failed export never leaves a partial file.
 
 ## 3. Shelves
 

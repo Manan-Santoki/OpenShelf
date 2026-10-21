@@ -6,6 +6,47 @@ tags `v<version>` and publishes a GitHub release with that section as notes.
 
 Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
 
+## [1.1.0] - 2026-10-21
+
+The biggest update yet: many more formats, five new tools, and the wheel
+without dragging.
+
+### New
+
+- **Open the wheel without dragging.** Select files in Finder and press
+  **⌃⌥Space**: arrow keys choose, Tab switches between Convert, Tools and
+  Actions, Return runs it, Esc closes. Change or turn off the shortcut in
+  Settings → Keyboard. (macOS asks once for permission to read Finder's
+  selection.)
+- **New tools**
+  - **Resize** images, one or many: exact size, percentage or presets, without
+    accidental upscaling.
+  - **Remove Background** from photos of people, pets and objects, saved as a
+    transparent PNG.
+  - **Merge** several videos into one MP4, or several audio files into one M4A.
+  - **Split** a video or audio file into equal parts, every N seconds, or at
+    the times you choose.
+  - **Rotate** videos left, right, 180° (without re-encoding) or flip them.
+- **New conversions**
+  - Audio: **OGG, Opus, WMA**, and OGG/Opus/WMA/MKA files as input.
+  - Video: **MKV, WebM, AVI, WMV**, and those (plus FLV) as input.
+  - PDF → **PowerPoint, Excel, EPUB, Markdown**.
+  - Documents → **EPUB, Markdown**; RTFD documents as input.
+  - **Spreadsheets:** CSV ⇄ TSV ⇄ Excel (XLSX), and tables to PDF.
+  - **Slides:** PowerPoint (PPT/PPTX/ODP) → PDF, JPG, PNG, and Excel/ODS
+    conversions, when LibreOffice is installed.
+  - Archives: **TAR** and **TAR.GZ** alongside ZIP.
+
+### Improved
+
+- Cancelling a video or audio export never leaves a half-written file behind.
+- Tools aren't offered for MKV, WebM, AVI and other formats they can't edit;
+  you're told to convert to MP4 or M4A first.
+
+Audio/video formats beyond Apple's own need `brew install ffmpeg`; slides and
+ODS need `brew install --cask libreoffice`. Those wedges stay hidden until the
+tool is installed.
+
 ## [1.0.4] - 2026-10-21
 
 ### Fixed

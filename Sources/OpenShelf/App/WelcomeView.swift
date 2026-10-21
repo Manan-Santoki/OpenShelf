@@ -4,7 +4,7 @@ import SwiftUI
 /// First-launch introduction to the three drag gestures. Also available from
 /// the menu bar as "How to Use OpenShelf".
 struct WelcomeView: View {
-    static let windowSize = CGSize(width: 460, height: 560)
+    static let windowSize = CGSize(width: 460, height: 600)
     private static let shownKey = "hasShownWelcome"
 
     let actions: EditorActions
@@ -45,6 +45,11 @@ struct WelcomeView: View {
                 }
 
                 Text("Drop on a wedge to run it. Results are saved next to the original. Press Esc to cancel.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+
+                Text("No drag needed: select files in Finder and press \(Preferences.shared.openWheelShortcut?.displayString ?? "your shortcut (set it in Settings)").")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

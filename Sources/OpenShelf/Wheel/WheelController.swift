@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import Observation
 import SwiftUI
 
@@ -12,14 +13,19 @@ final class WheelModel {
     var dragSummary = ""
     /// A short instruction that replaces the label for a moment.
     var hint: String?
+    /// Which wheel is showing, named in the label when opened from the keyboard.
+    var wheelName: String?
     var isPresented = false
 }
 
-/// Owns the overlay panel that shows a wheel under the pointer during a drag.
+/// Owns the overlay panel that shows a wheel under the pointer during a drag,
+/// or, in keyboard mode, for files selected in Finder.
 @MainActor
 final class WheelController {
-    /// Called when files are dropped on a wedge.
+    /// Called when files are dropped on a wedge (or a wedge runs from the keyboard).
     var onDrop: ((WheelItem, [URL]) -> Void)?
+    /// Supplies each wheel's wedges for the files of a keyboard session.
+    var itemsProvider: ((WheelKind, [URL]) -> [WheelItem])?
 
     let model = WheelModel()
     private let dropView = WheelDropView()
@@ -36,6 +42,19 @@ final class WheelController {
     private var isAbsorbingDrop = false
     private var followTask: Task<Void, Never>?
     private var hintTask: Task<Void, Never>?
+    private var keyboardSession: KeyboardSession?
+    private var resignKeyObserver: (any NSObjectProtocol)?
+
+    /// A wheel opened by shortcut for Finder's selection, driven by keys and clicks.
+    private struct KeyboardSession {
+        let urls: [URL]
+        let itemsByKind: [WheelKind: [WheelItem]]
+        let available: [WheelKind]
+        var kind: WheelKind
+        var taps = ModifierTapTracker()
+    }
+
+    var isInKeyboardMode: Bool { keyboardSession != nil }
 
     /// Shows `items` around `location`, or swaps them in place if the wheel is
     /// already open (e.g. when ⌥ is added to switch from Convert to Tools).
@@ -46,6 +65,7 @@ final class WheelController {
         model.highlighted = nil
         model.dragSummary = ""
         model.hint = nil
+        model.wheelName = nil
         summarizedURLs = []
         hasHoverReading = false
         endAbsorbingDrop()
@@ -65,6 +85,7 @@ final class WheelController {
     /// Hides the wheel. The short default delay lets a drop that coincides with
     /// the mouse-up reach the panel before it disappears.
     func dismiss(after delay: Duration = .milliseconds(200)) {
+        endKeyboardMode()
         guard panel.isVisible else { return }
         dismissTask?.cancel()
         dismissTask = Task { [weak self] in
@@ -106,6 +127,122 @@ final class WheelController {
         absorbNextDrop()
         onDrop?(item, urls)
         return true
+    }
+
+    // MARK: Keyboard mode
+
+    /// Opens a wheel for `urls` (e.g. Finder's selection) that is driven by the
+    /// keyboard or clicks instead of a drag: arrows choose, Return runs, Tab or
+    /// a trigger tap switches wheels, Esc or a click elsewhere closes. Returns
+    /// false when no wheel has anything for these files.
+    @discardableResult
+    func presentForKeyboard(urls: [URL], at location: NSPoint) -> Bool {
+        guard let itemsProvider, !urls.isEmpty else { return false }
+        var itemsByKind: [WheelKind: [WheelItem]] = [:]
+        for kind in WheelCycle.order {
+            itemsByKind[kind] = itemsProvider(kind, urls)
+        }
+        let available = WheelCycle.available { !(itemsByKind[$0] ?? []).isEmpty }
+        guard let first = available.first else { return false }
+
+        endKeyboardMode(hidingWheel: true)
+        keyboardSession = KeyboardSession(urls: urls, itemsByKind: itemsByKind, available: available, kind: first)
+        showKeyboardWheel(first, at: location)
+
+        dropView.isKeyboardMode = true
+        panel.acceptsKeyboard = true
+        panel.keyHandler = { [weak self] event in self?.handleKey(event) ?? false }
+        panel.makeKeyAndOrderFront(nil)
+        if !panel.isKeyWindow {
+            NSApp.activate()
+            panel.makeKey()
+        }
+        resignKeyObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didResignKeyNotification, object: panel, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                // Clicking anywhere else closes the wheel.
+                guard let self, self.isInKeyboardMode else { return }
+                self.dismiss(after: .zero)
+            }
+        }
+        let hint = available.count > 1 ? "Arrows choose · Return runs · Tab switches wheel" : "Arrows choose · Return runs"
+        showHint(hint)
+        return true
+    }
+
+    /// Leaves keyboard mode. A drag-triggered wheel calls this with
+    /// `hidingWheel` so it starts fresh under the pointer.
+    func endKeyboardMode(hidingWheel: Bool = false) {
+        guard keyboardSession != nil else { return }
+        keyboardSession = nil
+        dropView.isKeyboardMode = false
+        panel.acceptsKeyboard = false
+        panel.keyHandler = nil
+        model.wheelName = nil
+        if let resignKeyObserver {
+            NotificationCenter.default.removeObserver(resignKeyObserver)
+        }
+        resignKeyObserver = nil
+        if panel.isKeyWindow {
+            panel.resignKey()
+        }
+        if hidingWheel {
+            dismissTask?.cancel()
+            model.isPresented = false
+            model.highlighted = nil
+            panel.orderOut(nil)
+        }
+    }
+
+    private func showKeyboardWheel(_ kind: WheelKind, at location: NSPoint? = nil) {
+        guard var session = keyboardSession, let items = session.itemsByKind[kind] else { return }
+        session.kind = kind
+        keyboardSession = session
+        present(items, at: location ?? NSPoint(x: panel.frame.midX, y: panel.frame.midY))
+        updateSummary(for: session.urls)
+        model.wheelName = kind.shortTitle
+        // Start on the first wedge so Return does something straight away.
+        setHighlight(items.first)
+    }
+
+    private func handleKey(_ event: NSEvent) -> Bool {
+        guard var session = keyboardSession else { return false }
+        if event.type == .flagsChanged {
+            let tapped = session.taps.flagsChanged(event.modifierFlags)
+            keyboardSession = session
+            if let tapped,
+               let kind = TriggerMatcher(triggers: Preferences.shared.triggers).wheel(for: tapped),
+               session.available.contains(kind), kind != session.kind {
+                showKeyboardWheel(kind)
+            }
+            return true
+        }
+        session.taps.keyPressed()
+        keyboardSession = session
+        switch Int(event.keyCode) {
+        case kVK_RightArrow, kVK_DownArrow:
+            step(.clockwise)
+        case kVK_LeftArrow, kVK_UpArrow:
+            step(.counterClockwise)
+        case kVK_Return, kVK_ANSI_KeypadEnter:
+            runHighlighted()
+        case kVK_Escape:
+            dismiss(after: .zero)
+        case kVK_Tab:
+            if let next = WheelCycle.next(after: session.kind, in: session.available, backwards: event.modifierFlags.contains(.shift)) {
+                showKeyboardWheel(next)
+            }
+        default:
+            return false
+        }
+        return true
+    }
+
+    private func runHighlighted() {
+        guard let session = keyboardSession, let item = model.highlighted else { return }
+        dismiss(after: .zero)
+        onDrop?(item, session.urls)
     }
 
     /// Hides the wheel but keeps its panel, invisible, centred under the pointer
@@ -163,9 +300,9 @@ final class WheelController {
         model.dragSummary = urls.count == 1 ? size : "\(urls.count) · \(size)"
     }
 
-    private func makePanel() -> NSPanel {
+    private func makePanel() -> WheelPanel {
         let side = WheelGeometry.panelSide
-        let panel = NSPanel(
+        let panel = WheelPanel(
             contentRect: NSRect(x: 0, y: 0, width: side, height: side),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
@@ -177,6 +314,7 @@ final class WheelController {
         panel.backgroundColor = .clear
         panel.hasShadow = false
         panel.hidesOnDeactivate = false
+        panel.acceptsMouseMovedEvents = true
 
         dropView.onHover = { [weak self] wedge, urls in
             guard let self else { return }
@@ -194,6 +332,22 @@ final class WheelController {
         dropView.onAbsorbedDrop = { [weak self] in
             self?.dismiss(after: .zero)
         }
+        dropView.onPointerMoved = { [weak self] wedge in
+            guard let self, isInKeyboardMode else { return }
+            guard !hasHoverReading || wedge != lastHoverWedge else { return }
+            hasHoverReading = true
+            lastHoverWedge = wedge
+            if let wedge { setHighlight(model.items[safe: wedge]) }
+        }
+        dropView.onClick = { [weak self] wedge in
+            guard let self, isInKeyboardMode else { return }
+            guard let wedge, let item = model.items[safe: wedge] else {
+                dismiss(after: .zero)
+                return
+            }
+            setHighlight(item)
+            runHighlighted()
+        }
 
         // Size the container first: autoresizing can't grow a subview from a zero-sized superview.
         dropView.frame = NSRect(x: 0, y: 0, width: side, height: side)
@@ -207,7 +361,30 @@ final class WheelController {
     }
 }
 
-/// Container view that receives the file drag and hit-tests it against the wedges.
+/// The wheel's window. It only takes keyboard focus in keyboard mode, so a
+/// wheel shown mid-drag never takes focus from the app being dragged from.
+final class WheelPanel: NSPanel {
+    var acceptsKeyboard = false
+    /// Return true when the key or modifier event was handled.
+    var keyHandler: ((NSEvent) -> Bool)?
+
+    override var canBecomeKey: Bool { acceptsKeyboard }
+
+    override func keyDown(with event: NSEvent) {
+        if keyHandler?(event) != true {
+            super.keyDown(with: event)
+        }
+    }
+
+    override func flagsChanged(with event: NSEvent) {
+        if keyHandler?(event) != true {
+            super.flagsChanged(with: event)
+        }
+    }
+}
+
+/// Container view that receives the file drag and hit-tests it against the
+/// wedges; in keyboard mode it also handles hover and clicks.
 final class WheelDropView: NSView {
     var geometry = WheelGeometry(wedgeCount: 0)
     var onHover: ((Int?, [URL]) -> Void)?
@@ -215,6 +392,11 @@ final class WheelDropView: NSView {
     /// While set, any drop is accepted and discarded (see `absorbNextDrop`).
     var isAbsorbingDrop = false
     var onAbsorbedDrop: (() -> Void)?
+    /// Set while the wheel was opened from the keyboard rather than a drag.
+    var isKeyboardMode = false
+    var onPointerMoved: ((Int?) -> Void)?
+    /// Called with the clicked wedge, or nil for a click outside the wedges.
+    var onClick: ((Int?) -> Void)?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -254,8 +436,43 @@ final class WheelDropView: NSView {
     }
 
     private func wedge(for info: any NSDraggingInfo) -> Int? {
-        let point = convert(info.draggingLocation, from: nil)
+        wedge(atWindowPoint: info.draggingLocation)
+    }
+
+    private func wedge(atWindowPoint windowPoint: NSPoint) -> Int? {
+        let point = convert(windowPoint, from: nil)
         return geometry.wedge(at: point, center: CGPoint(x: bounds.midX, y: bounds.midY))
+    }
+
+    // MARK: Keyboard mode pointer handling
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        // Take clicks before the SwiftUI content; drags are unaffected.
+        guard isKeyboardMode else { return super.hitTest(point) }
+        return frame.contains(point) ? self : nil
+    }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        for area in trackingAreas {
+            removeTrackingArea(area)
+        }
+        addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseMoved, .activeAlways, .inVisibleRect], owner: self))
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        guard isKeyboardMode else { return }
+        onPointerMoved?(wedge(atWindowPoint: event.locationInWindow))
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard isKeyboardMode else {
+            super.mouseDown(with: event)
+            return
+        }
+        onClick?(wedge(atWindowPoint: event.locationInWindow))
     }
 
     private func fileURLs(in info: any NSDraggingInfo) -> [URL] {

@@ -6,6 +6,8 @@ enum FileKind: Hashable {
     case image
     case pdf
     case document
+    case spreadsheet
+    case presentation
     case audio
     case video
     case subtitle
@@ -16,14 +18,16 @@ enum FileKind: Hashable {
     init(url: URL) {
         // Classify what a symlink points to, not the link itself.
         let url = url.resolvingSymlinksInPath()
+        let extensionName = url.pathExtension.lowercased()
+        // Formats the system types don't describe well (or at all) go by name.
+        // RTFD is a folder on disk but a document to people.
+        if let kind = Self.kindsByExtension[extensionName] {
+            self = kind
+            return
+        }
         let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .contentTypeKey])
         if values?.isDirectory == true {
             self = .folder
-            return
-        }
-        let extensionName = url.pathExtension.lowercased()
-        if ["srt", "vtt"].contains(extensionName) {
-            self = .subtitle
             return
         }
         var type = values?.contentType ?? UTType(filenameExtension: extensionName)
@@ -38,8 +42,22 @@ enum FileKind: Hashable {
         self = Self.kind(of: type)
     }
 
+    /// Extensions classified before asking the system: subtitles, spreadsheets
+    /// whose types conform to plain text (CSV), and media containers that
+    /// macOS doesn't play itself.
+    static let kindsByExtension: [String: FileKind] = {
+        var kinds: [String: FileKind] = ["srt": .subtitle, "vtt": .subtitle, "rtfd": .document]
+        for ext in ["csv", "tsv", "xlsx", "xls", "ods"] { kinds[ext] = .spreadsheet }
+        for ext in ["ppt", "pptx", "odp", "key"] { kinds[ext] = .presentation }
+        for ext in MediaFormats.ffmpegOnlyVideoExtensions { kinds[ext] = .video }
+        for ext in MediaFormats.ffmpegOnlyAudioExtensions { kinds[ext] = .audio }
+        return kinds
+    }()
+
     static func kind(of type: UTType) -> FileKind {
         if type.conforms(to: .pdf) { return .pdf }
+        if type.conforms(to: .spreadsheet) { return .spreadsheet }
+        if type.conforms(to: .presentation) { return .presentation }
         if type.conforms(to: .image) { return .image }
         if type.conforms(to: .movie) || type.conforms(to: .video) { return .video }
         if type.conforms(to: .audio) { return .audio }
@@ -90,6 +108,11 @@ enum FileSniffer {
         if ascii("ID3") || starts(with: [0xFF, 0xFB]) { return .mp3 }
         if ascii("fLaC") { return UTType("org.xiph.flac") ?? .audio }
         if ascii("OggS") { return .audio }
+        // Matroska and WebM (EBML), AVI, ASF (WMV/WMA) and Flash video.
+        if starts(with: [0x1A, 0x45, 0xDF, 0xA3]) { return .movie }
+        if ascii("RIFF") && ascii("AVI ", at: 8) { return .avi }
+        if starts(with: [0x30, 0x26, 0xB2, 0x75, 0x8E, 0x66, 0xCF, 0x11]) { return .movie }
+        if ascii("FLV") { return .movie }
         if starts(with: [0x50, 0x4B, 0x03, 0x04]) { return .zip }
         if starts(with: [0x1F, 0x8B]) { return .gzip }
         if ascii("ftyp", at: 4), bytes.count >= 12 {

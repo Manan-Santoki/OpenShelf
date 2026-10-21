@@ -8,7 +8,7 @@ struct FileToolTests {
     }
 
     @Test func imagesGetTheVideoToolOrderPlusReadQR() {
-        #expect(FileTool.available(for: urls("a.jpg")) == [.compress, .metadata, .edit, .annotate, .addBackground, .crop, .redact, .readQR])
+        #expect(FileTool.available(for: urls("a.jpg")) == [.compress, .metadata, .edit, .annotate, .addBackground, .crop, .resize, .removeBackground, .redact, .readQR])
     }
 
     @Test func severalImagesCanBeCombined() {
@@ -28,8 +28,25 @@ struct FileToolTests {
     }
 
     @Test func mediaTools() {
-        #expect(FileTool.available(for: urls("a.mov")) == [.trim, .speed, .cropVideo, .compressVideo, .mute])
-        #expect(FileTool.available(for: urls("a.mp3")) == [.trim, .speed])
+        #expect(FileTool.available(for: urls("a.mov")) == [.trim, .speed, .cropVideo, .rotateVideo, .splitMedia, .compressVideo, .mute])
+        #expect(FileTool.available(for: urls("a.mp3")) == [.trim, .speed, .splitMedia])
+    }
+
+    @Test func severalMediaFilesCanBeMerged() {
+        #expect(FileTool.available(for: urls("a.mov", "b.mp4")).first == .mergeMedia)
+        #expect(FileTool.available(for: urls("a.mp3", "b.m4a")) == [.mergeMedia, .trim, .speed, .splitMedia])
+        #expect(!FileTool.available(for: urls("a.mov", "b.mp3")).contains(.mergeMedia))
+    }
+
+    @Test func mediaToolsOnlyForFormatsTheMediaFrameworkEdits() {
+        for name in ["a.mkv", "a.webm", "a.avi", "a.wmv", "a.flv", "a.wma"] {
+            #expect(FileTool.available(for: urls(name)).isEmpty, "\(name) should not offer tools")
+            #expect(FileTool.needsConversionForTools(urls(name)))
+        }
+        #expect(FileTool.available(for: urls("a.mp4", "b.mkv")).isEmpty)
+        #expect(!FileTool.available(for: urls("a.ogg")).isEmpty)
+        #expect(!FileTool.needsConversionForTools(urls("a.mp4")))
+        #expect(!FileTool.needsConversionForTools(urls("a.jpg")))
     }
 
     @Test func otherFilesHaveNoTools() {

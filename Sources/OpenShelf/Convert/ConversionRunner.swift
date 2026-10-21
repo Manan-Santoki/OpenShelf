@@ -13,16 +13,20 @@ final class ConversionRunner {
 
     func convert(_ urls: [URL], to format: OutputFormat, near location: NSPoint = NSEvent.mouseLocation) {
         let tools = ExternalTools.detect()
+        let isArchive = [.zip, .tar, .tgz].contains(format)
         let title = switch format {
-        case .zip: "Compressing to ZIP"
+        case .zip, .tar, .tgz: "Compressing to \(format.title)"
         case .extract: "Extracting"
         default: "Converting to \(format.title)"
         }
-        // Several files zip into one archive; everything else converts per file.
-        let jobs: [[URL]] = format == .zip ? [urls] : urls.map { [$0] }
+        // Several files go into one archive; everything else converts per file.
+        let jobs: [[URL]] = isArchive ? [urls] : urls.map { [$0] }
         run(title: title, jobs: jobs, savedSubtitle: format == .extract ? nil : "as \(format.title)", near: location) { sources, progress in
-            if format == .zip {
-                return [try await ArchiveConversion.zip(sources)]
+            switch format {
+            case .zip: return [try await ArchiveConversion.zip(sources)]
+            case .tar: return [try await ArchiveConversion.tar(sources, gzip: false)]
+            case .tgz: return [try await ArchiveConversion.tar(sources, gzip: true)]
+            default: break
             }
             return try await Converter.convert(sources[0], to: format, tools: tools, progress: progress)
         }

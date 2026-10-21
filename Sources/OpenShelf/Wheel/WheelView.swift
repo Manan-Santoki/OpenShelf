@@ -36,7 +36,7 @@ struct WheelView: View {
 
             // The dragged file's thumbnail sits over the hub, so the same label
             // also floats above the rim where nothing covers it.
-            LabelPill(text: model.hint ?? hubTitle, isActive: model.highlighted != nil && model.hint == nil)
+            LabelPill(text: model.hint ?? pillTitle, isActive: model.highlighted != nil && model.hint == nil)
                 .offset(y: -(geometry.outerRadius + rimWidth + 20))
         }
         .frame(width: WheelGeometry.panelSide, height: WheelGeometry.panelSide)
@@ -44,6 +44,11 @@ struct WheelView: View {
         .opacity(model.isPresented ? 1 : 0)
         .animation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.38, dampingFraction: 0.7), value: model.isPresented)
         .animation(.spring(response: 0.24, dampingFraction: 0.72), value: model.highlighted)
+    }
+
+    /// Names the wheel too when it was opened from the keyboard.
+    private var pillTitle: String {
+        model.wheelName.map { "\($0) · \(hubTitle)" } ?? hubTitle
     }
 
     private var hubTitle: String {

@@ -13,6 +13,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         wheel.onDrop = { [weak self] item, urls in
             self?.perform(item.command, on: urls)
         }
+        wheel.itemsProvider = { [weak self] kind, urls in
+            self?.items(for: kind, urls: urls) ?? []
+        }
+        GlobalHotKey.shared.onPress = { [weak self] in
+            self?.openWheelForFinderSelection()
+        }
+        GlobalHotKey.shared.register(Preferences.shared.openWheelShortcut)
         dragMonitor.onTrigger = { [weak self] kind, location, urls in
             self?.showWheel(kind, at: location, for: urls)
         }
@@ -40,10 +47,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         shelves.saveNow()
     }
 
+    /// Opens a keyboard-driven wheel for the files selected in Finder.
+    func openWheelForFinderSelection() {
+        let location = NSEvent.mouseLocation
+        let outcome = FinderSelection.resolve(frontmostBundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier) {
+            try FinderSelection.fetchFromFinder()
+        }
+        if case .files(let urls) = outcome {
+            if !wheel.presentForKeyboard(urls: urls, at: location) {
+                ToastController.shared.show(Toast(systemImage: "nosign", title: "Nothing to do with these files"), near: location)
+            }
+            return
+        }
+        if let toast = FinderSelection.toast(for: outcome) {
+            ToastController.shared.show(toast, near: location, for: .seconds(outcome == .notPermitted ? 5 : 2))
+        }
+        if outcome == .notPermitted, let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
     private func showWheel(_ kind: WheelKind, at location: NSPoint, for urls: [URL]) {
+        // A drag always gets a fresh wheel under the pointer.
+        wheel.endKeyboardMode(hidingWheel: true)
         let items = items(for: kind, urls: urls)
         guard !items.isEmpty else {
             wheel.dismiss(after: .zero)
+            if kind == .tools, FileTool.needsConversionForTools(urls) {
+                // MKV, WebM, AVI and friends convert fine but can't be edited directly.
+                ToastController.shared.show(
+                    Toast(systemImage: "arrow.triangle.2.circlepath", title: "Convert to MP4 or M4A first", subtitle: "Tools work on MP4, MOV and M4A. Tap ⇧ to convert."),
+                    near: location,
+                    for: .seconds(3)
+                )
+                return
+            }
             let title = kind == .convert ? "No conversions for this file" : "No tools for this file yet"
             ToastController.shared.show(Toast(systemImage: "nosign", title: title), near: location)
             return

@@ -13,6 +13,40 @@ enum MediaProbe {
         return handlerTypes(inMovieBox: moov).contains("soun")
     }
 
+    /// Like `hasAudioTrack(_:)`, falling back to ffprobe for containers other
+    /// than MP4/MOV (MKV, WebM, AVI, …). Nil when neither can tell.
+    static func hasAudioTrack(_ url: URL, ffprobe: URL?) -> Bool? {
+        if let answer = hasAudioTrack(url) { return answer }
+        guard let ffprobe, let output = runSync(ffprobe, ["-v", "error", "-select_streams", "a", "-show_entries", "stream=index", "-of", "csv=p=0", url.path]) else {
+            return nil
+        }
+        return !output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// The duration in seconds reported by ffprobe, or nil.
+    static func duration(of url: URL, ffprobe: URL?) -> Double? {
+        guard let ffprobe, let output = runSync(ffprobe, ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", url.path]) else {
+            return nil
+        }
+        return Double(output.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    /// Runs a quick probe and returns its standard output, or nil on failure.
+    /// Only for short-lived tools: it blocks until the process exits.
+    static func runSync(_ executable: URL, _ arguments: [String]) -> String? {
+        let process = Process()
+        process.executableURL = executable
+        process.arguments = arguments
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        guard (try? process.run()) != nil else { return nil }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else { return nil }
+        return String(decoding: data, as: UTF8.self)
+    }
+
     /// Finds a top-level box by walking box headers, reading only the match.
     private static func topLevelBox(named name: String, in handle: FileHandle, limit: UInt64 = 64 << 20) -> Data? {
         var offset: UInt64 = 0
@@ -57,6 +91,43 @@ enum MediaProbe {
             }
         }
         return types
+    }
+}
+
+/// Which media containers macOS can open itself, and which need ffmpeg.
+enum MediaFormats {
+    /// Video containers AVFoundation can't read.
+    static let ffmpegOnlyVideoExtensions: Set<String> = ["mkv", "webm", "avi", "wmv", "flv", "asf", "ogv", "mpg", "mpeg", "m2ts", "mts", "vob", "rm", "rmvb"]
+    /// Audio containers AVFoundation can't read.
+    static let ffmpegOnlyAudioExtensions: Set<String> = ["ogg", "oga", "opus", "wma", "mka", "ape", "ac3", "wv", "spx"]
+
+    /// Whether AVFoundation (and afconvert) can decode the file; otherwise
+    /// every conversion of it goes through ffmpeg.
+    static func isAVFoundationReadable(_ url: URL) -> Bool {
+        let ext = url.resolvingSymlinksInPath().pathExtension.lowercased()
+        return !ffmpegOnlyVideoExtensions.contains(ext) && !ffmpegOnlyAudioExtensions.contains(ext)
+    }
+}
+
+/// The encoders an ffmpeg build offers, asked once per binary.
+enum FFmpegEncoders {
+    private final class Cache: @unchecked Sendable {
+        let lock = NSLock()
+        var encoders: [String: Set<String>] = [:]
+    }
+    private static let cache = Cache()
+
+    static func available(in ffmpeg: URL) -> Set<String> {
+        if let known = cache.lock.withLock({ cache.encoders[ffmpeg.path] }) { return known }
+        let output = MediaProbe.runSync(ffmpeg, ["-hide_banner", "-encoders"]) ?? ""
+        // Lines look like " A....D libopus   libopus Opus (codec opus)".
+        let names = Set(output.split(separator: "\n").compactMap { line -> String? in
+            let fields = line.split(separator: " ", omittingEmptySubsequences: true)
+            guard fields.count >= 2, fields[0].count == 6 else { return nil }
+            return String(fields[1])
+        })
+        cache.lock.withLock { cache.encoders[ffmpeg.path] = names }
+        return names
     }
 }
 

@@ -1,3 +1,4 @@
+import Carbon.HIToolbox
 import ServiceManagement
 import SwiftUI
 
@@ -28,6 +29,18 @@ struct SettingsView: View {
                 Text("Wheels")
             } footer: {
                 Text("Start dragging any file, then tap the keys to open a wheel. Drop on a wedge to run it, or press Esc to cancel.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                LabeledContent("Open a wheel for Finder's selection") {
+                    ShortcutRecorder(combo: $preferences.openWheelShortcut)
+                }
+            } header: {
+                Text("Keyboard")
+            } footer: {
+                Text("Select files in Finder and press the shortcut. Arrows choose, Return runs, Tab switches wheels, Esc closes.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -109,5 +122,76 @@ private struct TriggerPicker: View {
                 flags = updated
             }
         }
+    }
+}
+
+/// Records a global shortcut: click, then press a key with ⌃, ⌥ or ⌘.
+private struct ShortcutRecorder: View {
+    @Binding var combo: KeyCombo?
+    @State private var isRecording = false
+    @State private var monitor: Any?
+    @State private var problem: String?
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 4) {
+            HStack(spacing: 6) {
+                Button(isRecording ? "Type a shortcut…" : (combo?.displayString ?? "Off")) {
+                    isRecording ? stopRecording() : startRecording()
+                }
+                .help("Click, then press a key together with ⌃, ⌥ or ⌘. Esc cancels.")
+                .accessibilityLabel(isRecording ? "Recording shortcut" : "Shortcut \(combo?.displayString ?? "off")")
+                if combo != .defaultOpenWheel {
+                    Button("Default") { apply(.defaultOpenWheel) }
+                }
+                if combo != nil {
+                    Button("Turn Off") { apply(nil) }
+                }
+            }
+            if let problem {
+                Text(problem)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+        .onDisappear { if isRecording { stopRecording() } }
+    }
+
+    private func startRecording() {
+        problem = nil
+        isRecording = true
+        // Pause the live shortcut so pressing it here records it instead.
+        GlobalHotKey.shared.register(nil)
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            MainActor.assumeIsolated {
+                if Int(event.keyCode) == kVK_Escape {
+                    stopRecording()
+                    return
+                }
+                let candidate = KeyCombo(event: event)
+                if candidate.isValid {
+                    apply(candidate)
+                    stopRecording()
+                } else {
+                    problem = "Include ⌃, ⌥ or ⌘ in the shortcut."
+                }
+            }
+            return nil
+        }
+    }
+
+    private func stopRecording() {
+        if let monitor {
+            NSEvent.removeMonitor(monitor)
+        }
+        monitor = nil
+        isRecording = false
+        if !GlobalHotKey.shared.register(combo) {
+            problem = "Another app already uses that shortcut."
+        }
+    }
+
+    private func apply(_ newCombo: KeyCombo?) {
+        combo = newCombo
+        problem = GlobalHotKey.shared.register(newCombo) ? nil : "Another app already uses that shortcut."
     }
 }

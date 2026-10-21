@@ -38,6 +38,29 @@ enum ArchiveConversion {
         return destination
     }
 
+    /// A tar archive (gzip-compressed when `gzip` is true) of one file or folder
+    /// ("<name>.tar.gz"), or of several ("Archive.tar.gz" next to the first).
+    static func tar(_ sources: [URL], gzip: Bool) async throws -> URL {
+        guard let first = sources.first else { throw ConversionError.failed("Nothing to archive.") }
+        let directory = first.deletingLastPathComponent()
+        let pathExtension = gzip ? "tar.gz" : "tar"
+        let baseName = sources.count == 1 ? first.lastPathComponent : "Archive"
+        let destination = OutputNaming.uniqueURL(in: directory, baseName: baseName, pathExtension: pathExtension)
+        // Paths relative to the first file's folder keep the structure; files from
+        // elsewhere are added with their full path (bsdtar strips the leading /).
+        let names = sources.map { $0.deletingLastPathComponent().path == directory.path ? $0.lastPathComponent : $0.path }
+        do {
+            try await ProcessRunner.run(
+                tar,
+                [gzip ? "-czf" : "-cf", destination.path, "--no-mac-metadata", "-C", directory.path] + names
+            )
+        } catch {
+            try? FileManager.default.removeItem(at: destination)
+            throw FailureMessage.describe(error, source: first)
+        }
+        return destination
+    }
+
     /// Extracts into a new folder named after the archive.
     static func extract(_ source: URL) async throws -> URL {
         let name = source.lastPathComponent.lowercased()

@@ -9,7 +9,7 @@ enum ToolLauncher {
         let runner = ConversionRunner.shared
 
         switch tool {
-        case .compress, .metadata, .edit, .annotate, .addBackground, .crop, .redact:
+        case .compress, .metadata, .edit, .annotate, .addBackground, .crop, .resize, .removeBackground, .redact:
             openImageEditor(tool, with: urls, near: location)
 
         case .readQR:
@@ -57,6 +57,14 @@ enum ToolLauncher {
             EditorWindowController.present(size: VideoCropEditor.windowSize, near: location) { VideoCropEditor(url: first, actions: $0) }
         case .compressVideo:
             EditorWindowController.present(size: VideoCompressEditor.windowSize, near: location) { VideoCompressEditor(urls: urls, actions: $0) }
+        case .mergeMedia:
+            EditorWindowController.present(size: MediaMergeEditor.windowSize, near: location) { MediaMergeEditor(urls: urls, actions: $0) }
+        case .splitMedia:
+            showOneFileNote(tool, urls: urls)
+            EditorWindowController.present(size: MediaSplitEditor.windowSize, near: location) { MediaSplitEditor(url: first, actions: $0) }
+        case .rotateVideo:
+            showOneFileNote(tool, urls: urls)
+            EditorWindowController.present(size: VideoRotateEditor.windowSize, near: location) { VideoRotateEditor(url: first, actions: $0) }
         }
     }
 
@@ -69,7 +77,7 @@ enum ToolLauncher {
             return
         }
         guard let first = images.first else { return }
-        if tool != .compress && tool != .metadata {
+        if tool != .compress && tool != .metadata && tool != .resize {
             showOneFileNote(tool, urls: urls)
         }
 
@@ -88,6 +96,10 @@ enum ToolLauncher {
             EditorWindowController.present(size: CompressEditor.windowSize, near: location) { CompressEditor(images: images, actions: $0) }
         case .metadata:
             EditorWindowController.present(size: MetadataEditor.windowSize, near: location) { MetadataEditor(images: images, actions: $0) }
+        case .resize:
+            EditorWindowController.present(size: ResizeEditor.windowSize, near: location) { ResizeEditor(images: images, actions: $0) }
+        case .removeBackground:
+            EditorWindowController.present(size: RemoveBackgroundEditor.windowSize, near: location) { RemoveBackgroundEditor(image: first, actions: $0) }
         default:
             break
         }
