@@ -1,5 +1,6 @@
 // Renders the background of the installer disk image to Support/dmg-background.png
 // (and @2x). The app icon sits at (150, 190) and Applications at (450, 190).
+// Finder draws the icon labels in dark text, so the background stays light.
 // Usage: swift scripts/make-dmg-background.swift  (run from the repository root)
 import AppKit
 import SwiftUI
@@ -7,22 +8,22 @@ import SwiftUI
 struct Background: View {
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Color(white: 0.13), Color(white: 0.06)], startPoint: .top, endPoint: .bottom)
+            LinearGradient(colors: [Color(white: 0.99), Color(white: 0.93)], startPoint: .top, endPoint: .bottom)
 
             VStack(spacing: 6) {
                 Text("Install OpenShelf")
                     .font(.system(size: 22, weight: .bold))
                 Text("Drag the app onto the Applications folder")
                     .font(.system(size: 13))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(.black.opacity(0.55))
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(.black.opacity(0.88))
             .position(x: 300, y: 52)
 
             // Arrow between the two icons.
             Image(systemName: "arrow.right")
                 .font(.system(size: 34, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.55))
+                .foregroundStyle(.black.opacity(0.35))
                 .position(x: 300, y: 190)
 
             VStack(alignment: .leading, spacing: 4) {
@@ -30,14 +31,14 @@ struct Background: View {
                     .font(.system(size: 12, weight: .semibold))
                 Text("If macOS says it can't verify OpenShelf, open System Settings → Privacy & Security, scroll down and click Open Anyway. You only need to do this once.")
                     .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(.black.opacity(0.6))
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(.black.opacity(0.85))
             .padding(12)
             .frame(width: 520, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.white.opacity(0.06)))
-            .position(x: 300, y: 335)
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.black.opacity(0.05)))
+            .position(x: 300, y: 322)
         }
         .frame(width: 600, height: 400)
     }

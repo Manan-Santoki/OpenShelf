@@ -61,7 +61,7 @@ dmg:
 		--volname "$(APP_NAME) $(VERSION)" \
 		--volicon Support/AppIcon.icns \
 		--background Support/dmg-background.tiff \
-		--window-size 600 400 \
+		--window-size 600 428 \
 		--icon-size 112 \
 		--icon "$(APP_NAME).app" 150 190 \
 		--hide-extension "$(APP_NAME).app" \
