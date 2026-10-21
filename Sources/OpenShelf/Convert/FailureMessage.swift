@@ -6,7 +6,7 @@ enum FailureMessage {
     /// The error to show for a failed conversion of `source`. Errors that are
     /// already user-facing pass through unchanged.
     static func describe(_ error: Error, source: URL) -> Error {
-        if error is CancellationError || error is ConversionError { return error }
+        if error is CancellationError || error is ConversionError || error is MissingToolError { return error }
         let kind = FileKind(url: source)
         let text = (error as? ProcessFailure)?.message ?? error.localizedDescription
 

@@ -51,7 +51,7 @@ enum ImageConversion {
         } else if let ffmpeg = tools.ffmpeg {
             try await ProcessRunner.run(ffmpeg, ["-y", "-loglevel", "error", "-i", temporary.path, "-quality", "88", url.path])
         } else {
-            throw ConversionError.unsupported("WebP needs cwebp or ffmpeg (brew install webp)")
+            throw MissingToolError(name: "ffmpeg")
         }
     }
 }

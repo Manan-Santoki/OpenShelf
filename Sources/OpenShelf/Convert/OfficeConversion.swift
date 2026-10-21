@@ -1,14 +1,14 @@
 import Foundation
 
 /// Office formats macOS can't read or write itself (PowerPoint, XLS, ODS…),
-/// converted by LibreOffice when it's installed (`brew install --cask libreoffice`).
+/// converted by LibreOffice when it's installed (Settings → Extra formats).
 enum OfficeConversion {
     /// How long LibreOffice gets before the conversion is abandoned.
     static let timeout: Duration = .seconds(120)
 
     static func convert(_ source: URL, to format: OutputFormat, tools: ExternalTools) async throws -> [URL] {
         guard let soffice = tools.libreOffice else {
-            throw ConversionError.unsupported("\(source.pathExtension.uppercased()) files need LibreOffice (brew install --cask libreoffice)")
+            throw MissingToolError(name: "LibreOffice")
         }
         let workspace = try PackageZip.makeWorkspace("office")
         defer { try? FileManager.default.removeItem(at: workspace) }

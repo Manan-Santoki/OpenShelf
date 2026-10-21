@@ -12,7 +12,7 @@ final class ConversionRunner {
     private var current: Task<Void, Never>?
 
     func convert(_ urls: [URL], to format: OutputFormat, near location: NSPoint = NSEvent.mouseLocation) {
-        let tools = ExternalTools.detect()
+        let tools = ExternalTools.current
         let isArchive = [.zip, .tar, .tgz].contains(format)
         let title = switch format {
         case .zip, .tar, .tgz: "Compressing to \(format.title)"

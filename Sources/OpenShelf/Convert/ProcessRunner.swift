@@ -9,6 +9,26 @@ struct ProcessFailure: LocalizedError {
     }
 }
 
+/// An optional tool that was there when the conversion was offered has since
+/// been uninstalled (or was never found, if a conversion runs without it).
+struct MissingToolError: LocalizedError, Equatable {
+    /// How people know the tool: "ffmpeg", "LibreOffice".
+    let name: String
+
+    init(name: String) {
+        self.name = name
+    }
+
+    init(executable: URL) {
+        let file = executable.lastPathComponent
+        name = file == "soffice" ? "LibreOffice" : file
+    }
+
+    var errorDescription: String? {
+        "\(name) isn’t installed any more."
+    }
+}
+
 /// Runs command-line tools without blocking, with cancellation and line-by-line
 /// output for progress reporting.
 enum ProcessRunner {
@@ -20,6 +40,12 @@ enum ProcessRunner {
         standardOutputFile: URL? = nil,
         onOutputLine: (@Sendable (String) -> Void)? = nil
     ) async throws {
+        // Launching a missing file fails with a cryptic "file doesn't exist";
+        // an optional tool may have been uninstalled since it was detected.
+        guard FileManager.default.isExecutableFile(atPath: executable.path) else {
+            ExternalTools.refresh()
+            throw MissingToolError(executable: executable)
+        }
         let box = ProcessBox()
         let process = box.process
         process.executableURL = executable

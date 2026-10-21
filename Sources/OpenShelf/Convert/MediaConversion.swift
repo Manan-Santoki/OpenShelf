@@ -21,8 +21,10 @@ enum MediaConversion {
         if format.isAudioOnly {
             try await requireAudio(in: source, isNative: isNative, tools: tools)
         }
+        // GIFs can be made natively, but ffmpeg's two-pass palette looks better.
+        let usesFFmpeg = !isNative || format.needsFFmpeg || (format == .gif && tools.ffmpeg != nil)
         do {
-            if isNative && !format.needsFFmpeg {
+            if !usesFFmpeg {
                 try await convertNatively(source, to: format, destination: destination, progress: progress)
             } else {
                 try await convertWithFFmpeg(source, to: format, destination: destination, tools: tools, progress: progress)
@@ -54,6 +56,8 @@ enum MediaConversion {
             try await ProcessRunner.run(afconvert, ["-f", "AIFF", "-d", "BEI16", source.path, destination.path])
         case .flac:
             try await ProcessRunner.run(afconvert, ["-f", "flac", "-d", "flac", source.path, destination.path])
+        case .gif:
+            try await VideoGIF.write(source, to: destination, progress: progress)
         default:
             throw ConversionError.unsupported("media to \(format.title)")
         }
@@ -67,7 +71,7 @@ enum MediaConversion {
         progress: @escaping @Sendable (Double) -> Void
     ) async throws {
         guard let ffmpeg = tools.ffmpeg else {
-            throw ConversionError.unsupported("\(format.title) needs ffmpeg (brew install ffmpeg)")
+            throw MissingToolError(name: "ffmpeg")
         }
         let encoders = FFmpegEncoders.available(in: ffmpeg)
         let duration = await duration(of: source, tools: tools)

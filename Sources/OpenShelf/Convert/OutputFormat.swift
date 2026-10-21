@@ -65,9 +65,10 @@ enum OutputFormat: String, CaseIterable, Hashable, Sendable {
         }
     }
 
-    /// Formats only ffmpeg can write.
+    /// Formats only ffmpeg can write from audio or video. (GIF has a native
+    /// fallback, `VideoGIF`.)
     var needsFFmpeg: Bool {
-        [.mp3, .gif, .ogg, .opus, .wma, .mkv, .webm, .avi, .wmv].contains(self)
+        [.mp3, .ogg, .opus, .wma, .mkv, .webm, .avi, .wmv].contains(self)
     }
 
     /// Audio-only outputs, which need a sound track in the source.
@@ -94,6 +95,14 @@ enum ConversionCatalog {
             common.removeAll { !available.contains($0) }
         }
         return common
+    }
+
+    /// The formats a Convert wheel's wedges offer.
+    static func formats(in items: [WheelItem]) -> [OutputFormat] {
+        items.compactMap { item in
+            if case .convert(let format) = item.command { return format }
+            return nil
+        }
     }
 
     static func formats(for url: URL, tools: ExternalTools) -> [OutputFormat] {
@@ -124,8 +133,9 @@ enum ConversionCatalog {
             }
         case .video:
             if MediaFormats.isAVFoundationReadable(url) {
-                formats = [.mp4, .mov, .m4a]
-                if hasFFmpeg { formats += [.gif, .mp3, .mkv, .webm, .avi, .wmv] }
+                // GIF is made natively when ffmpeg isn't installed.
+                formats = [.mp4, .mov, .m4a, .gif]
+                if hasFFmpeg { formats += [.mp3, .mkv, .webm, .avi, .wmv] }
             } else {
                 formats = hasFFmpeg ? [.mp4, .mov, .m4a, .gif, .mp3, .mkv, .webm, .avi, .wmv] : []
             }
@@ -154,38 +164,5 @@ enum ConversionCatalog {
             // XLS and ODS can only be opened by LibreOffice.
             return hasOffice ? [.xlsx, .csv, .pdf, .ods] : []
         }
-    }
-}
-
-/// Optional command-line encoders found on this Mac.
-struct ExternalTools: Sendable {
-    var ffmpeg: URL?
-    var cwebp: URL?
-    var ffprobe: URL? = nil
-    var libreOffice: URL? = nil
-
-    var canEncodeWebP: Bool { cwebp != nil || ffmpeg != nil }
-
-    /// Looks in the usual Homebrew and MacPorts locations; GUI apps don't inherit
-    /// the shell's PATH.
-    static func detect() -> ExternalTools {
-        ExternalTools(ffmpeg: find("ffmpeg"), cwebp: find("cwebp"), ffprobe: find("ffprobe"), libreOffice: findLibreOffice())
-    }
-
-    private static func find(_ name: String) -> URL? {
-        let directories = ["/opt/homebrew/bin", "/usr/local/bin", "/opt/local/bin"]
-            + (ProcessInfo.processInfo.environment["PATH"]?.split(separator: ":").map(String.init) ?? [])
-        return directories
-            .map { URL(fileURLWithPath: $0).appendingPathComponent(name) }
-            .first { FileManager.default.isExecutableFile(atPath: $0.path) }
-    }
-
-    /// LibreOffice's command-line converter, inside the app bundle
-    /// (`brew install --cask libreoffice` puts it in /Applications).
-    private static func findLibreOffice() -> URL? {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        return ["/Applications/LibreOffice.app", "\(home)/Applications/LibreOffice.app"]
-            .map { URL(fileURLWithPath: $0).appendingPathComponent("Contents/MacOS/soffice") }
-            .first { FileManager.default.isExecutableFile(atPath: $0.path) }
     }
 }
