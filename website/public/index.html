@@ -94,7 +94,7 @@ kbd, .cap { font-family: var(--keys) !important; }
 .hero { position: relative; isolation: isolate; }
 .hero::before { content: ""; position: absolute; inset: -60px 0 auto; height: 720px; z-index: -1; pointer-events: none;
   background: radial-gradient(42% 46% at 72% 34%, var(--accent-glow), transparent 70%); }
-.hero .wrap { display: grid; grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr); gap: 56px; align-items: center; padding-top: 72px; padding-bottom: 72px; }
+.hero .wrap { display: grid; grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr); gap: 56px; align-items: center; padding-top: 72px; padding-bottom: 8px; }
 .eyebrow { display: inline-flex; align-items: center; gap: 8px; font: 500 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
 .eyebrow::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
 h1 { font-weight: 800; font-size: clamp(50px, 6.6vw, 82px); line-height: .96; letter-spacing: -0.045em; margin: 22px 0 22px; }
@@ -141,14 +141,25 @@ h1 span { color: var(--muted); }
 #wheel .disc { filter: drop-shadow(0 22px 34px rgba(0,0,0,.6)); }
 #wheel .petal path.shape { fill: rgba(255,255,255,.12); stroke: rgba(255,255,255,.38); stroke-width: .8; transition: fill .12s; }
 #wheel .petal path.gloss { fill: url(#wheel-gloss); pointer-events: none; opacity: .3; }
-#wheel .petal text { font: 700 13px var(--body); letter-spacing: .4px; fill: rgba(255,255,255,.86); text-anchor: middle; dominant-baseline: central; pointer-events: none; }
-#wheel .petal text.small { font-size: 9.5px; }
-#wheel .petal .ico { fill: none; stroke: rgba(255,255,255,.86); stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+#wheel .lab text { font: 700 13px var(--body); letter-spacing: .4px; fill: rgba(255,255,255,.86); text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+#wheel .lab text.small { font-size: 9.5px; }
+#wheel .lab .ico { fill: none; stroke: rgba(255,255,255,.86); stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 #wheel .petal.on { filter: drop-shadow(0 3px 10px rgba(61,123,253,.5)); }
 #wheel .petal.on path.shape { fill: url(#wheel-lit); stroke: rgba(255,255,255,.55); }
 #wheel .petal.on path.gloss { opacity: 1; }
-#wheel .petal.on text { fill: #fff; }
-#wheel .petal.on .ico { stroke: #fff; }
+#wheel .petal.empty { opacity: .3; }
+#wheel .lab .ico.pg { stroke-width: 3.6; }
+#wheel .lab .track { fill: none; stroke: rgba(255,255,255,.86); stroke-width: 2; opacity: .25; }
+#wheel .lab .prog { fill: none; stroke: rgba(255,255,255,.95); stroke-width: 2; stroke-dasharray: 1 1; stroke-dashoffset: 1; transition: stroke-dashoffset .12s ease-out; }
+#wheel .lab.dwell .prog { stroke-dashoffset: 0; transition: stroke-dashoffset .35s linear; }
+#wheel .lab .dot { fill: rgba(255,255,255,.86); opacity: .35; }
+#wheel .lab .dot.cur { opacity: 1; }
+#wheel .lab.on text, #wheel .lab.on .dot { fill: #fff; }
+#wheel .lab.on .ico, #wheel .lab.on .track, #wheel .lab.on .prog { stroke: #fff; }
+/* Page turn: labels cross-fade with a slight turn about the wheel's centre (user-space origin). */
+#wheel .labels { pointer-events: none; transition: opacity .18s ease, transform .18s ease; transform-box: view-box; transform-origin: 0 0; }
+#wheel .labels.enter { opacity: 0; transform: rotate(-10deg); }
+#wheel .labels.leave { opacity: 0; transform: rotate(10deg); }
 #wheel .hub { fill: rgba(255,255,255,.08); stroke: rgba(255,255,255,.5); stroke-width: .8; transition: fill .12s; }
 #wheel.has-on .hub { fill: rgba(61,123,253,.9); }
 #wheel .pill rect { fill: rgba(44,44,50,.96); stroke: rgba(255,255,255,.35); stroke-width: .8; }
@@ -331,6 +342,9 @@ footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition: none !important; animation: none !important; }
+  #wheel .labels { transition: opacity .15s ease !important; }
+  #wheel .labels.enter, #wheel .labels.leave { transform: none !important; }
+  #wheel .lab.dwell .prog { transition: stroke-dashoffset .35s linear !important; }
 }
 
 /* Responsive */
@@ -359,7 +373,7 @@ footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
 @media (max-width: 640px) {
   .wrap { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
   section { padding-block: 80px; }
-  .hero .wrap { padding-top: 40px; padding-bottom: 80px; }
+  .hero .wrap { padding-top: 40px; padding-bottom: 16px; }
   .lede { font-size: 17px; }
   .cta .btn { flex: 1 1 100%; }
   .meta { gap: 4px 16px; }
@@ -574,7 +588,7 @@ footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
           <div class="shot"><img src="assets/wheel-tools.webp" alt="The Tools wheel for a photo, with Crop highlighted among Compress, Metadata, Edit, Annotate, Add BG, Redact and Read QR" width="608" height="608" loading="lazy"></div>
           <div class="copy">
             <h3><kbd class="kc">⇧⌥</kbd>Tools</h3>
-            <p>Quick edits without opening a full app. Most tools open a small focused editor and save a copy beside the original.</p>
+            <p>Quick edits without opening a full app. Most tools open a small focused editor and save a copy beside the original. Busy wheels show six at a time; rest on <span class="nw">⋯ for more.</span></p>
             <ul class="examples">
               <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l6-6M10 14v5M10 14H5M20 4l-6 6M14 10V5M14 10h5"/></svg><span>Compress a photo</span></li>
               <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2v16h16M2 6h16v16"/></svg><span>Crop or resize images</span></li>
@@ -927,22 +941,25 @@ const ICONS = {
   move: "M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2h8.5A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z",
   path: "M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1",
   terminal: "M3 5h18v14H3zM7 10l3 2-3 2M12 15h5",
+  more: "M6 12h.01M12 12h.01M18 12h.01",
+  back: "M9 14L4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11",
 };
 
 const conv = (fmt, name) => ({ label: fmt, title: "Convert to " + fmt, toast: ["Saved " + name, "Next to Photo.jpg"] });
 const tool = (label, icon, title, sub) => ({ label, icon, title, toast: [title === "Read QR" ? "No QR code found" : "Opened " + title, sub || "Saves a copy beside Photo.jpg"] });
+// The app's curated order for a JPG: everyday options first, so they land on page 1.
 const WHEELS = {
   convert: { name: "Convert", keys: "⇧", items: [
-    conv("PNG", "Photo.png"), conv("WEBP", "Photo.webp"), conv("HEIC", "Photo.heic"),
-    conv("TIFF", "Photo.tiff"), conv("AVIF", "Photo.avif"), conv("BMP", "Photo.bmp"),
-    conv("PDF", "Photo.pdf"), conv("DOCX", "Photo.docx"), conv("ZIP", "Photo.zip"),
+    conv("PNG", "Photo.png"), conv("HEIC", "Photo.heic"), conv("WEBP", "Photo.webp"),
+    conv("PDF", "Photo.pdf"), conv("AVIF", "Photo.avif"), conv("TIFF", "Photo.tiff"),
+    conv("BMP", "Photo.bmp"), conv("DOCX", "Photo.docx"), conv("ZIP", "Photo.zip"),
   ]},
   tools: { name: "Tools", keys: "⇧⌥", items: [
-    tool("Compress", "compress", "Compress"), tool("Metadata", "metadata", "Metadata", "View or remove EXIF and location"),
-    tool("Edit", "edit", "Edit"), tool("Annotate", "annotate", "Annotate"),
-    tool("Add BG", "addbg", "Add Background"), tool("Crop", "crop", "Crop"),
-    tool("Resize", "resize", "Resize"), tool("Remove BG", "removebg", "Remove Background", "Saves a transparent PNG"),
-    tool("Redact", "redact", "Redact"), tool("Read QR", "qr", "Read QR", "Photo.jpg has no code to copy"),
+    tool("Compress", "compress", "Compress"), tool("Crop", "crop", "Crop"),
+    tool("Resize", "resize", "Resize"), tool("Annotate", "annotate", "Annotate"),
+    tool("Remove BG", "removebg", "Remove Background", "Saves a transparent PNG"), tool("Edit", "edit", "Edit"),
+    tool("Metadata", "metadata", "Metadata", "View or remove EXIF and location"), tool("Redact", "redact", "Redact"),
+    tool("Add BG", "addbg", "Add Background"), tool("Read QR", "qr", "Read QR", "Photo.jpg has no code to copy"),
   ]},
   actions: { name: "Actions", keys: "⌃", items: [
     { label: "Shelf", icon: "shelf", title: "Shelf", toast: ["Put on a shelf", "Photo.jpg waits in a floating shelf"] },
@@ -955,34 +972,68 @@ const WHEELS = {
 };
 const G = { inner: 50, outer: 132, gap: 7, corner: 16, rim: 9 };
 
-// Builds one wheel's petals into `group`. Shared by the demo and the "How it works" illustration.
-function buildPetals(group, items, g, opts) {
-  const n = items.length, sweep = 2 * Math.PI / n, crowded = n > 8;
-  const labelR = (g.inner + g.outer) / 2 + (crowded ? 9 : 3);
-  const petals = [];
-  items.forEach((item, i) => {
+// Paging, as in the app: up to 7 items show at once; more than that shows
+// 6 items plus More (or Back on the last page) in the same last slot.
+const PER_PAGE = 6;
+function pageCount(items) { return items.length <= PER_PAGE + 1 ? 1 : Math.ceil(items.length / PER_PAGE); }
+function slotsFor(items, page) {
+  const pages = pageCount(items);
+  if (pages === 1) return items.map(item => ({ type: "item", item }));
+  const slots = items.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE).map(item => ({ type: "item", item }));
+  while (slots.length < PER_PAGE) slots.push({ type: "empty" });
+  slots.push({ type: page < pages - 1 ? "more" : "back" });
+  return slots;
+}
+const isPager = slot => !!slot && (slot.type === "more" || slot.type === "back");
+
+// Wedge shapes. Shared by the demo and the "How it works" illustration.
+function buildShapes(group, n, g) {
+  const sweep = 2 * Math.PI / n, petals = [];
+  for (let i = 0; i < n; i++) {
     const c = sweep * i;
     const p = el("g", { class: "petal" }, group);
     const d = wedgePath(c - sweep / 2, c + sweep / 2, g);
     el("path", { class: "shape", d }, p);
     el("path", { class: "gloss", d }, p);
-    if (opts && opts.labels === false) { petals.push(p); return; }
+    petals.push(p);
+  }
+  return petals;
+}
+// What each slot shows: an icon and name, a format name, or for More/Back a
+// symbol in a ring (which fills while the pointer rests there) over page dots.
+function buildLabels(group, slots, g, page, pages) {
+  const n = slots.length, sweep = 2 * Math.PI / n, crowded = n > 8;
+  const labelR = (g.inner + g.outer) / 2 + (crowded ? 9 : 3);
+  return slots.map((slot, i) => {
+    const lab = el("g", { class: "lab" }, group);
+    const c = sweep * i;
     const [x, y] = pt(labelR, c);
+    if (slot.type === "empty") return lab;
+    if (isPager(slot)) {
+      const ringY = y - 41 / 2 + 15;
+      el("circle", { class: "track", cx: x.toFixed(2), cy: ringY.toFixed(2), r: 14 }, lab);
+      el("circle", { class: "prog", cx: x.toFixed(2), cy: ringY.toFixed(2), r: 14, pathLength: 1, transform: `rotate(-90 ${x.toFixed(2)} ${ringY.toFixed(2)})` }, lab);
+      el("path", { class: "ico pg", d: ICONS[slot.type], transform: `translate(${(x - 7).toFixed(2)} ${(ringY - 7).toFixed(2)}) scale(${(14 / 24).toFixed(3)})` }, lab);
+      for (let k = 0; k < pages; k++) {
+        el("circle", { class: "dot" + (k === page ? " cur" : ""), cx: (x + (k - (pages - 1) / 2) * 9).toFixed(2), cy: (y + 41 / 2 - 2.5).toFixed(2), r: 2.5 }, lab);
+      }
+      return lab;
+    }
+    const item = slot.item;
     const iconH = item.icon ? (crowded ? 15 : 17) : 0, textH = item.icon ? 9 : 12, spacing = item.icon ? 4 : 0;
     const total = iconH + spacing + textH;
     if (item.icon) {
       const s = iconH / 24, iy = y - total / 2;
-      el("path", { class: "ico", d: ICONS[item.icon], transform: `translate(${(x - iconH / 2).toFixed(2)} ${iy.toFixed(2)}) scale(${s.toFixed(3)})` }, p);
+      el("path", { class: "ico", d: ICONS[item.icon], transform: `translate(${(x - iconH / 2).toFixed(2)} ${iy.toFixed(2)}) scale(${s.toFixed(3)})` }, lab);
     }
-    const t = el("text", { x: x.toFixed(2), y: (y + total / 2 - textH / 2).toFixed(2), class: item.icon ? "small" : "" }, p);
+    const t = el("text", { x: x.toFixed(2), y: (y + total / 2 - textH / 2).toFixed(2), class: item.icon ? "small" : "" }, lab);
     t.textContent = item.label.toUpperCase();
     t.dataset.max = Math.max(0, Math.min(74, 2 * labelR * Math.sin(sweep / 2) - 8)).toFixed(1);
-    petals.push(p);
+    return lab;
   });
-  return petals;
 }
-function fitLabels(svg) {
-  svg.querySelectorAll(".petal text").forEach(t => {
+function fitLabels(root) {
+  root.querySelectorAll("text[data-max]").forEach(t => {
     t.style.fontSize = "";
     let w = 0;
     try { w = t.getComputedTextLength(); } catch (_) { return; }
@@ -1018,7 +1069,7 @@ function addDefs(svg) {
   const g = { inner: 22, outer: 62, gap: 4, corner: 8 };
   el("circle", { r: 67, fill: `url(#${svg.id}-disc)`, stroke: `url(#${svg.id}-rim)`, "stroke-width": 1 }, svg);
   const group = el("g", {}, svg);
-  const petals = buildPetals(group, WHEELS.convert.items.slice(0, 8), g, { labels: false });
+  const petals = buildShapes(group, 7, g);
   petals.forEach((p, i) => {
     const shape = p.querySelector(".shape");
     const on = i === 2;
@@ -1049,6 +1100,7 @@ function addDefs(svg) {
   const sr = document.getElementById("demo-sr");
   const keyBtns = [...stage.querySelectorAll(".wkey")];
   const touchFirst = matchMedia("(hover: none)").matches;
+  const DWELL_MS = 350;
 
   const HINTS = {
     idle: touchFirst ? 'Tap a wheel below, then a wedge' : 'Drag the file, then tap <kbd>⇧</kbd>',
@@ -1057,16 +1109,18 @@ function addDefs(svg) {
     held: 'Picked up. Tap <kbd>⇧</kbd>, <kbd>⇧⌥</kbd> or <kbd>⌃</kbd>',
     keyOpen: '<kbd>←</kbd><kbd>→</kbd> choose <span class="alt">·</span> <kbd>↵</kbd> drop <span class="alt">·</span> <kbd>esc</kbd>',
     tapOpen: 'Tap a wedge to run it',
+    clickOpen: 'Click a wedge, or use <kbd>←</kbd><kbd>→</kbd> and <kbd>↵</kbd>',
     nudge: 'Pick up the file first: drag it, or focus it and press Space',
     touchDrag: 'Now tap a wheel below with another finger',
   };
 
-  // Static wheel scaffolding (rebuilt petals per wheel).
+  // Static wheel scaffolding; wedges are rebuilt per wheel, labels per page.
   addDefs(svg);
   svg.setAttribute("viewBox", "-150 -182 300 332");
-  const disc = el("circle", { class: "disc", r: G.outer + G.rim, fill: "url(#wheel-disc)", stroke: "url(#wheel-rim)", "stroke-width": 1.2 }, svg);
+  el("circle", { class: "disc", r: G.outer + G.rim, fill: "url(#wheel-disc)", stroke: "url(#wheel-rim)", "stroke-width": 1.2 }, svg);
   const petalsG = el("g", {}, svg);
-  const hub = el("circle", { class: "hub", r: G.inner - 6 }, svg);
+  const labelsWrap = el("g", {}, svg);
+  el("circle", { class: "hub", r: G.inner - 6 }, svg);
   const hubIcon = el("path", { class: "ico", d: "", fill: "none", stroke: "#fff", "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round", transform: "translate(-13 -13) scale(1.083)" }, svg);
   const pill = el("g", { class: "pill" }, svg);
   const pillRect = el("rect", { y: -(G.outer + G.rim + 20) - 13, height: 26, rx: 13 }, pill);
@@ -1076,16 +1130,19 @@ function addDefs(svg) {
     mode: "idle",          // idle | drag | held
     wheel: null,           // convert | tools | actions | null
     via: null,             // drag | held | tap
-    hi: null,
+    hi: null,              // highlighted slot on the current page
+    page: 0,
+    slots: [],
+    armed: true,           // false right after a page turn, until the pointer leaves More/Back
+    dwellT: 0,
     pointer: { x: 0, y: 0 },
     cardPos: { x: 0, y: 0 },
     grab: { x: 0, y: 0 },
     center: { x: 0, y: 0 },
     pointerId: null,
-    moved: false,
     m: null,
   };
-  let petals = [];
+  let petals = [], labs = [];
   let toastTimer = 0;
 
   function metrics() {
@@ -1108,16 +1165,37 @@ function addDefs(svg) {
       r.style.width = r.style.height = d.toFixed(1) + "px";
       r.style.transform = `translate(${(st.m.home.x - d / 2).toFixed(1)}px, ${(st.m.home.y - d / 2).toFixed(1)}px)`;
     });
-    if (st.mode !== "drag") placeCard(st.m.home.x, st.m.home.y, false);
+    if (st.mode !== "drag" && !st.wheel) placeCard(st.m.home.x, st.m.home.y, false);
     if (st.wheel) positionWheel();
   }
   function setHint(key) { hint.innerHTML = HINTS[key] || ""; }
   function say(text) { sr.textContent = ""; setTimeout(() => { sr.textContent = text; }, 30); }
 
+  function items() { return WHEELS[st.wheel].items; }
   function buildWheel(name) {
+    st.wheel = name;
+    st.page = 0;
     petalsG.textContent = "";
-    petals = buildPetals(petalsG, WHEELS[name].items, G);
-    fitLabels(svg);
+    labelsWrap.textContent = "";
+    petals = buildShapes(petalsG, slotsFor(items(), 0).length, G);
+    renderPage(false);
+  }
+  // Swaps the labels for the current page: a short cross-fade with a slight
+  // turn (a plain fade with reduced motion). Wedge shapes stay where they are.
+  function renderPage(animate) {
+    const pages = pageCount(items());
+    st.slots = slotsFor(items(), st.page);
+    petals.forEach((p, j) => p.classList.toggle("empty", st.slots[j].type === "empty"));
+    const old = [...labelsWrap.children];
+    const layer = el("g", { class: "labels" + (animate ? " enter" : "") }, labelsWrap);
+    labs = buildLabels(layer, st.slots, G, st.page, pages);
+    fitLabels(layer);
+    old.forEach(o => {
+      if (!animate) { o.remove(); return; }
+      o.classList.add("leave");
+      setTimeout(() => o.remove(), 220);
+    });
+    if (animate) { void getComputedStyle(layer).opacity; layer.classList.remove("enter"); }
   }
   function positionWheel() {
     const m = st.m, s = m.s, R = (G.outer + G.rim) * s;
@@ -1131,6 +1209,14 @@ function addDefs(svg) {
     svg.style.left = (cx - 150 * s) + "px";
     svg.style.top = (cy - 182 * s) + "px";
   }
+  function pillLabel() {
+    const pages = pageCount(items());
+    const slot = st.hi === null || st.hi < 0 ? null : st.slots[st.hi];
+    if (!slot) return `${WHEELS[st.wheel].name} · 2.4 MB` + (pages > 1 ? ` · ${st.page + 1} of ${pages}` : "");
+    if (slot.type === "more") return `More · ${st.page + 2} of ${pages}`;
+    if (slot.type === "back") return `Back · 1 of ${pages}`;
+    return slot.item.title;
+  }
   function setPill(text) {
     pillText.textContent = text;
     let w = 0;
@@ -1141,25 +1227,66 @@ function addDefs(svg) {
   }
   function setHi(i) {
     if (!st.wheel) return;
+    if (i !== null && (!st.slots[i] || st.slots[i].type === "empty")) i = null;
     if (i === st.hi) return;
     st.hi = i;
     petals.forEach((p, j) => p.classList.toggle("on", j === i));
+    labs.forEach((l, j) => l.classList.toggle("on", j === i));
     svg.classList.toggle("has-on", i !== null);
-    const item = i === null ? null : WHEELS[st.wheel].items[i];
-    setPill(item ? item.title : `${WHEELS[st.wheel].name} · 2.4 MB`);
-    hubIcon.setAttribute("d", item && item.icon ? ICONS[item.icon] : "");
-    if (item && st.via !== "drag") say(`${item.title}, ${i + 1} of ${WHEELS[st.wheel].items.length}`);
+    setPill(pillLabel());
+    const slot = i === null ? null : st.slots[i];
+    const icon = !slot ? "" : isPager(slot) ? ICONS[slot.type] : (slot.item.icon ? ICONS[slot.item.icon] : "");
+    hubIcon.setAttribute("d", icon);
+    hubIcon.setAttribute("stroke-width", slot && slot.type === "more" ? 3.4 : 2);
+    if (slot && st.via !== "drag") say(isPager(slot) ? `${pillLabel()}. Press Return to turn the page.` : slot.item.title);
+  }
+  function clearDwell() {
+    clearTimeout(st.dwellT);
+    st.dwellT = 0;
+    labs.forEach(l => l.classList.remove("dwell"));
+  }
+  // Pointer (mouse, pen, touch drag) over slot i. Resting on More/Back turns
+  // the page after DWELL_MS; after a turn the pointer must leave and come back.
+  function hover(i) {
+    if (!st.wheel) return;
+    if (i !== null && (!st.slots[i] || st.slots[i].type === "empty")) i = null;
+    const slot = i === null ? null : st.slots[i];
+    if (i !== st.hi) clearDwell();
+    if (!isPager(slot)) st.armed = true;
+    setHi(i);
+    if (isPager(slot) && st.armed && !st.dwellT) {
+      labs[i].classList.add("dwell");
+      st.dwellT = setTimeout(() => {
+        st.dwellT = 0;
+        if (st.wheel && st.hi === i && isPager(st.slots[i])) turnPage();
+      }, DWELL_MS);
+    }
+  }
+  function turnPage() {
+    const slot = st.hi === null ? null : st.slots[st.hi];
+    if (!isPager(slot)) return;
+    const pages = pageCount(items());
+    clearDwell();
+    st.page = slot.type === "more" ? Math.min(st.page + 1, pages - 1) : 0;
+    renderPage(true);
+    st.armed = false;
+    const h = st.hi;
+    st.hi = -1;
+    setHi(h);
+    const names = st.slots.filter(s => s.type === "item").map(s => s.item.title).join(", ");
+    say(`Page ${st.page + 1} of ${pages}: ${names}.`);
   }
   function openWheel(name) {
     if (!WHEELS[name]) return;
     const same = st.wheel === name;
     if (!st.m) layout();
     st.via = st.mode === "drag" ? "drag" : st.mode === "held" ? "held" : "tap";
-    if (!same) { buildWheel(name); st.hi = -1; }
-    st.wheel = name;
+    clearDwell();
+    if (!same) { buildWheel(name); st.hi = -1; st.armed = true; }
     if (st.via === "drag") st.center = { ...st.pointer };
     else st.center = { ...st.m.home };
     if (st.via !== "drag") placeCard(st.m.home.x, st.m.home.y, true);
+    else placeDragged(true);
     positionWheel();
     if (!same) setHi(null);
     else { const h = st.hi; st.hi = -1; setHi(h); }
@@ -1167,11 +1294,14 @@ function addDefs(svg) {
     stage.classList.add("wheel-open");
     keyBtns.forEach(b => b.setAttribute("aria-pressed", String(b.dataset.wheel === name)));
     hideToast();
-    setHint(st.via === "drag" ? "dragOpen" : st.via === "held" ? "keyOpen" : (touchFirst ? "tapOpen" : "keyOpen"));
-    if (st.via !== "drag" && !touchFirst && st.via === "tap") hint.innerHTML = 'Click a wedge, or use <kbd>←</kbd><kbd>→</kbd> and <kbd>↵</kbd>';
-    if (!same) say(`${WHEELS[name].name} wheel open, ${WHEELS[name].items.length} options. ${st.via === "drag" ? "Move onto a wedge and let go." : "Use the arrow keys to choose and Return to drop, or Escape to cancel."}`);
+    setHint(st.via === "drag" ? "dragOpen" : st.via === "held" ? "keyOpen" : (touchFirst ? "tapOpen" : "clickOpen"));
+    if (!same) {
+      const n = items().length, paged = pageCount(items()) > 1;
+      say(`${WHEELS[name].name} wheel open, ${n} options${paged ? ", six at a time; More shows the rest" : ""}. ${st.via === "drag" ? "Move onto a wedge and let go." : "Use the arrow keys to choose and Return to drop, or Escape to cancel."}`);
+    }
   }
   function closeWheel() {
+    clearDwell();
     st.wheel = null; st.hi = null; st.via = null;
     svg.classList.remove("open", "has-on");
     stage.classList.remove("wheel-open");
@@ -1195,15 +1325,24 @@ function addDefs(svg) {
   }
   function run(i) {
     if (!st.wheel || i === null || i < 0) return;
-    const item = WHEELS[st.wheel].items[i];
+    const slot = st.slots[i];
+    if (!slot || slot.type !== "item") return;
     setHi(i);
     const finish = () => {
       closeWheel();
       putDown(true);
       setHint("idle");
-      showToast(item.toast[0], item.toast[1]);
+      showToast(slot.item.toast[0], slot.item.toast[1]);
     };
     if (reduceMotion()) finish(); else setTimeout(finish, 140);
+  }
+  // Return, a click or a tap on a slot: More/Back turns the page, items run.
+  function activate(i) {
+    const slot = i === null ? null : st.slots[i];
+    if (!slot || slot.type === "empty") return false;
+    if (isPager(slot)) { clearDwell(); setHi(i); turnPage(); return true; }
+    run(i);
+    return true;
   }
   function showToast(title, sub) {
     clearTimeout(toastTimer);
@@ -1223,10 +1362,11 @@ function addDefs(svg) {
     const s = st.m.s, dx = (p.x - st.center.x) / s, dy = (p.y - st.center.y) / s;
     const d = Math.hypot(dx, dy);
     if (d < G.inner || d > G.outer + G.rim) return null;
-    const n = WHEELS[st.wheel].items.length, sweep = 2 * Math.PI / n;
+    const n = st.slots.length, sweep = 2 * Math.PI / n;
     let a = Math.atan2(dx, -dy);
     if (a < 0) a += 2 * Math.PI;
-    return Math.floor((a + sweep / 2) / sweep) % n;
+    const i = Math.floor((a + sweep / 2) / sweep) % n;
+    return st.slots[i].type === "empty" ? null : i;
   }
 
   // Mouse, pen and touch dragging of the file card.
@@ -1239,7 +1379,6 @@ function addDefs(svg) {
     const p = local(e);
     st.mode = "drag";
     st.pointerId = e.pointerId;
-    st.moved = false;
     st.pointer = p;
     st.grab = { x: p.x - st.cardPos.x, y: p.y - st.cardPos.y };
     try { card.setPointerCapture(e.pointerId); } catch (_) {}
@@ -1253,17 +1392,35 @@ function addDefs(svg) {
   card.addEventListener("pointermove", e => {
     if (st.mode !== "drag" || e.pointerId !== st.pointerId) return;
     const p = local(e);
-    if (Math.hypot(p.x - st.pointer.x, p.y - st.pointer.y) > 2) st.moved = true;
     st.pointer = p;
-    const x = Math.min(Math.max(p.x - st.grab.x, 20), st.m.W - 20);
-    const y = Math.min(Math.max(p.y - st.grab.y, 20), st.m.H - 20);
-    placeCard(x, y, false);
-    if (st.wheel) setHi(wedgeAt(p));
+    placeDragged(false);
+    if (st.wheel) hover(wedgeAt(p));
   });
+  // Mid-drag the card follows the grab point; with a wheel open it trails just
+  // below-right of the pointer, so the hovered wedge (and More's ring) stays visible.
+  function placeDragged(animate) {
+    const p = st.pointer;
+    const x = st.wheel ? p.x + 34 : p.x - st.grab.x;
+    const y = st.wheel ? p.y + 30 : p.y - st.grab.y;
+    placeCard(Math.min(Math.max(x, 20), st.m.W - 20), Math.min(Math.max(y, 20), st.m.H - 20), animate);
+  }
   const endDrag = e => {
     if (st.mode !== "drag" || e.pointerId !== st.pointerId) return;
     try { card.releasePointerCapture(e.pointerId); } catch (_) {}
-    if (e.type === "pointerup" && st.wheel && st.hi !== null && st.hi >= 0) { run(st.hi); return; }
+    const slot = st.wheel && st.hi !== null && st.hi >= 0 ? st.slots[st.hi] : null;
+    if (e.type === "pointerup" && isPager(slot)) {
+      // Dropping on More/Back turns the page and keeps the wheel open, to finish with a click or Return.
+      st.mode = "idle";
+      st.pointerId = null;
+      card.classList.remove("lifted", "held");
+      stage.classList.remove("lifted");
+      placeCard(st.center.x, st.center.y, true);
+      st.via = "tap";
+      setHint(touchFirst ? "tapOpen" : "clickOpen");
+      turnPage();
+      return;
+    }
+    if (e.type === "pointerup" && slot && slot.type === "item") { run(st.hi); return; }
     const hadWheel = !!st.wheel;
     closeWheel();
     putDown(true);
@@ -1275,19 +1432,22 @@ function addDefs(svg) {
   card.addEventListener("lostpointercapture", e => { if (st.mode === "drag" && e.pointerId === st.pointerId) endDrag({ type: "pointercancel", pointerId: e.pointerId }); });
   stage.addEventListener("contextmenu", e => e.preventDefault());
 
-  // Tap / click mode: wheel opened from a button, wedges are clicked or tapped.
+  // Tap / click mode: wheel opened from a button (or left open after a drop on More).
   stage.addEventListener("pointermove", e => {
     if (st.via !== "tap" || st.mode === "drag" || e.pointerType !== "mouse") return;
-    setHi(wedgeAt(local(e)));
+    hover(wedgeAt(local(e)));
   });
+  stage.addEventListener("pointerleave", () => { if (st.via === "tap") hover(null); });
   stage.addEventListener("click", e => {
     if (st.via !== "tap" || st.mode === "drag") return;
+    // The click that follows a drag's pointerup lands on the card; it isn't a wedge click.
     if (e.target.closest(".wkey, .file")) return;
     const p = local(e);
     const i = wedgeAt(p);
-    if (i !== null) { run(i); return; }
+    if (i !== null) { activate(i); return; }
     const dx = p.x - st.center.x, dy = p.y - st.center.y;
-    if (Math.hypot(dx, dy) > (G.outer + G.rim) * st.m.s) cancel();
+    const d = Math.hypot(dx, dy) / st.m.s;
+    if (d > G.outer + G.rim) cancel();
   });
 
   document.addEventListener("pointerdown", e => {
@@ -1309,6 +1469,17 @@ function addDefs(svg) {
     }
     return null;
   }
+  // Arrows step one slot at a time, wrapping, over More/Back but not empty slots.
+  function step(dir) {
+    const n = st.slots.length;
+    let i = st.hi === null || st.hi < 0 ? null : st.hi;
+    for (let k = 0; k < n; k++) {
+      i = i === null ? (dir > 0 ? 0 : n - 1) : (i + dir + n) % n;
+      if (st.slots[i].type !== "empty") break;
+    }
+    clearDwell();
+    setHi(i);
+  }
   function demoHasFocus() { return stage.contains(document.activeElement); }
   document.addEventListener("keydown", e => {
     const held = st.mode === "drag" || st.mode === "held";
@@ -1321,11 +1492,10 @@ function addDefs(svg) {
     }
     const engaged = st.wheel && (st.mode !== "idle" || demoHasFocus() || stage.matches(":hover"));
     if (st.wheel && engaged) {
-      const n = WHEELS[st.wheel].items.length;
       const cur = st.hi === null || st.hi < 0 ? null : st.hi;
-      if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); if (st.via === "drag") st.via = "held"; setHi(cur === null ? 0 : (cur + 1) % n); return; }
-      if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); if (st.via === "drag") st.via = "held"; setHi(cur === null ? n - 1 : (cur - 1 + n) % n); return; }
-      if (e.key === "Enter") { e.preventDefault(); if (cur !== null) run(cur); else say("Choose a wedge with the arrow keys first."); return; }
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); if (st.via === "drag") st.via = "held"; step(1); return; }
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); if (st.via === "drag") st.via = "held"; step(-1); return; }
+      if (e.key === "Enter") { e.preventDefault(); if (!activate(cur)) say("Choose a wedge with the arrow keys first."); return; }
       if (e.key === "Escape") { e.preventDefault(); cancel(); return; }
     }
     if (e.key === "Escape" && st.mode !== "idle") { e.preventDefault(); cancel(); }
@@ -1364,8 +1534,8 @@ function addDefs(svg) {
   setHint("idle");
   layout();
 
-  // Test hook for headless checks (no effect on visitors).
-  window.__demo = { st, openWheel, run, wedgeAt, cancel, setHi, layout };
+  // Read-only state for the site's headless interaction tests; visitors never touch it.
+  window.__demo = { st };
 })();
 })();
 </script>
