@@ -10,7 +10,9 @@ enum OutputNaming {
     private static let counterReserve = 4
 
     /// - Parameters:
-    ///   - suffix: Appended to the base name, e.g. "Cropped".
+    ///   - suffix: Appended to the base name, e.g. "Cropped". A name that already
+    ///     ends with it doesn't get it twice: compressing "Photo Compressed.jpg"
+    ///     saves "Photo Compressed 2.jpg", not "Photo Compressed Compressed.jpg".
     ///   - pathExtension: Extension of the new file, or nil for a folder.
     static func destination(
         for source: URL,
@@ -19,12 +21,27 @@ enum OutputNaming {
         fileManager: FileManager = .default
     ) -> URL {
         let directory = source.deletingLastPathComponent()
-        let suffixPart = suffix.map { $0.isEmpty ? "" : " \($0)" } ?? ""
+        let (name, suffixPart) = splitSuffix(suffix, from: visibleName(source.deletingPathExtension().lastPathComponent))
         let extensionPart = pathExtension.map { ".\($0)" } ?? ""
         // Shorten the original name, never the suffix, so "… Cropped" stays readable.
         let room = maxNameBytes - counterReserve - suffixPart.utf8.count - extensionPart.utf8.count
-        let base = truncated(visibleName(source.deletingPathExtension().lastPathComponent), toBytes: room)
+        let base = truncated(name, toBytes: room)
         return uniqueURL(in: directory, baseName: base + suffixPart, pathExtension: pathExtension, fileManager: fileManager)
+    }
+
+    /// Splits off the part of a new name that comes after the original: " <suffix>".
+    /// A name that already ends with the suffix, in any letter case, keeps its
+    /// own spelling of it; any other name gets it appended.
+    static func splitSuffix(_ suffix: String?, from name: String) -> (name: String, suffix: String) {
+        guard let suffix, !suffix.isEmpty else { return (name, "") }
+        let suffixPart = " \(suffix)"
+        if let range = name.range(of: suffixPart, options: [.anchored, .backwards, .caseInsensitive]) {
+            let stem = String(name[..<range.lowerBound])
+            if !stem.trimmingCharacters(in: .whitespaces).isEmpty {
+                return (stem, String(name[range]))
+            }
+        }
+        return (name, suffixPart)
     }
 
     static func uniqueURL(in directory: URL, baseName: String, pathExtension: String?, fileManager: FileManager = .default) -> URL {
