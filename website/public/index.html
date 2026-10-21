@@ -268,10 +268,10 @@ code { font: 13.5px var(--mono); background: var(--panel-2); border: 1px solid v
 .install { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); margin-top: 56px; overflow: hidden; }
 .install-steps { padding: 40px; }
 .install-steps ol { list-style: none; padding: 0; margin: 0; display: grid; gap: 26px; counter-reset: s; }
-.install-steps li { counter-increment: s; display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 16px; }
-.install-steps li::before { content: counter(s); width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font: 500 14px var(--mono); border: 1px solid var(--line); background: var(--panel-2); }
-.install-steps li b { display: block; font-weight: 600; color: var(--ink); }
-.install-steps li span { color: var(--muted); font-size: 15.5px; }
+.install-steps > ol > li { counter-increment: s; display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 16px; }
+.install-steps > ol > li::before { content: counter(s); width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font: 500 14px var(--mono); border: 1px solid var(--line); background: var(--panel-2); }
+.install-steps > ol > li b { display: block; font-weight: 600; color: var(--ink); }
+.install-steps > ol > li span { color: var(--muted); font-size: 15.5px; }
 .install-get { padding: 40px; border-left: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
   background: radial-gradient(70% 60% at 50% 30%, rgba(61,123,253,.12), transparent 75%), #0f0f12; }
 .install-get img { width: 88px; height: 88px; }
@@ -286,6 +286,8 @@ details.firstrun summary { padding: 14px 16px; }
 details.firstrun .body { padding: 0 16px 18px 46px; color: var(--muted); font-size: 15px; display: grid; gap: 10px; }
 details.firstrun .body b { color: var(--ink); font-weight: 600; }
 details.firstrun ul { margin: 0; padding-left: 18px; display: grid; gap: 8px; }
+details.firstrun li { line-height: 1.55; }
+details.firstrun code { display: block; margin-top: 6px; overflow-x: auto; white-space: nowrap; font: 13px var(--mono); color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
 
 /* Disclosure summary (shared) */
 summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 12px; font-weight: 600; }
