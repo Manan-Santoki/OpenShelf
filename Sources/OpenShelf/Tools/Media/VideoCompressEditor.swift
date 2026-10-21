@@ -170,7 +170,8 @@ final class VideoCompressModel {
             do {
                 loaded.append(try await VideoSourceInfo.load(url))
             } catch {
-                loadError = urls.count == 1 ? "This video can’t be read." : "“\(url.lastPathComponent)” can’t be read."
+                let text = urls.count == 1 ? "This video can’t be read." : "“\(url.lastPathComponent)” can’t be read."
+                loadError = MediaLoading.loadError(error, otherwise: text)
                 return
             }
         }

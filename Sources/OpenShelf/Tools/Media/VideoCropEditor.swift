@@ -150,18 +150,12 @@ final class VideoCropModel {
 
     func load() async {
         do {
-            let size = try await MediaTools.displaySize(of: url)
-            let asset = AVURLAsset(url: url)
-            let duration = try await asset.load(.duration).seconds
-            let generator = AVAssetImageGenerator(asset: asset)
-            generator.appliesPreferredTrackTransform = true
-            generator.maximumSize = CGSize(width: 1600, height: 1600)
-            let time = MediaTime.cmTime(duration > 2 ? 1 : duration / 2)
-            frame = try await generator.image(at: time).image
+            guard let size = try await MediaLoading.basics(of: url).displaySize else { throw MediaToolError.noVideo(url) }
+            frame = try await MediaLoading.poster(of: url, maximumSize: 1600)
             bounds = CGRect(origin: .zero, size: size)
             crop = bounds
         } catch {
-            loadError = "This video can’t be read."
+            loadError = MediaLoading.loadError(error, otherwise: "This video can’t be read.")
         }
     }
 

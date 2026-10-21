@@ -24,10 +24,18 @@ enum MediaConversion {
         // GIFs can be made natively, but ffmpeg's two-pass palette looks better.
         let usesFFmpeg = !isNative || format.needsFFmpeg || (format == .gif && tools.ffmpeg != nil)
         do {
-            if !usesFFmpeg {
-                try await convertNatively(source, to: format, destination: destination, progress: progress)
-            } else {
+            if usesFFmpeg {
                 try await convertWithFFmpeg(source, to: format, destination: destination, tools: tools, progress: progress)
+            } else {
+                // A file named like one AVFoundation reads may not be one (an
+                // MPEG-TS stream saved as .mp4); ffmpeg gets a go at those.
+                try await MediaFallback.run(source, tools: tools) {
+                    try await convertNatively(source, to: format, destination: destination, progress: progress)
+                } fallback: { _ in
+                    // AVFoundation may have started the file before giving up.
+                    try? FileManager.default.removeItem(at: destination)
+                    try await convertWithFFmpeg(source, to: format, destination: destination, tools: tools, progress: progress)
+                }
             }
         } catch {
             // Don't leave a half-written file behind.
@@ -76,44 +84,20 @@ enum MediaConversion {
         let encoders = FFmpegEncoders.available(in: ffmpeg)
         let duration = await duration(of: source, tools: tools)
         let audio = await sourceAudio(of: source, tools: tools)
+        let input: [String] = ["-i", source.path]
 
+        var attempts: [[String]] = []
         if format == .mkv {
-            // Matroska holds almost any codec, so try copying the streams first.
-            do {
-                try await run(ffmpeg, source: source, destination: destination, arguments: ["-map", "0", "-c", "copy"], duration: duration, progress: progress)
-                return
-            } catch is CancellationError {
-                throw CancellationError()
-            } catch {
-                try? FileManager.default.removeItem(at: destination)
-            }
+            // Matroska holds almost any codec, so try copying every stream first.
+            attempts.append(input + ["-map", "0", "-c", "copy"])
+        } else if format == .mp4 || format == .mov,
+                  let probed = try? await ProbedMedia.load(source, ffprobe: tools.ffprobe),
+                  let copy = FFmpegArguments.streamCopy(to: format, from: probed) {
+            // H.264 or HEVC with AAC, as in most MPEG-TS recordings, only needs a new container.
+            attempts.append(input + copy)
         }
-        try await run(
-            ffmpeg,
-            source: source,
-            destination: destination,
-            arguments: FFmpegArguments.arguments(for: format, encoders: encoders, audio: audio),
-            duration: duration,
-            progress: progress
-        )
-    }
-
-    private static func run(
-        _ ffmpeg: URL,
-        source: URL,
-        destination: URL,
-        arguments: [String],
-        duration: Double,
-        progress: @escaping @Sendable (Double) -> Void
-    ) async throws {
-        try await ProcessRunner.run(
-            ffmpeg,
-            ["-y", "-loglevel", "error", "-i", source.path] + arguments + ["-progress", "pipe:1", "-nostats", destination.path]
-        ) { line in
-            // ffmpeg reports "out_time_us=<microseconds>" (also as out_time_ms, in µs).
-            guard duration > 0, line.hasPrefix("out_time_us="), let micros = Double(line.dropFirst(12)) else { return }
-            progress(min(micros / 1_000_000 / duration, 1))
-        }
+        attempts.append(input + FFmpegArguments.arguments(for: format, encoders: encoders, audio: audio))
+        try await FFmpegJob.export(ffmpeg, attempts: attempts, to: destination, duration: duration, progress: progress)
     }
 
     private static func duration(of source: URL, tools: ExternalTools) async -> Double {
@@ -133,14 +117,13 @@ enum MediaConversion {
     }
 
     private static func requireAudio(in source: URL, isNative: Bool, tools: ExternalTools) async throws {
-        let hasAudio: Bool
-        if isNative {
-            hasAudio = try await !AVURLAsset(url: source).loadTracks(withMediaType: .audio).isEmpty
-        } else {
-            // When ffprobe can't tell, let ffmpeg try and report.
-            hasAudio = MediaProbe.hasAudioTrack(source, ffprobe: tools.ffprobe) ?? true
+        var hasAudio: Bool?
+        if isNative, let tracks = try? await AVURLAsset(url: source).loadTracks(withMediaType: .audio) {
+            hasAudio = !tracks.isEmpty
         }
-        guard hasAudio else {
+        // ffprobe answers for the rest, including "native" files AVFoundation
+        // can't open. When it can't tell either, let the conversion try and report.
+        guard hasAudio ?? MediaProbe.hasAudioTrack(source, ffprobe: tools.ffprobe) ?? true else {
             throw ConversionError.failed("“\(source.lastPathComponent)” has no audio track.")
         }
     }
@@ -153,6 +136,9 @@ enum MediaConversion {
         progress: @escaping @Sendable (Double) -> Void
     ) async throws {
         let asset = AVURLAsset(url: source)
+        // Opening the file first fails with a clear "can't open" (see
+        // `MediaFallback`) rather than the export's catch-all error.
+        _ = try await asset.load(.duration)
         guard let session = AVAssetExportSession(asset: asset, presetName: preset) else {
             throw ConversionError.failed("This file can’t be exported as \(destination.pathExtension.uppercased()).")
         }
@@ -220,6 +206,32 @@ enum FFmpegArguments {
         default:
             return []
         }
+    }
+
+    /// Arguments that copy `probed`'s picture and sound into an MP4 or MOV
+    /// untouched, when they're in codecs Apple's players handle: 8-bit H.264,
+    /// HEVC and AAC. Nil when they need re-encoding.
+    static func streamCopy(to format: OutputFormat, from probed: ProbedMedia) -> [String]? {
+        guard format == .mp4 || format == .mov, let video = probed.video else { return nil }
+        let pixelFormat: String = video.pixelFormat ?? ""
+        let playable: Bool
+        switch video.codec {
+        case "h264": playable = ["yuv420p", "yuvj420p"].contains(pixelFormat)
+        case "hevc": playable = ["yuv420p", "yuvj420p", "yuv420p10le"].contains(pixelFormat)
+        default: playable = false
+        }
+        guard playable, probed.audio.allSatisfy({ $0.codec == "aac" }) else { return nil }
+
+        // Every sound track comes along, not just the first.
+        var arguments: [String] = ["-map", "0:V:0", "-map", "0:a?", "-c", "copy"]
+        if video.codec == "hevc" {
+            // QuickTime only plays HEVC tagged "hvc1"; ffmpeg's default is "hev1".
+            arguments += ["-tag:v", "hvc1"]
+        }
+        if format == .mp4 {
+            arguments += ["-movflags", "+faststart"]
+        }
+        return arguments
     }
 }
 

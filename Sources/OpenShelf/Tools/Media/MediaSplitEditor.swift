@@ -171,7 +171,7 @@ final class SplitModel {
     }
 
     func load() async {
-        duration = (try? await AVURLAsset(url: url).load(.duration).seconds) ?? 0
+        duration = (try? await MediaLoading.basics(of: url).duration) ?? 0
     }
 
     func reset() {

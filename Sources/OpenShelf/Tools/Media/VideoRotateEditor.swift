@@ -114,14 +114,9 @@ final class RotateModel {
 
     func load() async {
         do {
-            let asset = AVURLAsset(url: url)
-            let duration = try await asset.load(.duration).seconds
-            let generator = AVAssetImageGenerator(asset: asset)
-            generator.appliesPreferredTrackTransform = true
-            generator.maximumSize = CGSize(width: 1200, height: 1200)
-            frame = try await generator.image(at: MediaTime.cmTime(duration > 2 ? 1 : duration / 2)).image
+            frame = try await MediaLoading.poster(of: url, maximumSize: 1200)
         } catch {
-            loadError = "This video can’t be read."
+            loadError = MediaLoading.loadError(error, otherwise: "This video can’t be read.")
         }
     }
 

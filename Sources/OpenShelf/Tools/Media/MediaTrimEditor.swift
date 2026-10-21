@@ -29,8 +29,16 @@ struct MediaTrimEditor: View {
                     if let error = model.loadError {
                         Label(error, systemImage: "exclamationmark.triangle")
                             .foregroundStyle(.secondary)
-                    } else if model.isVideo {
+                    } else if model.isVideo && model.isPlayable {
                         PlayerSurface(player: model.player)
+                    } else if model.isVideo {
+                        // No playback; the filmstrip frame under the playhead stands in.
+                        if let frame = model.stillFrame {
+                            Image(decorative: frame, scale: 1)
+                                .resizable()
+                                .scaledToFit()
+                                .accessibilityLabel("Preview frame")
+                        }
                     } else {
                         VStack(spacing: 8) {
                             Image(systemName: "waveform")
@@ -56,7 +64,7 @@ struct MediaTrimEditor: View {
                     .help("Play the selection (Space)")
                     .accessibilityLabel(model.isPlaying ? "Pause" : "Play selection")
                     .keyboardShortcut(.space, modifiers: [])
-                    .disabled(!model.isReady)
+                    .disabled(!model.isReady || !model.isPlayable)
 
                     Text("Start").foregroundStyle(.secondary)
                     TimeField(label: "Start time", seconds: model.startBinding)
@@ -86,6 +94,8 @@ final class TrimModel {
     let player: AVPlayer
     private(set) var duration: Double = 0
     private(set) var isVideo = true
+    /// False for files AVFoundation can't read, which are trimmed with ffmpeg.
+    private(set) var isPlayable = true
     private(set) var isReady = false
     private(set) var loadError: String?
     private(set) var thumbnails: [CGImage] = []
@@ -113,13 +123,21 @@ final class TrimModel {
         Binding { self.end } set: { self.setEnd($0) }
     }
 
+    /// The filmstrip frame nearest the playhead, for videos that can't play.
+    var stillFrame: CGImage? {
+        guard !thumbnails.isEmpty, duration > 0 else { return nil }
+        let index = Int(currentTime / duration * Double(thumbnails.count))
+        return thumbnails[min(max(index, 0), thumbnails.count - 1)]
+    }
+
     func load() async {
-        let asset = AVURLAsset(url: url)
         do {
-            duration = try await asset.load(.duration).seconds
-            isVideo = try await !asset.loadTracks(withMediaType: .video).isEmpty
+            let basics = try await MediaLoading.basics(of: url)
+            duration = basics.duration
+            isVideo = basics.hasVideo
+            isPlayable = basics.isPlayable
         } catch {
-            loadError = "This file can’t be read."
+            loadError = MediaLoading.loadError(error, otherwise: "This file can’t be read.")
             return
         }
         guard duration.isFinite, duration > 0 else {
@@ -136,10 +154,15 @@ final class TrimModel {
             }
         }
 
-        if isVideo {
+        // Files only ffmpeg reads get their previews from it, and can't play.
+        if isVideo && isPlayable {
             thumbnails = await Self.thumbnails(for: url, count: 10, duration: duration)
-        } else {
+        } else if isVideo {
+            thumbnails = await MediaLoading.thumbnails(of: url, count: 10, duration: duration)
+        } else if isPlayable {
             waveform = await Self.waveform(for: url, bars: 300)
+        } else {
+            waveform = await MediaLoading.waveform(of: url, bars: 300, duration: duration)
         }
     }
 

@@ -96,8 +96,9 @@ enum MediaProbe {
 
 /// Which media containers macOS can open itself, and which need ffmpeg.
 enum MediaFormats {
-    /// Video containers AVFoundation can't read.
-    static let ffmpegOnlyVideoExtensions: Set<String> = ["mkv", "webm", "avi", "wmv", "flv", "asf", "ogv", "mpg", "mpeg", "m2ts", "mts", "vob", "rm", "rmvb"]
+    /// Video containers AVFoundation can't read. (Recent macOS opens some
+    /// MPEG-TS files, but not reliably across the versions OpenShelf runs on.)
+    static let ffmpegOnlyVideoExtensions: Set<String> = ["mkv", "webm", "avi", "wmv", "flv", "asf", "ogv", "mpg", "mpeg", "m2ts", "mts", "ts", "vob", "rm", "rmvb"]
     /// Audio containers AVFoundation can't read.
     static let ffmpegOnlyAudioExtensions: Set<String> = ["ogg", "oga", "opus", "wma", "mka", "ape", "ac3", "wv", "spx"]
 
@@ -106,6 +107,23 @@ enum MediaFormats {
     static func isAVFoundationReadable(_ url: URL) -> Bool {
         let ext = url.resolvingSymlinksInPath().pathExtension.lowercased()
         return !ffmpegOnlyVideoExtensions.contains(ext) && !ffmpegOnlyAudioExtensions.contains(ext)
+    }
+
+    /// Whether `url` starts like an MPEG transport stream: 188-byte packets,
+    /// each opening with the sync byte 0x47. ".ts" is also TypeScript, so the
+    /// name alone doesn't say. Nil when the file can't be read.
+    static func isTransportStream(_ url: URL) -> Bool? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let header = try? handle.read(upToCount: 189) else { return nil }
+        return isTransportStream(header: header)
+    }
+
+    static func isTransportStream(header: Data) -> Bool {
+        let bytes = [UInt8](header)
+        guard bytes.first == 0x47 else { return false }
+        // A second packet, when the file is long enough to have one.
+        return bytes.count < 189 || bytes[188] == 0x47
     }
 }
 

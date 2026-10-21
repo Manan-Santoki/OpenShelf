@@ -19,9 +19,11 @@ enum FileKind: Hashable {
         // Classify what a symlink points to, not the link itself.
         let url = url.resolvingSymlinksInPath()
         let extensionName = url.pathExtension.lowercased()
+        // ".ts" is an MPEG transport stream or TypeScript source; only the bytes tell.
+        let isTypeScript = extensionName == "ts" && MediaFormats.isTransportStream(url) == false
         // Formats the system types don't describe well (or at all) go by name.
         // RTFD is a folder on disk but a document to people.
-        if let kind = Self.kindsByExtension[extensionName] {
+        if let kind = Self.kindsByExtension[extensionName], !isTypeScript {
             self = kind
             return
         }
@@ -39,7 +41,9 @@ enum FileKind: Hashable {
             self = .other
             return
         }
-        self = Self.kind(of: type)
+        let kind = Self.kind(of: type)
+        // Without an editor that claims TypeScript, macOS calls every .ts a movie.
+        self = isTypeScript && kind == .video ? .other : kind
     }
 
     /// Extensions classified before asking the system: subtitles, spreadsheets

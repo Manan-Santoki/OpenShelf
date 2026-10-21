@@ -108,9 +108,9 @@ final class MergeModel {
     func load() async {
         var allVideo = true
         for index in items.indices {
-            let asset = AVURLAsset(url: items[index].url)
-            items[index].duration = try? await asset.load(.duration).seconds
-            if (try? await asset.loadTracks(withMediaType: .video).isEmpty) ?? true { allVideo = false }
+            let basics = try? await MediaLoading.basics(of: items[index].url)
+            items[index].duration = basics?.duration
+            if basics?.hasVideo != true { allVideo = false }
         }
         isVideo = allVideo
     }

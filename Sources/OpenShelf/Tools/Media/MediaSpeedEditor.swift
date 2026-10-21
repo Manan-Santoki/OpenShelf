@@ -115,7 +115,7 @@ final class SpeedModel {
     func load() async {
         var total: Double = 0
         for url in urls {
-            if let duration = try? await AVURLAsset(url: url).load(.duration).seconds, duration.isFinite {
+            if let duration = try? await MediaLoading.basics(of: url).duration {
                 total += duration
             }
         }

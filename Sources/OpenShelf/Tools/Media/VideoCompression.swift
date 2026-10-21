@@ -89,7 +89,17 @@ struct VideoSourceInfo: Equatable, Sendable {
         return CGSize(width: abs(rect.width).rounded(), height: abs(rect.height).rounded())
     }
 
-    static func load(_ url: URL) async throws -> VideoSourceInfo {
+    /// Reads the tracks with AVFoundation, or with ffprobe for files it turns
+    /// out not to read (see `MediaFallback`).
+    static func load(_ url: URL, tools: ExternalTools = .current) async throws -> VideoSourceInfo {
+        try await MediaFallback.run(url, tools: tools) {
+            try await loadWithAVFoundation(url)
+        } fallback: { _ in
+            try await probe(url, ffprobe: tools.ffprobe)
+        }
+    }
+
+    private static func loadWithAVFoundation(_ url: URL) async throws -> VideoSourceInfo {
         let asset = AVURLAsset(url: url)
         guard let video = try await asset.loadTracks(withMediaType: .video).first else { throw MediaToolError.noVideo(url) }
         let (naturalSize, transform, frameRate, dataRate) = try await video.load(.naturalSize, .preferredTransform, .nominalFrameRate, .estimatedDataRate)
@@ -126,6 +136,45 @@ struct VideoSourceInfo: Equatable, Sendable {
         else { return nil }
         // Core Media and AVFoundation spell these values the same way.
         return [AVVideoColorPrimariesKey: primaries, AVVideoTransferFunctionKey: transfer, AVVideoYCbCrMatrixKey: matrix]
+    }
+}
+
+extension VideoSourceInfo {
+    /// The same facts from ffprobe. Colours aren't needed: ffmpeg keeps the
+    /// source's own tags when it re-encodes.
+    static func probe(_ url: URL, ffprobe: URL?) async throws -> VideoSourceInfo {
+        let probed = try await ProbedMedia.load(url, ffprobe: ffprobe)
+        guard let video = probed.video else { throw MediaToolError.noVideo(url) }
+        return VideoSourceInfo(probed: probed, video: video, fileSize: MediaSize.fileSize(url))
+    }
+
+    init(probed: ProbedMedia, video: ProbedMedia.Video, fileSize: Int64) {
+        self.init(naturalSize: CGSize(width: video.width, height: video.height), duration: probed.duration, fileSize: fileSize)
+        preferredTransform = Self.transform(rotatedClockwise: video.rotation)
+        frameRate = video.framesPerSecond ?? 30
+        isHEVC = video.codec == "hevc"
+        isHDR = video.isHDR
+        audioTracks = probed.audio.map { AudioTrack(audio: $0.source, sampleRate: $0.sampleRate ?? 44_100) }
+        if let rate = video.bitRate {
+            bitRate = rate
+        } else if probed.duration > 0 {
+            // MPEG-TS doesn't say what the picture alone takes; the whole
+            // file's rate less the sound is close.
+            let total: Double = Double(fileSize) * 8 / probed.duration
+            let sound: Int = audioTracks.reduce(0) { $0 + ($1.audio.bitRate ?? 0) }
+            bitRate = max(Int(total) - sound, 0)
+        }
+    }
+
+    /// The preferred transform that turns a frame `degrees` clockwise, as
+    /// AVFoundation reports it for phone videos.
+    static func transform(rotatedClockwise degrees: Int) -> CGAffineTransform {
+        switch degrees {
+        case 90: CGAffineTransform(a: 0, b: 1, c: -1, d: 0, tx: 0, ty: 0)
+        case 180: CGAffineTransform(a: -1, b: 0, c: 0, d: -1, tx: 0, ty: 0)
+        case 270: CGAffineTransform(a: 0, b: -1, c: 1, d: 0, tx: 0, ty: 0)
+        default: .identity
+        }
     }
 }
 
@@ -260,21 +309,36 @@ extension MediaTools {
         _ url: URL,
         resolution: VideoResolution,
         quality: VideoQuality,
+        tools: ExternalTools = .current,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws -> URL? {
-        let source = try await VideoSourceInfo.load(url)
+        let source = try await VideoSourceInfo.load(url, tools: tools)
         let plan = VideoCompressionPlan(source: source, resolution: resolution, quality: quality)
         let destination = OutputNaming.destination(for: url, suffix: "Compressed", pathExtension: "mp4")
         try SaveError.checkWritable(destination)
 
         // Like `export`, write a hidden file and move it into place only once
-        // it's complete and worth keeping.
-        let partial = partialURL(for: destination)
-        do {
-            try await transcode(url, source: source, plan: plan, to: partial, progress: progress)
-        } catch {
-            discardPartial(partial)
-            throw error
+        // it's complete and worth keeping. ffmpeg follows the same plan when
+        // AVFoundation can't read the file, in a partial file of its own.
+        let partial: URL = try await MediaFallback.run(url, tools: tools) {
+            let partial = partialURL(for: destination)
+            do {
+                try await transcode(url, source: source, plan: plan, to: partial, progress: progress)
+            } catch {
+                discardPartial(partial)
+                throw error
+            }
+            return partial
+        } fallback: { ffmpeg in
+            let partial = partialURL(for: destination)
+            let arguments: [String] = FFmpegEdits.compress(url, plan: plan, source: source)
+            do {
+                try await FFmpegJob.run(ffmpeg, arguments, output: partial, duration: source.duration, progress: progress)
+            } catch {
+                discardPartial(partial)
+                throw error
+            }
+            return partial
         }
         guard MediaSize.fileSize(partial) < source.fileSize else {
             discardPartial(partial)

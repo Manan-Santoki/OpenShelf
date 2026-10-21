@@ -161,8 +161,18 @@ extension MediaTools {
 
     /// Joins videos (into "Merged.mp4") or audio files (into "Merged.m4a") in
     /// the given order, saved next to the first one.
-    static func merge(_ urls: [URL], progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
-        guard let first = urls.first, urls.count >= 2 else { throw MediaToolError.failed("Choose at least two files to merge.") }
+    static func merge(_ urls: [URL], tools: ExternalTools = .current, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
+        guard urls.count >= 2 else { throw MediaToolError.failed("Choose at least two files to merge.") }
+        // Any one file AVFoundation can't read sends them all through ffmpeg.
+        return try await MediaFallback.run(nil, tools: tools) {
+            try await mergeWithAVFoundation(urls, progress: progress)
+        } fallback: { ffmpeg in
+            try await mergeWithFFmpeg(urls, ffmpeg: ffmpeg, tools: tools, progress: progress)
+        }
+    }
+
+    private static func mergeWithAVFoundation(_ urls: [URL], progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
+        guard let first = urls.first else { throw MediaToolError.failed("Choose at least two files to merge.") }
         var allVideo = true
         for url in urls where try await AVURLAsset(url: url).loadTracks(withMediaType: .video).isEmpty {
             allVideo = false
@@ -264,6 +274,7 @@ extension MediaTools {
     static func split(
         _ url: URL,
         into segments: [SplitSegment],
+        tools: ExternalTools = .current,
         progress: @escaping @Sendable (_ fraction: Double, _ part: Int) -> Void
     ) async throws -> [URL] {
         var outputs: [URL] = []
@@ -271,7 +282,7 @@ extension MediaTools {
             for (index, segment) in segments.enumerated() {
                 try Task.checkCancellation()
                 let range = CMTimeRange(start: MediaTime.cmTime(segment.start), end: MediaTime.cmTime(segment.end))
-                let output = try await exportRange(url, range: range, suffix: "Part \(index + 1)") { fraction in
+                let output = try await exportRange(url, range: range, suffix: "Part \(index + 1)", tools: tools) { fraction in
                     progress((Double(index) + fraction) / Double(segments.count), index + 1)
                 }
                 outputs.append(output)
@@ -290,7 +301,20 @@ extension MediaTools {
 
     /// Turns or mirrors a video. Turns keep the original frames and only change
     /// their orientation; a mirror re-encodes. Audio is kept.
-    static func rotate(_ url: URL, by rotation: VideoRotation, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
+    static func rotate(
+        _ url: URL,
+        by rotation: VideoRotation,
+        tools: ExternalTools = .current,
+        progress: @escaping @Sendable (Double) -> Void
+    ) async throws -> URL {
+        try await MediaFallback.run(url, tools: tools) {
+            try await rotateWithAVFoundation(url, by: rotation, progress: progress)
+        } fallback: { ffmpeg in
+            try await rotateWithFFmpeg(url, by: rotation, ffmpeg: ffmpeg, tools: tools, progress: progress)
+        }
+    }
+
+    private static func rotateWithAVFoundation(_ url: URL, by rotation: VideoRotation, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
         let asset = AVURLAsset(url: url)
         guard let source = try await asset.loadTracks(withMediaType: .video).first else { throw MediaToolError.noVideo(url) }
         let audioTracks = try await asset.loadTracks(withMediaType: .audio)

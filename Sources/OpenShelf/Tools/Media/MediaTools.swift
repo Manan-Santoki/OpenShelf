@@ -25,11 +25,23 @@ enum MediaToolError: LocalizedError {
 
 /// Video and audio edits built on AVFoundation compositions and export sessions.
 /// Every function writes a new file beside the source and never overwrites.
+///
+/// Files AVFoundation turns out not to read, like an MPEG-TS stream named
+/// .mp4, are edited with ffmpeg instead when it's installed (see
+/// `MediaFallback` and MediaToolsFFmpeg.swift).
 enum MediaTools {
     // MARK: Mute
 
     /// A copy of a video with its audio tracks removed.
-    static func mute(_ url: URL, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
+    static func mute(_ url: URL, tools: ExternalTools = .current, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
+        try await MediaFallback.run(url, tools: tools) {
+            try await muteWithAVFoundation(url, progress: progress)
+        } fallback: { ffmpeg in
+            try await muteWithFFmpeg(url, ffmpeg: ffmpeg, tools: tools, progress: progress)
+        }
+    }
+
+    private static func muteWithAVFoundation(_ url: URL, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
         let asset = AVURLAsset(url: url)
         let videoTracks = try await asset.loadTracks(withMediaType: .video)
         guard !videoTracks.isEmpty else { throw MediaToolError.noVideo(url) }
@@ -56,13 +68,32 @@ enum MediaTools {
     // MARK: Trim
 
     /// The part of a video or audio file within `range`.
-    static func trim(_ url: URL, range: CMTimeRange, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
-        try await exportRange(url, range: range, suffix: "Trimmed", progress: progress)
+    static func trim(
+        _ url: URL,
+        range: CMTimeRange,
+        tools: ExternalTools = .current,
+        progress: @escaping @Sendable (Double) -> Void
+    ) async throws -> URL {
+        try await exportRange(url, range: range, suffix: "Trimmed", tools: tools, progress: progress)
     }
 
     /// Writes `range` of a video or audio file as "<name> <suffix>", without
     /// re-encoding when the container allows it.
     static func exportRange(
+        _ url: URL,
+        range: CMTimeRange,
+        suffix: String,
+        tools: ExternalTools = .current,
+        progress: @escaping @Sendable (Double) -> Void
+    ) async throws -> URL {
+        try await MediaFallback.run(url, tools: tools) {
+            try await exportRangeWithAVFoundation(url, range: range, suffix: suffix, progress: progress)
+        } fallback: { ffmpeg in
+            try await exportRangeWithFFmpeg(url, range: range, suffix: suffix, ffmpeg: ffmpeg, tools: tools, progress: progress)
+        }
+    }
+
+    private static func exportRangeWithAVFoundation(
         _ url: URL,
         range: CMTimeRange,
         suffix: String,
@@ -96,6 +127,20 @@ enum MediaTools {
 
     /// Plays the whole file `rate` times faster (or slower, below 1).
     static func changeSpeed(
+        _ url: URL,
+        rate: Double,
+        keepsPitch: Bool,
+        tools: ExternalTools = .current,
+        progress: @escaping @Sendable (Double) -> Void
+    ) async throws -> URL {
+        try await MediaFallback.run(url, tools: tools) {
+            try await changeSpeedWithAVFoundation(url, rate: rate, keepsPitch: keepsPitch, progress: progress)
+        } fallback: { ffmpeg in
+            try await changeSpeedWithFFmpeg(url, rate: rate, keepsPitch: keepsPitch, ffmpeg: ffmpeg, tools: tools, progress: progress)
+        }
+    }
+
+    private static func changeSpeedWithAVFoundation(
         _ url: URL,
         rate: Double,
         keepsPitch: Bool,
@@ -188,7 +233,20 @@ enum MediaTools {
 
     /// Crops a video to `rect`, given in pixels of the upright frame with the
     /// origin at the top left. Audio is kept.
-    static func crop(_ url: URL, to rect: CGRect, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
+    static func crop(
+        _ url: URL,
+        to rect: CGRect,
+        tools: ExternalTools = .current,
+        progress: @escaping @Sendable (Double) -> Void
+    ) async throws -> URL {
+        try await MediaFallback.run(url, tools: tools) {
+            try await cropWithAVFoundation(url, to: rect, progress: progress)
+        } fallback: { ffmpeg in
+            try await cropWithFFmpeg(url, to: rect, ffmpeg: ffmpeg, tools: tools, progress: progress)
+        }
+    }
+
+    private static func cropWithAVFoundation(_ url: URL, to rect: CGRect, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
         let asset = AVURLAsset(url: url)
         guard let videoTrack = try await asset.loadTracks(withMediaType: .video).first else { throw MediaToolError.noVideo(url) }
         let audioTracks = try await asset.loadTracks(withMediaType: .audio)
@@ -341,7 +399,7 @@ enum MediaTools {
     }
 
     /// Audio formats a passthrough export can write back unchanged.
-    private static func audioPassthroughContainer(for url: URL) -> (fileType: AVFileType, pathExtension: String)? {
+    static func audioPassthroughContainer(for url: URL) -> (fileType: AVFileType, pathExtension: String)? {
         switch url.pathExtension.lowercased() {
         case "m4a": (.m4a, "m4a")
         case "wav", "wave": (.wav, "wav")
@@ -352,7 +410,7 @@ enum MediaTools {
     }
 
     /// Video encoders need even dimensions.
-    private static func evenRect(_ rect: CGRect) -> CGRect {
+    static func evenRect(_ rect: CGRect) -> CGRect {
         CGRect(
             x: rect.minX,
             y: rect.minY,
