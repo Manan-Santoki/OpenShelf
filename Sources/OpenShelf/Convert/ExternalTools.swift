@@ -43,27 +43,30 @@ struct ExternalTools: Equatable, Sendable {
     }
     private static let cache = Cache()
 
-    /// Looks in `locations`, in order. Tools named in the `IgnoredExternalTools`
-    /// default are treated as missing (see `ignoredTools`).
+    /// Looks in `locations`, in order. For tools named in the
+    /// `IgnoredExternalTools` default, only OpenShelf's own copies count (see
+    /// `ignoredTools`).
     static func detect(in locations: ToolLocations = .standard, ignoring ignored: Set<String> = ignoredTools) -> ExternalTools {
-        func find(_ name: String) -> URL? {
-            locations.commandDirectories
+        func find(_ name: String, ignoredAs key: String) -> URL? {
+            let directories = ignored.contains(key) ? locations.ownCommandDirectories : locations.commandDirectories
+            return directories
                 .map { $0.appendingPathComponent(name) }
                 .first { FileManager.default.isExecutableFile(atPath: $0.path) }
         }
-        let hidesFFmpeg = ignored.contains("ffmpeg")
+        let apps = ignored.contains("libreoffice") ? locations.ownLibreOfficeApps : locations.libreOfficeApps
         return ExternalTools(
-            ffmpeg: hidesFFmpeg ? nil : find("ffmpeg"),
-            cwebp: ignored.contains("cwebp") ? nil : find("cwebp"),
-            ffprobe: hidesFFmpeg ? nil : find("ffprobe"),
-            libreOffice: ignored.contains("libreoffice") ? nil : locations.libreOfficeApps
+            ffmpeg: find("ffmpeg", ignoredAs: "ffmpeg"),
+            cwebp: find("cwebp", ignoredAs: "cwebp"),
+            ffprobe: find("ffprobe", ignoredAs: "ffmpeg"),
+            libreOffice: apps
                 .map { $0.appendingPathComponent("Contents/MacOS/soffice") }
                 .first { FileManager.default.isExecutableFile(atPath: $0.path) }
         )
     }
 
-    /// Tools to treat as not installed, for trying OpenShelf as someone without
-    /// them would see it: `defaults write app.openshelf.OpenShelf
+    /// Tools whose Homebrew, MacPorts and /Applications copies are ignored, to
+    /// try OpenShelf as someone without them sees it, and to try installing
+    /// them from Settings: `defaults write app.openshelf.OpenShelf
     /// IgnoredExternalTools -array ffmpeg cwebp libreoffice` ("ffmpeg" covers
     /// ffprobe too). `defaults delete` the key to undo.
     static var ignoredTools: Set<String> {
@@ -76,6 +79,9 @@ struct ExternalTools: Equatable, Sendable {
 struct ToolLocations: Sendable {
     var commandDirectories: [URL]
     var libreOfficeApps: [URL]
+    /// Where OpenShelf installs tools itself (see `ToolInstallation`).
+    var ownCommandDirectories: [URL] = []
+    var ownLibreOfficeApps: [URL] = []
 
     /// Homebrew, MacPorts and the PATH come first: tools people installed
     /// themselves and keep up to date. OpenShelf's own copies (`ManagedTools`)
@@ -83,17 +89,16 @@ struct ToolLocations: Sendable {
     /// GUI apps don't inherit the shell's PATH, hence the fixed folders.
     static var standard: ToolLocations {
         let path = ProcessInfo.processInfo.environment["PATH"]?.split(separator: ":").map { URL(fileURLWithPath: String($0)) } ?? []
-        let home = FileManager.default.homeDirectoryForCurrentUser
+        // `brew install --cask libreoffice` uses /Applications; OpenShelf
+        // installs into ~/Applications, which needs no administrator.
+        let ownApp = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications/LibreOffice.app")
         return ToolLocations(
             commandDirectories: ["/opt/homebrew/bin", "/usr/local/bin", "/opt/local/bin"].map { URL(fileURLWithPath: $0) }
                 + path
                 + [ManagedTools.directory],
-            // `brew install --cask libreoffice` uses /Applications; OpenShelf
-            // installs into ~/Applications, which needs no administrator.
-            libreOfficeApps: [
-                URL(fileURLWithPath: "/Applications/LibreOffice.app"),
-                home.appendingPathComponent("Applications/LibreOffice.app"),
-            ]
+            libreOfficeApps: [URL(fileURLWithPath: "/Applications/LibreOffice.app"), ownApp],
+            ownCommandDirectories: [ManagedTools.directory],
+            ownLibreOfficeApps: [ownApp]
         )
     }
 }

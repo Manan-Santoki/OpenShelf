@@ -232,6 +232,20 @@ struct ToolDetectionTests {
         #expect(tools.cwebp != nil)
     }
 
+    @Test func ignoringKeepsOpenShelfsOwnCopies() throws {
+        let homebrew = try makeFolder()
+        let own = try makeFolder()
+        defer {
+            try? FileManager.default.removeItem(at: homebrew)
+            try? FileManager.default.removeItem(at: own)
+        }
+        _ = try makeExecutable("ffmpeg", in: homebrew)
+        let ownFFmpeg = try makeExecutable("ffmpeg", in: own)
+        let locations = ToolLocations(commandDirectories: [homebrew, own], libreOfficeApps: [], ownCommandDirectories: [own])
+        // So installing from Settings can be tried on a Mac that has Homebrew's.
+        #expect(ExternalTools.detect(in: locations, ignoring: ["ffmpeg"]).ffmpeg == ownFFmpeg)
+    }
+
     @Test func managedToolsLiveInApplicationSupport() {
         #expect(ManagedTools.directory.path.hasSuffix("Library/Application Support/OpenShelf/Tools"))
         #expect(ToolLocations.standard.commandDirectories.last == ManagedTools.directory)
