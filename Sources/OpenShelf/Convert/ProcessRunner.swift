@@ -16,6 +16,7 @@ enum ProcessRunner {
         _ executable: URL,
         _ arguments: [String],
         currentDirectory: URL? = nil,
+        standardInputFile: URL? = nil,
         standardOutputFile: URL? = nil,
         onOutputLine: (@Sendable (String) -> Void)? = nil
     ) async throws {
@@ -25,6 +26,9 @@ enum ProcessRunner {
         process.arguments = arguments
         if let currentDirectory {
             process.currentDirectoryURL = currentDirectory
+        }
+        if let standardInputFile {
+            process.standardInput = try FileHandle(forReadingFrom: standardInputFile)
         }
 
         let errorPipe = Pipe()
