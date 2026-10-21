@@ -2,7 +2,8 @@ import CoreGraphics
 
 /// Decides where a shelf settles after the user moves it: flush against the left
 /// or right screen edge when released close to it, otherwise wherever it was
-/// dropped. Either way it is kept fully inside the visible screen area.
+/// dropped. Either way it is kept fully inside the visible screen area, and its
+/// height on screen is the user's: docking only ever moves it sideways.
 struct EdgeDocking {
     var threshold: CGFloat = 48
 

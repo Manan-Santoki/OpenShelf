@@ -22,7 +22,9 @@ final class ShelfPanel: NSPanel {
         backgroundColor = .clear
         hasShadow = true
         hidesOnDeactivate = false
-        isMovableByWindowBackground = true
+        // Moved only by its top bar (`WindowDragArea`), which places it exactly;
+        // a window-server drag can be tiled and re-centred at a screen edge.
+        isMovableByWindowBackground = false
         isReleasedWhenClosed = false
         animationBehavior = .utilityWindow
     }
