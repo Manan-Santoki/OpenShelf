@@ -75,7 +75,8 @@ struct WheelOrderingTests {
     }
 
     @Test func videoFormatsWithoutFFmpegFitOnOnePage() {
-        #expect(formats(urls("a.mov"), noTools) == [.mp4, .m4a, .zip])
+        // GIF is made natively, so it stays without ffmpeg.
+        #expect(formats(urls("a.mov"), noTools) == [.mp4, .m4a, .gif, .zip])
     }
 
     @Test func audioFormatsWithFFmpeg() {
