@@ -6,6 +6,21 @@ tags `v<version>` and publishes a GitHub release with that section as notes.
 
 Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
 
+## [1.0.4] - 2026-10-21
+
+### Fixed
+
+- **The wheel's shadow is no longer cut off.** Its soft shadow used to stop at a
+  straight edge around the wheel, which showed on dark backgrounds. The wheel
+  now has room for the whole shadow, so it blends in seamlessly. Thanks to the
+  Reddit commenter who spotted it.
+- **You can always see what a wedge will do.** Finder's drag thumbnail covers
+  the centre of the wheel, so the file size and the hovered action now also
+  appear in a label above the wheel.
+- **Arrow keys no longer switch desktops by accident.** Control or Command plus
+  an arrow is a macOS shortcut (⌃→ switches desktops), so the wheel's arrow keys
+  wait until those keys are released, and the label says so.
+
 ## [1.0.3] - 2026-10-20
 
 Fixes from a full edge-case test run (724 checks across 60+ unusual files).

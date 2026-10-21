@@ -6,7 +6,7 @@ struct WheelGeometry {
     static let outerRadius: CGFloat = 132
     static let innerRadius: CGFloat = 50
     /// Room around the wheel for its rim, shadow and the label above it.
-    static let margin: CGFloat = 48
+    static let margin: CGFloat = 76
     static var panelSide: CGFloat { (outerRadius + margin) * 2 }
 
     var wedgeCount: Int
