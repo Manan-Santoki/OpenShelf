@@ -5,7 +5,7 @@ struct ProcessFailure: LocalizedError {
     let message: String
 
     var errorDescription: String? {
-        message.isEmpty ? "\(tool) failed." : "\(tool) failed: \(message)"
+        message.isEmpty ? "\(tool) failed." : "\(tool) failed: \(FailureMessage.sanitized(message))"
     }
 }
 

@@ -11,6 +11,7 @@ struct PDFCompressEditor: View {
     @State private var estimate: Int64?
     @State private var estimateFailed = false
     @State private var isWorking = false
+    @State private var notice: String?
     private let originalSizes: [Int64]
 
     init(urls: [URL], actions: EditorActions) {
@@ -51,10 +52,19 @@ struct PDFCompressEditor: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 sizeSummary
+                if let notice {
+                    Label(notice, systemImage: "checkmark.circle")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 Spacer(minLength: 0)
             }
         }
-        .task(id: level) { await updateEstimate() }
+        .task(id: level) {
+            notice = nil
+            await updateEstimate()
+        }
     }
 
     private var sizeSummary: some View {
@@ -109,6 +119,7 @@ struct PDFCompressEditor: View {
 
     private func compress() {
         isWorking = true
+        notice = nil
         let urls = urls
         let level = level
         Task {
@@ -117,8 +128,24 @@ struct PDFCompressEditor: View {
             }.value
             isWorking = false
             switch result {
-            case .success(let saved): actions.saved(saved)
-            case .failure(let error): actions.failed(error)
+            case .success(let outcomes):
+                let saved = outcomes.compactMap { $0 }
+                let skipped = outcomes.count - saved.count
+                if saved.isEmpty {
+                    notice = PDFToolError.notSmaller(count: skipped).localizedDescription
+                    actions.failed(PDFToolError.notSmaller(count: skipped))
+                } else {
+                    actions.saved(saved)
+                    if skipped > 0 {
+                        ToastController.shared.show(Toast(
+                            systemImage: "checkmark",
+                            title: "Saved \(saved.count) of \(outcomes.count)",
+                            subtitle: "\(skipped) already as small as \(skipped == 1 ? "it gets" : "they get") — not saved"
+                        ))
+                    }
+                }
+            case .failure(let error):
+                actions.failed(error)
             }
         }
     }

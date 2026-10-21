@@ -23,9 +23,7 @@ enum MediaConversion {
         case .mov:
             try await export(source, to: destination, preset: AVAssetExportPresetHighestQuality, fileType: .mov, progress: progress)
         case .m4a:
-            guard try await !AVURLAsset(url: source).loadTracks(withMediaType: .audio).isEmpty else {
-                throw ConversionError.failed("“\(source.lastPathComponent)” has no audio track.")
-            }
+            try await requireAudio(in: source)
             try await export(source, to: destination, preset: AVAssetExportPresetAppleM4A, fileType: .m4a, progress: progress)
         case .wav:
             try await ProcessRunner.run(afconvert, ["-f", "WAVE", "-d", "LEI16", source.path, destination.path])
@@ -34,6 +32,7 @@ enum MediaConversion {
         case .flac:
             try await ProcessRunner.run(afconvert, ["-f", "flac", "-d", "flac", source.path, destination.path])
         case .mp3:
+            try await requireAudio(in: source)
             try await ffmpeg(tools, source: source, destination: destination, arguments: ["-vn", "-codec:a", "libmp3lame", "-q:a", "2"], progress: progress)
         case .gif:
             // Two-pass palette for clean colours; capped at 720 px wide and 12 fps to keep files small.
@@ -43,6 +42,12 @@ enum MediaConversion {
             throw ConversionError.unsupported("media to \(format.title)")
         }
         return destination
+    }
+
+    private static func requireAudio(in source: URL) async throws {
+        guard try await !AVURLAsset(url: source).loadTracks(withMediaType: .audio).isEmpty else {
+            throw ConversionError.failed("“\(source.lastPathComponent)” has no audio track.")
+        }
     }
 
     private static func export(

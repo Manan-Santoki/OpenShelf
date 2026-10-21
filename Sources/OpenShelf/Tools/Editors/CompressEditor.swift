@@ -25,16 +25,63 @@ struct CompressOptions: Equatable, Sendable {
     var maxDimension: Int?
 }
 
+enum CompressError: LocalizedError, Equatable {
+    /// Nothing was saved because no image got smaller.
+    case notSmaller(count: Int)
+
+    var errorDescription: String? {
+        switch self {
+        case .notSmaller(let count):
+            count == 1
+                ? "Already as small as it gets — nothing saved."
+                : "These \(count) files are already as small as they get — nothing saved."
+        }
+    }
+}
+
 /// Encodes images to meet `CompressOptions`.
 enum ImageCompressor {
     static let lossyTypes = Set([UTType.jpeg, .heic] + [UTType("public.heif"), UTType("public.avif")].compactMap { $0 })
 
+    /// The format a compressed copy is written in.
+    ///
+    /// "Keep" keeps lossy formats and PNG as they are. Formats ImageIO can't
+    /// write well (GIF, WebP, TIFF, BMP, …) become JPEG, or HEIC when the image
+    /// is see-through so transparency survives.
     static func outputType(for image: EditableImage, format: CompressOptions.Format) -> UTType {
+        outputType(sourceType: image.type, isTransparent: image.isTransparent, format: format)
+    }
+
+    static func outputType(sourceType: UTType, isTransparent: Bool, format: CompressOptions.Format) -> UTType {
         switch format {
-        case .keepOriginal: lossyTypes.contains(image.type) ? image.type : .jpeg
-        case .jpeg: .jpeg
-        case .heic: .heic
+        case .keepOriginal:
+            if lossyTypes.contains(sourceType) || sourceType == .png { return sourceType }
+            return isTransparent ? .heic : .jpeg
+        case .jpeg: return .jpeg
+        case .heic: return .heic
         }
+    }
+
+    /// A short explanation when the chosen format changes something the
+    /// user might not expect, shown under the format picker.
+    static func formatNote(for images: [EditableImage], format: CompressOptions.Format) -> String? {
+        var notes: [String] = []
+        if images.contains(where: \.isAnimated) {
+            notes.append("Animation isn’t kept; only the first frame is saved.")
+        }
+        let switched = images.filter { image in
+            let type = outputType(for: image, format: format)
+            return format == .keepOriginal && type != image.type
+        }
+        if let first = switched.first {
+            let from = first.type.preferredFilenameExtension?.uppercased() ?? "This format"
+            let to = outputType(for: first, format: format) == .heic ? "HEIC (keeps transparency)" : "JPEG"
+            notes.append("\(from) can’t be compressed in place — saves as \(to).")
+        }
+        if format == .jpeg, images.contains(where: \.isTransparent) {
+            notes.append("JPEG has no transparency; see-through areas become white.")
+        }
+        return notes.isEmpty ? nil : notes.joined(separator: " ")
     }
 
     static func originalSize(of url: URL) -> Int64 {
@@ -47,6 +94,9 @@ enum ImageCompressor {
         var pixels = image.cgImage
         if let maxDimension = options.maxDimension {
             pixels = resized(pixels, maxDimension: CGFloat(maxDimension)) ?? pixels
+        }
+        if type == .png {
+            return try compressPNG(pixels, image: image, options: options)
         }
 
         switch options.mode {
@@ -79,6 +129,34 @@ enum ImageCompressor {
             }
             return try encode(pixels, as: type, quality: 0.05, metadata: image.properties, source: image.url)
         }
+    }
+
+    /// PNG is lossless: re-encode as compact 8-bit (dropping an unused alpha
+    /// channel), and for a target size, scale down until it fits.
+    private static func compressPNG(_ pixels: CGImage, image: EditableImage, options: CompressOptions) throws -> Data {
+        var pixels = eightBit(pixels, keepsAlpha: image.isTransparent) ?? pixels
+        var data = try encode(pixels, as: .png, quality: 1, metadata: [:], source: image.url)
+        guard options.mode == .targetSize else { return data }
+        let target = Int(Double(originalSize(of: image.url)) * options.targetPercent / 100)
+        for _ in 0..<6 where data.count > target {
+            let scale = max(0.2, (Double(target) / Double(data.count)).squareRoot() * 0.95)
+            let longest = CGFloat(max(pixels.width, pixels.height)) * scale
+            guard longest >= 16, let smaller = resized(pixels, maxDimension: longest) else { break }
+            pixels = smaller
+            data = try encode(pixels, as: .png, quality: 1, metadata: [:], source: image.url)
+        }
+        return data
+    }
+
+    /// The image redrawn at 8 bits per channel, opaque unless `keepsAlpha`.
+    static func eightBit(_ image: CGImage, keepsAlpha: Bool) -> CGImage? {
+        guard let context = CGContext(
+            data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: 0,
+            space: image.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!,
+            bitmapInfo: keepsAlpha ? CGImageAlphaInfo.premultipliedLast.rawValue : CGImageAlphaInfo.noneSkipLast.rawValue
+        ) else { return nil }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        return context.makeImage()
     }
 
     static func encode(_ image: CGImage, as type: UTType, quality: Double, metadata: [CFString: Any], source: URL) throws -> Data {
@@ -117,15 +195,19 @@ enum ImageCompressor {
         return context.makeImage()
     }
 
+    /// Whether a compressed result is worth saving: only if it's smaller.
+    static func isWorthSaving(_ compressedSize: Int, originalSize: Int64) -> Bool {
+        originalSize <= 0 || Int64(compressedSize) < originalSize
+    }
+
     /// Writes the compressed copy next to the original, e.g. "Photo Compressed.jpg".
-    static func save(_ image: EditableImage, options: CompressOptions) throws -> URL {
+    /// Returns nil, writing nothing, when the result wouldn't be smaller.
+    static func save(_ image: EditableImage, options: CompressOptions) throws -> URL? {
         let data = try compress(image, options: options)
+        guard isWorthSaving(data.count, originalSize: originalSize(of: image.url)) else { return nil }
         let type = outputType(for: image, format: options.format)
-        let ext = type == image.type && !image.url.pathExtension.isEmpty
-            ? image.url.pathExtension
-            : type.preferredFilenameExtension ?? "jpg"
-        let url = OutputNaming.destination(for: image.url, suffix: "Compressed", pathExtension: ext)
-        try data.write(to: url, options: .withoutOverwriting)
+        let url = OutputNaming.destination(for: image.url, suffix: "Compressed", pathExtension: image.pathExtension(for: type))
+        try data.writeNew(to: url)
         return url
     }
 }
@@ -141,6 +223,8 @@ struct CompressEditor: View {
     @State private var estimate: Int64?
     @State private var estimateTask: Task<Void, Never>?
     @State private var isWorking = false
+    @State private var notice: String?
+    @State private var formatNote: String?
 
     private let originalSizes: [Int64]
 
@@ -148,15 +232,9 @@ struct CompressEditor: View {
         self.images = images
         self.actions = actions
         originalSizes = images.map { ImageCompressor.originalSize(of: $0.url) }
-        let allLossy = images.allSatisfy { ImageCompressor.lossyTypes.contains($0.type) }
-        _options = State(initialValue: CompressOptions(format: allLossy ? .keepOriginal : .jpeg))
     }
 
     private var totalOriginalSize: Int64 { originalSizes.reduce(0, +) }
-
-    private var canKeepOriginal: Bool {
-        images.allSatisfy { ImageCompressor.lossyTypes.contains($0.type) }
-    }
 
     var body: some View {
         EditorChrome(
@@ -164,7 +242,7 @@ struct CompressEditor: View {
             primaryTitle: isWorking ? "Compressing…" : "Compress",
             isPrimaryEnabled: !isWorking,
             actions: actions,
-            onReset: { options = CompressOptions(format: canKeepOriginal ? .keepOriginal : .jpeg) },
+            onReset: { options = CompressOptions() },
             onPrimary: compress
         ) {
             VStack(alignment: .leading, spacing: 14) {
@@ -186,9 +264,7 @@ struct CompressEditor: View {
 
                 EditorRow(label: "Format") {
                     Picker("Format", selection: $options.format) {
-                        if canKeepOriginal {
-                            Text("Keep").tag(CompressOptions.Format.keepOriginal)
-                        }
+                        Text("Keep").tag(CompressOptions.Format.keepOriginal)
                         Text("JPEG").tag(CompressOptions.Format.jpeg)
                         Text("HEIC").tag(CompressOptions.Format.heic)
                     }
@@ -208,11 +284,28 @@ struct CompressEditor: View {
                     Spacer(minLength: 0)
                 }
 
+                if let formatNote {
+                    Label(formatNote, systemImage: "info.circle")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 sizeSummary
+
+                if let notice {
+                    Label(notice, systemImage: "checkmark.circle")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
         .onAppear(perform: updateEstimate)
-        .onChange(of: options) { updateEstimate() }
+        .onChange(of: options) {
+            notice = nil
+            updateEstimate()
+        }
     }
 
     private var header: some View {
@@ -281,11 +374,15 @@ struct CompressEditor: View {
         estimate = nil
         let first = images[0]
         let options = options
+        let images = images
         let firstOriginal = originalSizes[0]
         let total = totalOriginalSize
         estimateTask = Task {
             try? await Task.sleep(for: .milliseconds(250))
             guard !Task.isCancelled else { return }
+            formatNote = await Task.detached(priority: .utility) {
+                ImageCompressor.formatNote(for: images, format: options.format)
+            }.value
             let size = await Task.detached(priority: .utility) {
                 (try? ImageCompressor.compress(first, options: options)).map { Int64($0.count) }
             }.value
@@ -296,17 +393,34 @@ struct CompressEditor: View {
 
     private func compress() {
         isWorking = true
+        notice = nil
         estimateTask?.cancel()
         let images = images
         let options = options
         Task {
-            let result = await Task.detached(priority: .userInitiated) { () -> Result<[URL], Error> in
+            let result = await Task.detached(priority: .userInitiated) { () -> Result<[URL?], Error> in
                 Result { try images.map { try ImageCompressor.save($0, options: options) } }
             }.value
             isWorking = false
             switch result {
-            case .success(let urls): actions.saved(urls)
-            case .failure(let error): actions.failed(error)
+            case .success(let outcomes):
+                let saved = outcomes.compactMap { $0 }
+                let skipped = outcomes.count - saved.count
+                if saved.isEmpty {
+                    notice = CompressError.notSmaller(count: skipped).localizedDescription
+                    actions.failed(CompressError.notSmaller(count: skipped))
+                } else {
+                    actions.saved(saved)
+                    if skipped > 0 {
+                        ToastController.shared.show(Toast(
+                            systemImage: "checkmark",
+                            title: "Saved \(saved.count) of \(outcomes.count)",
+                            subtitle: "\(skipped) already as small as \(skipped == 1 ? "it gets" : "they get") — not saved"
+                        ))
+                    }
+                }
+            case .failure(let error):
+                actions.failed(error)
             }
         }
     }

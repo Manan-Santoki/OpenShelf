@@ -88,6 +88,10 @@ enum ConversionCatalog {
         case .video:
             formats = [.mp4, .mov, .m4a]
             if tools.ffmpeg != nil { formats += [.gif, .mp3] }
+            // Silent videos have nothing to extract as audio.
+            if MediaProbe.hasAudioTrack(url.resolvingSymlinksInPath()) == false {
+                formats.removeAll { $0 == .m4a || $0 == .mp3 }
+            }
         case .subtitle:
             formats = [.txt, .srt, .vtt]
         case .archive:

@@ -23,6 +23,19 @@ enum Converter {
         tools: ExternalTools,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws -> [URL] {
+        do {
+            return try await run(source, to: format, tools: tools, progress: progress)
+        } catch {
+            throw FailureMessage.describe(error, source: source)
+        }
+    }
+
+    private static func run(
+        _ source: URL,
+        to format: OutputFormat,
+        tools: ExternalTools,
+        progress: @escaping @Sendable (Double) -> Void
+    ) async throws -> [URL] {
         switch format {
         case .zip:
             return [try await ArchiveConversion.zip([source])]

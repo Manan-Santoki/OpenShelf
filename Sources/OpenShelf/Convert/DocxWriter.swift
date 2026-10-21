@@ -44,6 +44,9 @@ enum DocxWriter {
         zip.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
         zip.currentDirectoryURL = root
         zip.arguments = ["-X", "-r", "-q", url.path, "[Content_Types].xml", "_rels", "word"]
+        // Failures surface as an error below; keep zip's own message out of the log.
+        zip.standardOutput = FileHandle.nullDevice
+        zip.standardError = FileHandle.nullDevice
         try zip.run()
         zip.waitUntilExit()
         guard zip.terminationStatus == 0 else { throw EditableImageError.unwritable(url) }

@@ -14,6 +14,8 @@ enum FileKind: Hashable {
     case other
 
     init(url: URL) {
+        // Classify what a symlink points to, not the link itself.
+        let url = url.resolvingSymlinksInPath()
         let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .contentTypeKey])
         if values?.isDirectory == true {
             self = .folder
@@ -24,7 +26,12 @@ enum FileKind: Hashable {
             self = .subtitle
             return
         }
-        guard let type = values?.contentType ?? UTType(filenameExtension: extensionName) else {
+        var type = values?.contentType ?? UTType(filenameExtension: extensionName)
+        // Without a telling extension the system only knows "data"; look inside.
+        if type == nil || type == .data || extensionName.isEmpty {
+            type = FileSniffer.type(of: url) ?? type
+        }
+        guard let type else {
             self = .other
             return
         }
@@ -49,4 +56,52 @@ enum FileKind: Hashable {
         UTType("org.oasis-open.opendocument.text"),
         UTType("net.daringfireball.markdown"),
     ].compactMap { $0 }
+}
+
+/// Recognises common formats from their first bytes, for files whose name
+/// doesn't say what they are.
+enum FileSniffer {
+    static func type(of url: URL) -> UTType? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let header = try? handle.read(upToCount: 16) else { return nil }
+        return type(ofHeader: header)
+    }
+
+    static func type(ofHeader data: Data) -> UTType? {
+        let bytes = [UInt8](data)
+        func starts(with prefix: [UInt8], at offset: Int = 0) -> Bool {
+            bytes.count >= offset + prefix.count && Array(bytes[offset..<offset + prefix.count]) == prefix
+        }
+        func ascii(_ string: String, at offset: Int = 0) -> Bool {
+            starts(with: Array(string.utf8), at: offset)
+        }
+
+        if starts(with: [0xFF, 0xD8, 0xFF]) { return .jpeg }
+        if starts(with: [0x89, 0x50, 0x4E, 0x47]) { return .png }
+        if ascii("GIF8") { return .gif }
+        if ascii("%PDF") { return .pdf }
+        if starts(with: [0x49, 0x49, 0x2A, 0x00]) || starts(with: [0x4D, 0x4D, 0x00, 0x2A]) { return .tiff }
+        // "BM" alone is too common in text; also require the zeroed reserved field.
+        if ascii("BM") && starts(with: [0, 0, 0, 0], at: 6) { return .bmp }
+        if ascii("RIFF") && ascii("WEBP", at: 8) { return .webP }
+        if ascii("RIFF") && ascii("WAVE", at: 8) { return .wav }
+        if ascii("FORM") && (ascii("AIFF", at: 8) || ascii("AIFC", at: 8)) { return .aiff }
+        if ascii("ID3") || starts(with: [0xFF, 0xFB]) { return .mp3 }
+        if ascii("fLaC") { return UTType("org.xiph.flac") ?? .audio }
+        if ascii("OggS") { return .audio }
+        if starts(with: [0x50, 0x4B, 0x03, 0x04]) { return .zip }
+        if starts(with: [0x1F, 0x8B]) { return .gzip }
+        if ascii("ftyp", at: 4), bytes.count >= 12 {
+            let brand = String(decoding: bytes[8..<12], as: UTF8.self)
+            switch brand {
+            case "heic", "heix", "heim", "heis", "mif1", "msf1": return .heic
+            case "avif", "avis": return UTType("public.avif") ?? .image
+            case "M4A ", "M4B ": return .mpeg4Audio
+            case "qt  ": return .quickTimeMovie
+            default: return .mpeg4Movie
+            }
+        }
+        return nil
+    }
 }

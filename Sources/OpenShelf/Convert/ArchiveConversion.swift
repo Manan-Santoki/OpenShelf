@@ -11,6 +11,14 @@ enum ArchiveConversion {
     /// next to the first.
     static func zip(_ sources: [URL]) async throws -> URL {
         guard let first = sources.first else { throw ConversionError.failed("Nothing to compress.") }
+        do {
+            return try await makeZip(sources, first: first)
+        } catch {
+            throw FailureMessage.describe(error, source: first)
+        }
+    }
+
+    private static func makeZip(_ sources: [URL], first: URL) async throws -> URL {
         if sources.count == 1 {
             let destination = OutputNaming.uniqueURL(in: first.deletingLastPathComponent(), baseName: first.lastPathComponent, pathExtension: "zip")
             try await ProcessRunner.run(ditto, ["-c", "-k", "--sequesterRsrc", "--keepParent", first.path, destination.path])

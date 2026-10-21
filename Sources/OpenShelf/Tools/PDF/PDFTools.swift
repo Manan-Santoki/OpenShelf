@@ -8,6 +8,8 @@ enum PDFToolError: LocalizedError {
     case locked(URL)
     case unwritable(URL)
     case nothingToSave
+    /// Compressing didn't make the files smaller, so nothing was saved.
+    case notSmaller(count: Int)
 
     var errorDescription: String? {
         switch self {
@@ -15,6 +17,10 @@ enum PDFToolError: LocalizedError {
         case .locked(let url): "“\(url.lastPathComponent)” is password-protected."
         case .unwritable(let url): "“\(url.lastPathComponent)” couldn’t be saved."
         case .nothingToSave: "There are no pages to save."
+        case .notSmaller(let count):
+            count == 1
+                ? "Already as small as it gets — nothing saved."
+                : "These \(count) PDFs are already as small as they get — nothing saved."
         }
     }
 }
@@ -115,7 +121,7 @@ enum PDFTools {
         }
         guard output.pageCount > 0 else { throw PDFToolError.nothingToSave }
         let destination = OutputNaming.uniqueURL(in: first.deletingLastPathComponent(), baseName: "Combined", pathExtension: "pdf")
-        guard output.write(to: destination) else { throw PDFToolError.unwritable(destination) }
+        try write(output, to: destination)
         return destination
     }
 
@@ -150,7 +156,7 @@ enum PDFTools {
             output.insert(page, at: output.pageCount)
         }
         let destination = OutputNaming.destination(for: url, suffix: "Edited", pathExtension: "pdf")
-        guard output.write(to: destination) else { throw PDFToolError.unwritable(destination) }
+        try write(output, to: destination)
         return destination
     }
 
@@ -214,7 +220,7 @@ enum PDFTools {
             guard let first = group.first, let last = group.last else { throw PDFToolError.nothingToSave }
             let suffix = first == last ? "Page \(first + 1)" : "Pages \(first + 1)-\(last + 1)"
             let destination = OutputNaming.destination(for: url, suffix: suffix, pathExtension: "pdf")
-            guard output.write(to: destination) else { throw PDFToolError.unwritable(destination) }
+            try write(output, to: destination)
             return destination
         }
     }
@@ -257,11 +263,13 @@ enum PDFTools {
         return try Data(contentsOf: temporary)
     }
 
-    /// Saves "<name> Compressed.pdf".
-    static func compress(_ url: URL, level: PDFCompressionLevel) throws -> URL {
+    /// Saves "<name> Compressed.pdf", or returns nil without writing anything
+    /// when the result wouldn't be smaller than the original.
+    static func compress(_ url: URL, level: PDFCompressionLevel) throws -> URL? {
         let data = try compressedData(url, level: level)
+        guard ImageCompressor.isWorthSaving(data.count, originalSize: fileSize(url)) else { return nil }
         let destination = OutputNaming.destination(for: url, suffix: "Compressed", pathExtension: "pdf")
-        try data.write(to: destination, options: .withoutOverwriting)
+        try data.writeNew(to: destination)
         return destination
     }
 
@@ -324,17 +332,26 @@ enum PDFTools {
             attributes[PDFDocumentAttribute.modificationDateAttribute] = Date()
             document.documentAttributes = attributes
             let destination = OutputNaming.destination(for: url, suffix: "Edited", pathExtension: "pdf")
-            guard document.write(to: destination) else { throw PDFToolError.unwritable(destination) }
+            try write(document, to: destination)
             return destination
         }
 
         document.documentAttributes = [:]
         let destination = OutputNaming.destination(for: url, suffix: "Clean", pathExtension: "pdf")
-        guard document.write(to: destination) else { throw PDFToolError.unwritable(destination) }
+        try write(document, to: destination)
         return destination
     }
 
     // MARK: Helpers
+
+    /// Writes `document`, explaining why if it can't be saved.
+    private static func write(_ document: PDFDocument, to destination: URL) throws {
+        try SaveError.checkWritable(destination)
+        guard document.write(to: destination) else {
+            try? FileManager.default.removeItem(at: destination)
+            throw SaveError.diagnose(destination)
+        }
+    }
 
     static func open(_ url: URL) throws -> PDFDocument {
         guard let document = PDFDocument(url: url) else { throw PDFToolError.unreadable(url) }

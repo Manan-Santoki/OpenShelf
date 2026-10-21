@@ -1,5 +1,5 @@
+import AppKit
 import CoreGraphics
-import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
@@ -39,7 +39,11 @@ struct EditableImage: @unchecked Sendable {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
               let typeIdentifier = CGImageSourceGetType(source) as String?,
               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
-        else { throw EditableImageError.unreadable(url) }
+        else {
+            // ImageIO can't read vector formats such as SVG; AppKit can draw them.
+            if let rasterized = rasterized(url) { return rasterized }
+            throw EditableImageError.unreadable(url)
+        }
 
         let width = properties[kCGImagePropertyPixelWidth] as? Int ?? 0
         let height = properties[kCGImagePropertyPixelHeight] as? Int ?? 0
@@ -77,21 +81,39 @@ struct EditableImage: @unchecked Sendable {
         keepsMetadata: Bool = true
     ) throws -> URL {
         let outputType = type ?? (Self.writableTypes.contains(self.type) ? self.type : .png)
-        // Keep the original's spelling ("jpg", not "jpeg") when the format is unchanged.
-        let pathExtension = outputType == self.type && !url.pathExtension.isEmpty
-            ? url.pathExtension
-            : outputType.preferredFilenameExtension ?? "png"
-        let destinationURL = OutputNaming.destination(for: url, suffix: suffix, pathExtension: pathExtension)
+        let destinationURL = OutputNaming.destination(for: url, suffix: suffix, pathExtension: pathExtension(for: outputType))
         try Self.write(image, to: destinationURL, type: outputType, quality: quality, metadata: keepsMetadata ? properties : nil)
         return destinationURL
+    }
+
+    /// Draws a file ImageIO can't decode (e.g. SVG) with AppKit at a useful
+    /// size: its own size, scaled so the long edge is 1024–4096 px.
+    private static func rasterized(_ url: URL) -> EditableImage? {
+        guard let image = NSImage(contentsOf: url), image.size.width > 0, image.size.height > 0 else { return nil }
+        let longest = max(image.size.width, image.size.height)
+        let scale = min(max(1, 1024 / longest), 4096 / longest)
+        let width = max(1, Int((image.size.width * scale).rounded()))
+        let height = max(1, Int((image.size.height * scale).rounded()))
+        guard let context = CGContext(
+            data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+        let previous = NSGraphicsContext.current
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+        image.draw(in: NSRect(x: 0, y: 0, width: width, height: height))
+        NSGraphicsContext.current = previous
+        guard let cgImage = context.makeImage() else { return nil }
+        let type = UTType(filenameExtension: url.pathExtension) ?? .image
+        return EditableImage(url: url, cgImage: cgImage, properties: [:], type: type)
     }
 
     /// Encodes `image` with ImageIO. JPEG and BMP have no alpha channel, so
     /// transparent images are flattened onto white for them.
     static func write(_ image: CGImage, to url: URL, type: UTType, quality: Double = 0.92, metadata: [CFString: Any]? = nil) throws {
+        try SaveError.checkWritable(url)
         let image = (type == .jpeg || type == .bmp) ? flattened(image) ?? image : image
         guard let destination = CGImageDestinationCreateWithURL(url as CFURL, type.identifier as CFString, 1, nil) else {
-            throw EditableImageError.unwritable(url)
+            throw SaveError.diagnose(url)
         }
         var properties = metadata ?? [:]
         properties[kCGImagePropertyOrientation] = 1
@@ -104,7 +126,43 @@ struct EditableImage: @unchecked Sendable {
             properties[kCGImagePropertyTIFFDictionary] = tiff
         }
         CGImageDestinationAddImage(destination, image, properties as CFDictionary)
-        guard CGImageDestinationFinalize(destination) else { throw EditableImageError.unwritable(url) }
+        guard CGImageDestinationFinalize(destination) else {
+            try? FileManager.default.removeItem(at: url)
+            throw SaveError.diagnose(url)
+        }
+    }
+
+    /// Whether any pixel is see-through, judged from a downscaled copy (an
+    /// alpha channel alone doesn't mean the image uses it).
+    var isTransparent: Bool {
+        guard hasAlpha else { return false }
+        let scale = min(1, 1024 / CGFloat(max(cgImage.width, cgImage.height)))
+        let width = max(1, Int(CGFloat(cgImage.width) * scale))
+        let height = max(1, Int(CGFloat(cgImage.height) * scale))
+        guard let context = CGContext(
+            data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ), let data = context.data else { return true }
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let pixels = data.bindMemory(to: UInt8.self, capacity: width * height * 4)
+        for index in stride(from: 3, to: width * height * 4, by: 4) where pixels[index] < 255 {
+            return true
+        }
+        return false
+    }
+
+    /// Whether the source file has more than one frame (an animated GIF, say).
+    var isAnimated: Bool {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return false }
+        return CGImageSourceGetCount(source) > 1
+    }
+
+    /// The extension to use for `type`, keeping the original's spelling when the
+    /// format is unchanged and preferring "jpg" over "jpeg".
+    func pathExtension(for type: UTType) -> String {
+        if type == self.type, !url.pathExtension.isEmpty { return url.pathExtension }
+        if type == .jpeg { return "jpg" }
+        return type.preferredFilenameExtension ?? "png"
     }
 
     /// The image drawn over an opaque white background.
@@ -120,7 +178,7 @@ struct EditableImage: @unchecked Sendable {
         return context.makeImage()
     }
 
-    private static let writableTypes: Set<UTType> = Set(
+    static let writableTypes: Set<UTType> = Set(
         (CGImageDestinationCopyTypeIdentifiers() as? [String] ?? []).compactMap { UTType($0) }
     )
 }

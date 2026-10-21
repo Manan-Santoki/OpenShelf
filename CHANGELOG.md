@@ -6,6 +6,34 @@ tags `v<version>` and publishes a GitHub release with that section as notes.
 
 Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
 
+## [1.0.3] - 2026-10-20
+
+Fixes from a full edge-case test run (724 checks across 60+ unusual files).
+
+### Privacy
+
+- **Metadata removal now always removes location.** HEIC, HEIF and AVIF
+  photos (the iPhone's formats) could keep their GPS location. Every cleaned
+  copy is now re-checked, and nothing is saved if anything identifying is left.
+
+### Fixed
+
+- Password-protected PDFs no longer convert to blank pages; you're told to
+  remove the password first.
+- Scanned PDFs (no text layer) no longer produce empty TXT files.
+- Text files in older encodings (Windows/Latin-1, UTF-16) now convert.
+- SVG files now work with every conversion and tool.
+- Silent videos aren't offered MP3 or M4A, which they can't produce.
+- Converting very large documents no longer freezes the app.
+- **Compress** keeps PNGs as PNG, keeps transparency, says when a format has to
+  change (e.g. GIF animation), uses `.jpg` instead of `.jpeg`, and never saves a
+  "compressed" copy that's bigger. The same goes for PDF compression.
+- Clear messages instead of technical ones: password-protected or damaged
+  archives, and saving into a folder you can't write to, among others.
+- Very long file names no longer fail when a suffix like "Cropped" is added.
+- Symlinks and files without an extension are recognised by their contents.
+- Files whose names start with a dot no longer produce hidden results.
+
 ## [1.0.2] - 2026-10-20
 
 ### New

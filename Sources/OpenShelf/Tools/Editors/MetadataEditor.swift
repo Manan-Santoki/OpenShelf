@@ -208,36 +208,112 @@ enum MetadataReader {
 
 /// Writes copies of images without their metadata.
 enum MetadataStripper {
+    /// Formats whose metadata ImageIO can't reliably drop without re-encoding
+    /// (GPS survives a lossless copy of HEIC, for example).
+    static let reencodedTypes: Set<String> = ["public.heic", "public.heics", "public.heif", "public.avif"]
+
     /// Saves "<name> Clean.<ext>" next to the original.
     ///
     /// When orientation and colour profile are kept, the image data is copied
-    /// as-is (no re-encoding) with only the orientation tag. Otherwise the
-    /// upright pixels are re-encoded in sRGB with no metadata at all.
+    /// as-is (no re-encoding) with only the orientation tag, where the format
+    /// allows. Otherwise, or if anything sensitive survives the copy, the
+    /// upright pixels are re-encoded with no metadata at all (in sRGB unless the
+    /// profile is kept). The result is always checked before it's returned.
     static func strip(_ image: EditableImage, keepsOrientationAndProfile: Bool) throws -> URL {
-        if keepsOrientationAndProfile, let url = losslessCopy(of: image) {
-            return url
+        if keepsOrientationAndProfile, !reencodedTypes.contains(image.type.identifier),
+           let url = losslessCopy(of: image) {
+            if leftoverMetadata(at: url).isEmpty { return url }
+            try? FileManager.default.removeItem(at: url)
         }
-        let writable = Set((CGImageDestinationCopyTypeIdentifiers() as? [String]) ?? [])
-        let type = writable.contains(image.type.identifier) ? image.type : .png
-        let ext = type == image.type && !image.url.pathExtension.isEmpty
-            ? image.url.pathExtension
-            : type.preferredFilenameExtension ?? "png"
-        let url = OutputNaming.destination(for: image.url, suffix: "Clean", pathExtension: ext)
+        let type = EditableImage.writableTypes.contains(image.type) ? image.type : .png
+        let url = OutputNaming.destination(for: image.url, suffix: "Clean", pathExtension: image.pathExtension(for: type))
         var pixels = image.cgImage
         if !keepsOrientationAndProfile {
             pixels = sRGB(pixels) ?? pixels
         }
         try EditableImage.write(pixels, to: url, type: type, quality: 0.95, metadata: [:])
+        let leftovers = leftoverMetadata(at: url)
+        guard leftovers.isEmpty else {
+            try? FileManager.default.removeItem(at: url)
+            throw StripError.couldNotRemove(file: image.url.lastPathComponent, fields: leftovers)
+        }
         return url
+    }
+
+    enum StripError: LocalizedError {
+        case couldNotRemove(file: String, fields: [String])
+
+        var errorDescription: String? {
+            switch self {
+            case .couldNotRemove(let file, let fields):
+                "Some details couldn’t be removed from “\(file)” (\(fields.joined(separator: ", "))), so no copy was saved."
+            }
+        }
+    }
+
+    /// EXIF fields ImageIO writes for any image; they say nothing about the
+    /// camera, place or person.
+    private static let neutralExifKeys: Set<String> = [
+        kCGImagePropertyExifVersion, kCGImagePropertyExifFlashPixVersion, kCGImagePropertyExifColorSpace,
+        kCGImagePropertyExifPixelXDimension, kCGImagePropertyExifPixelYDimension, kCGImagePropertyExifComponentsConfiguration,
+    ].reduce(into: []) { $0.insert($1 as String) }
+    private static let neutralTIFFKeys: Set<String> = [
+        kCGImagePropertyTIFFOrientation, kCGImagePropertyTIFFXResolution, kCGImagePropertyTIFFYResolution,
+        kCGImagePropertyTIFFResolutionUnit, kCGImagePropertyTIFFCompression, kCGImagePropertyTIFFPhotometricInterpretation,
+        kCGImagePropertyTIFFTileWidth, kCGImagePropertyTIFFTileLength,
+    ].reduce(into: []) { $0.insert($1 as String) }
+    private static let identifyingDictionaries: [String] = [
+        kCGImagePropertyMakerAppleDictionary, kCGImagePropertyMakerCanonDictionary, kCGImagePropertyMakerNikonDictionary,
+        kCGImagePropertyMakerMinoltaDictionary, kCGImagePropertyMakerFujiDictionary, kCGImagePropertyMakerOlympusDictionary,
+        kCGImagePropertyMakerPentaxDictionary, kCGImagePropertyIPTCDictionary, kCGImagePropertyExifAuxDictionary,
+        kCGImagePropertyGPSDictionary,
+    ].map { $0 as String }
+
+    /// Names of identifying metadata still present in the file at `url`:
+    /// location, camera, dates, maker notes, IPTC or XMP descriptions.
+    static func leftoverMetadata(at url: URL) -> [String] {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any]
+        else { return [] }
+        var found: [String] = []
+        for key in identifyingDictionaries {
+            if let dictionary = properties[key] as? [String: Any], !dictionary.isEmpty {
+                found.append(key == kCGImagePropertyGPSDictionary as String ? "location" : key)
+            }
+        }
+        if let exif = properties[kCGImagePropertyExifDictionary as String] as? [String: Any],
+           exif.keys.contains(where: { !neutralExifKeys.contains($0) }) {
+            found.append("camera details")
+        }
+        if let tiff = properties[kCGImagePropertyTIFFDictionary as String] as? [String: Any],
+           tiff.keys.contains(where: { !neutralTIFFKeys.contains($0) }) {
+            found.append("camera details")
+        }
+        // XMP can repeat any of the above; only the EXIF/TIFF basics are allowed.
+        if let metadata = CGImageSourceCopyMetadataAtIndex(source, 0, nil),
+           let tags = CGImageMetadataCopyTags(metadata) as? [CGImageMetadataTag] {
+            let allowed: Set<String> = ["exif", "tiff"]
+            for tag in tags {
+                let prefix = CGImageMetadataTagCopyPrefix(tag) as String? ?? ""
+                let name = CGImageMetadataTagCopyName(tag) as String? ?? ""
+                if !allowed.contains(prefix) || name.hasPrefix("GPS") {
+                    found.append("XMP \(prefix):\(name)")
+                }
+            }
+        }
+        var unique: [String] = []
+        for item in found where !unique.contains(item) { unique.append(item) }
+        return unique
     }
 
     private static func losslessCopy(of image: EditableImage) -> URL? {
         guard let source = CGImageSourceCreateWithURL(image.url as CFURL, nil),
               let typeIdentifier = CGImageSourceGetType(source)
         else { return nil }
-        let ext = image.url.pathExtension.isEmpty ? (image.type.preferredFilenameExtension ?? "") : image.url.pathExtension
-        let url = OutputNaming.destination(for: image.url, suffix: "Clean", pathExtension: ext)
-        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, typeIdentifier, 1, nil) else { return nil }
+        let url = OutputNaming.destination(for: image.url, suffix: "Clean", pathExtension: image.pathExtension(for: image.type))
+        guard (try? SaveError.checkWritable(url)) != nil,
+              let destination = CGImageDestinationCreateWithURL(url as CFURL, typeIdentifier, 1, nil)
+        else { return nil }
 
         let metadata = CGImageMetadataCreateMutable()
         if let orientation = image.properties[kCGImagePropertyOrientation] as? Int, orientation != 1 {
