@@ -189,7 +189,7 @@ struct RedactEditor: View {
                     EditorFilmstrip(
                         thumbnails: thumbnails,
                         names: images.map(\.url.lastPathComponent),
-                        selection: Binding(get: { index }, set: show),
+                        selection: Binding(get: { index }, set: { show($0) }),
                         edited: edited
                     )
                 }
