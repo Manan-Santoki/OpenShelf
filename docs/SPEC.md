@@ -115,7 +115,11 @@ back into a wheel. One-click tools run with the progress toast instead.
 Remove BG · Redact · Read QR (+ Combine for several files)
 
 - **Crop:** dimmed outside area, 8 handles, aspect presets (Free, 1:1, 16:9,
-  9:16, 4:3, 3:4), live W × H fields in px. Reset / Apply.
+  9:16, 4:3, 3:4), live W × H fields in px. Reset / Apply. With several
+  images, a filmstrip under the canvas moves between them and "Same for all"
+  (on by default) carries one crop to every image as fractions of its size,
+  so "the top half" stays the top half on images of any size; turned off,
+  each image keeps its own crop. "Crop N Images" saves every changed image.
 - **Add BG:** gradient and solid swatches, custom image and colour; Padding,
   Corners and Shadow sliders in px; ratio Auto, 1:1, 16:9, 4:5. Saves PNG.
 - **Annotate:** draw, arrow, box, highlight, text, numbered callouts; colours

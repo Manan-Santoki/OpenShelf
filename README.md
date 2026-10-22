@@ -145,6 +145,11 @@ bottom right (or Return); a copy is saved next to the original with a suffix,
 like `Photo Cropped.jpg`, so you can drag the result straight back into another
 wheel. **Read QR**, **Combine** and **Mute** run immediately without an editor.
 
+Drop several images on **Crop** to crop them in one go: set the crop once and
+**Same for all** applies it to every image (the top half stays the top half,
+whatever their sizes), or turn it off and click through the filmstrip to give
+each image its own crop.
+
 <p align="center"><img src="docs/images/editors.png" alt="Crop, Add Background and Annotate editors" width="900"></p>
 <p align="center"><img src="docs/images/trim.png" alt="Trim editor for video and audio" width="560"></p>
 

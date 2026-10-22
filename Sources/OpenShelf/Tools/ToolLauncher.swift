@@ -77,13 +77,13 @@ enum ToolLauncher {
             return
         }
         guard let first = images.first else { return }
-        if tool != .compress && tool != .metadata && tool != .resize {
+        if tool != .compress && tool != .metadata && tool != .resize && tool != .crop {
             showOneFileNote(tool, urls: urls)
         }
 
         switch tool {
         case .crop:
-            EditorWindowController.present(size: CropEditor.windowSize, near: location) { CropEditor(image: first, actions: $0) }
+            EditorWindowController.present(size: CropEditor.windowSize(for: images.count), near: location) { CropEditor(images: images, actions: $0) }
         case .addBackground:
             EditorWindowController.present(size: AddBackgroundEditor.windowSize, near: location) { AddBackgroundEditor(image: first, actions: $0) }
         case .annotate:

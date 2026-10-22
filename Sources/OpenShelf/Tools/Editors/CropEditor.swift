@@ -1,34 +1,65 @@
 import SwiftUI
 
 /// Crops an image to a rectangle chosen with handles, an aspect preset, or exact
-/// pixel dimensions.
+/// pixel dimensions. Given several images, a filmstrip moves between them, and
+/// one crop can apply to all of them ("the top half") or each can have its own.
 struct CropEditor: View {
-    static let windowSize = CGSize(width: 440, height: 600)
+    static func windowSize(for count: Int) -> CGSize {
+        CGSize(width: 440, height: count > 1 ? 600 + EditorFilmstrip.height : 600)
+    }
 
-    let image: EditableImage
+    let images: [EditableImage]
     let actions: EditorActions
 
-    /// The crop in image pixels, origin at the top left.
-    @State private var crop: CGRect
+    @State private var index = 0
+    /// Each image's crop in its own pixels, origin at the top left.
+    @State private var crops: [CGRect]
+    /// One crop for every image, kept as fractions of the image.
+    @State private var sameForAll = true
     @State private var ratio = CropRatio.free
     @State private var dragStart: CGRect?
+    @State private var isWorking = false
+    @State private var thumbnails: [CGImage]
 
     private let minimumSize: CGFloat = 16
 
-    init(image: EditableImage, actions: EditorActions) {
-        self.image = image
+    init(images: [EditableImage], actions: EditorActions) {
+        self.images = images
         self.actions = actions
-        _crop = State(initialValue: CGRect(origin: .zero, size: image.pixelSize))
+        _crops = State(initialValue: images.map { CGRect(origin: .zero, size: $0.pixelSize) })
+        _thumbnails = State(initialValue: images.count > 1 ? images.map { $0.thumbnail() } : [])
     }
 
-    private var bounds: CGRect { CGRect(origin: .zero, size: image.pixelSize) }
+    private var image: EditableImage { images[index] }
+    private var isBatch: Bool { images.count > 1 }
+
+    private func bounds(_ index: Int) -> CGRect { CGRect(origin: .zero, size: images[index].pixelSize) }
+    private var bounds: CGRect { bounds(index) }
+
+    /// The image being shown's crop. With Same for All on, changing it carries
+    /// the same crop, as fractions, to every other image.
+    private var crop: CGRect {
+        get { crops[index] }
+        nonmutating set {
+            guard isBatch, sameForAll else {
+                crops[index] = newValue
+                return
+            }
+            let unit = CropMath.unit(newValue, in: bounds)
+            crops = images.indices.map { $0 == index ? newValue : CropMath.mapped(unit, to: bounds($0), ratio: ratio.value) }
+        }
+    }
+
+    /// Images whose crop would change them.
+    private var edited: [Bool] { images.indices.map { crops[$0] != bounds($0) } }
+    private var editedCount: Int { edited.filter { $0 }.count }
 
     var body: some View {
         EditorChrome(
-            title: "Crop Image",
-            primaryTitle: "Apply",
+            title: isBatch ? "Crop Images" : "Crop Image",
+            primaryTitle: primaryTitle,
             // Cropping to the whole image would only save a copy of it.
-            isPrimaryEnabled: crop != bounds,
+            isPrimaryEnabled: !isWorking && editedCount > 0,
             actions: actions,
             onReset: reset,
             onPrimary: apply
@@ -38,6 +69,21 @@ struct CropEditor: View {
                     canvas(in: proxy.size)
                 }
                 .frame(height: 400)
+
+                if isBatch {
+                    EditorFilmstrip(
+                        thumbnails: thumbnails,
+                        names: images.map(\.url.lastPathComponent),
+                        selection: $index,
+                        edited: edited,
+                        sameForAll: $sameForAll
+                    )
+                    .onChange(of: index) { _, _ in dragStart = nil }
+                    .onChange(of: sameForAll) { _, isOn in
+                        // Turning it on spreads the shown image's crop to the rest.
+                        if isOn { crop = crops[index] }
+                    }
+                }
 
                 EditorRow(label: "Aspect ratio") {
                     Picker("Aspect ratio", selection: $ratio) {
@@ -63,6 +109,15 @@ struct CropEditor: View {
                     .font(.system(size: 12))
                 }
             }
+        }
+    }
+
+    private var primaryTitle: String {
+        guard isBatch else { return "Apply" }
+        switch editedCount {
+        case 0: return "Crop Images"
+        case 1: return "Crop 1 Image"
+        default: return "Crop \(editedCount) Images"
         }
     }
 
@@ -142,22 +197,62 @@ struct CropEditor: View {
         crop = CropMath.largest(ratio: value, centeredAt: CGPoint(x: crop.midX, y: crop.midY), in: bounds)
     }
 
+    /// Resets the shown image, or every image while they share one crop.
     private func reset() {
         ratio = .free
         crop = bounds
     }
 
     private func apply() {
-        // The crop is kept on whole pixels, so this is exactly the size shown.
-        guard let cropped = image.cgImage.cropping(to: CropMath.snapped(crop, in: bounds)) else {
-            actions.failed(EditableImageError.unwritable(image.url))
+        let jobs = images.indices.map { (images[$0], crops[$0]) }
+        guard isBatch else {
+            do {
+                actions.saved([try ImageCropper.save(jobs[0].0, cropTo: jobs[0].1)])
+            } catch {
+                actions.failed(error)
+            }
             return
         }
-        do {
-            actions.saved([try image.save(cropped, suffix: "Cropped")])
-        } catch {
-            actions.failed(error)
+        isWorking = true
+        Task.detached {
+            let result = Result { try ImageCropper.run(jobs) }
+            await MainActor.run {
+                isWorking = false
+                switch result {
+                case .success(let outcome):
+                    actions.finished(outcome)
+                case .failure(let error):
+                    actions.failed(error)
+                }
+            }
         }
+    }
+}
+
+/// Saves cropped copies next to the originals.
+enum ImageCropper {
+    /// Saves `image` cropped to `crop` (in its pixels) as "<name> Cropped".
+    static func save(_ image: EditableImage, cropTo crop: CGRect) throws -> URL {
+        // The crop is kept on whole pixels, so this is exactly the size shown.
+        let bounds = CGRect(origin: .zero, size: image.pixelSize)
+        guard let cropped = image.cgImage.cropping(to: CropMath.snapped(crop, in: bounds)) else {
+            throw EditableImageError.unwritable(image.url)
+        }
+        return try image.save(cropped, suffix: "Cropped")
+    }
+
+    /// Crops and saves each image; images whose crop is the whole image are
+    /// left alone and counted.
+    static func run(_ jobs: [(EditableImage, CGRect)]) throws -> SaveOutcome {
+        var outcome = SaveOutcome(saved: [], savedLabel: "cropped", unchangedLabel: "not cropped")
+        for (image, crop) in jobs {
+            guard crop != CGRect(origin: .zero, size: image.pixelSize) else {
+                outcome.unchanged += 1
+                continue
+            }
+            outcome.saved.append(try save(image, cropTo: crop))
+        }
+        return outcome
     }
 }
 
@@ -372,6 +467,48 @@ enum CropMath {
         let x = handle.movesLeft ? rect.maxX - width : handle.movesRight ? rect.minX : rect.midX - width / 2
         let y = handle.movesTop ? rect.maxY - height : handle.movesBottom ? rect.minY : rect.midY - height / 2
         return CGRect(x: x, y: y, width: width, height: height)
+    }
+
+    /// `rect` as fractions of `bounds`, so one crop can be carried over to
+    /// images of other sizes with `mapped(_:to:ratio:)`.
+    static func unit(_ rect: CGRect, in bounds: CGRect) -> CGRect {
+        CGRect(
+            x: (rect.minX - bounds.minX) / bounds.width,
+            y: (rect.minY - bounds.minY) / bounds.height,
+            width: rect.width / bounds.width,
+            height: rect.height / bounds.height
+        )
+    }
+
+    /// A crop given as fractions of an image, placed on an image of `bounds`
+    /// in whole pixels: "the top half" stays the top half whatever the size.
+    /// With a `ratio`, the crop keeps that shape on images of another shape,
+    /// as wide as the fractions say where it fits, centred where they put it.
+    static func mapped(_ unit: CGRect, to bounds: CGRect, ratio: CGFloat?) -> CGRect {
+        var rect = CGRect(
+            x: bounds.minX + unit.minX * bounds.width,
+            y: bounds.minY + unit.minY * bounds.height,
+            width: unit.width * bounds.width,
+            height: unit.height * bounds.height
+        )
+        if let ratio {
+            var width: CGFloat = rect.width
+            var height: CGFloat = width / ratio
+            if height > bounds.height {
+                height = bounds.height
+                width = height * ratio
+            }
+            if width > bounds.width {
+                width = bounds.width
+                height = width / ratio
+            }
+            width = width.rounded()
+            height = height.rounded()
+            rect = CGRect(x: (rect.midX - width / 2).rounded(), y: (rect.midY - height / 2).rounded(), width: width, height: height)
+            rect.origin.x = min(max(rect.minX, bounds.minX), bounds.maxX - width)
+            rect.origin.y = min(max(rect.minY, bounds.minY), bounds.maxY - height)
+        }
+        return snapped(rect, in: bounds)
     }
 
     /// The largest rect with `ratio` that fits in `bounds`, centred on `center`
