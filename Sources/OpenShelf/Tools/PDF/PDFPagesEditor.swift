@@ -2,31 +2,67 @@ import PDFKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The "Pages" tool: reorder, rotate and delete pages of one PDF.
+/// The "Pages" tool: reorder, rotate and delete pages of a PDF. Given several
+/// PDFs, a filmstrip moves between them, and each keeps its own pages.
 struct PDFPagesEditor: View {
-    static let windowSize = CGSize(width: 620, height: 640)
+    static func windowSize(for count: Int) -> CGSize {
+        CGSize(width: 620, height: count > 1 ? 640 + EditorFilmstrip.height : 640)
+    }
 
-    let url: URL
+    let urls: [URL]
     let actions: EditorActions
 
-    @State private var pages: [PDFPageEdit] = []
-    @State private var original: [PDFPageEdit] = []
-    @State private var thumbnails: [Int: CGImage] = [:]
+    @State private var index = 0
+    /// Each PDF's pages as edited and as it was, once it has been shown.
+    @State private var edits: [[PDFPageEdit]?]
+    @State private var originals: [[PDFPageEdit]?]
+    @State private var thumbnails: [[Int: CGImage]]
+    @State private var loadErrors: [String?]
     @State private var selection: Set<PDFPageEdit.ID> = []
     @State private var dragged: PDFPageEdit.ID?
-    @State private var loadError: String?
     @State private var isWorking = false
+    private let firstPages: [CGImage]
 
-    init(url: URL, actions: EditorActions) {
-        self.url = url
+    init(urls: [URL], actions: EditorActions) {
+        self.urls = urls
         self.actions = actions
+        _edits = State(initialValue: Array(repeating: nil, count: urls.count))
+        _originals = State(initialValue: Array(repeating: nil, count: urls.count))
+        _thumbnails = State(initialValue: Array(repeating: [:], count: urls.count))
+        _loadErrors = State(initialValue: Array(repeating: nil, count: urls.count))
+        firstPages = urls.count > 1 ? urls.map { PDFTools.firstPageThumbnail(of: $0) } : []
+    }
+
+    private var isBatch: Bool { urls.count > 1 }
+
+    /// The shown PDF's pages.
+    private var pages: [PDFPageEdit] {
+        get { edits[index] ?? [] }
+        nonmutating set { edits[index] = newValue }
+    }
+
+    private var pagesBinding: Binding<[PDFPageEdit]> {
+        Binding(get: { pages }, set: { pages = $0 })
+    }
+
+    private var original: [PDFPageEdit] { originals[index] ?? [] }
+
+    /// PDFs with page changes waiting to be saved.
+    private var edited: [Bool] { urls.indices.map { edits[$0] != originals[$0] } }
+    private var editedCount: Int { edited.filter { $0 }.count }
+
+    private var canSave: Bool {
+        guard !isWorking else { return false }
+        guard isBatch else { return !pages.isEmpty && pages != original }
+        // A PDF with every page deleted has nothing to save.
+        return editedCount > 0 && !urls.indices.contains { edited[$0] && edits[$0]?.isEmpty == true }
     }
 
     var body: some View {
         EditorChrome(
             title: "Pages",
-            primaryTitle: isWorking ? "Saving…" : "Save",
-            isPrimaryEnabled: !isWorking && !pages.isEmpty && pages != original,
+            primaryTitle: primaryTitle,
+            isPrimaryEnabled: canSave,
             actions: actions,
             onReset: {
                 withAnimation(.snappy) { pages = original }
@@ -37,9 +73,32 @@ struct PDFPagesEditor: View {
             VStack(spacing: 12) {
                 grid
                 toolbar
+                if isBatch {
+                    EditorFilmstrip(
+                        thumbnails: firstPages,
+                        names: urls.map(\.lastPathComponent),
+                        selection: $index,
+                        edited: edited,
+                        sameForAll: nil
+                    )
+                    .onChange(of: index) { _, _ in
+                        selection = []
+                        dragged = nil
+                    }
+                }
             }
         }
-        .task { await load() }
+        .task(id: index) { await load(index) }
+    }
+
+    private var primaryTitle: String {
+        if isWorking { return "Saving…" }
+        guard isBatch else { return "Save" }
+        switch editedCount {
+        case 0: return "Save PDFs"
+        case 1: return "Save 1 PDF"
+        default: return "Save \(editedCount) PDFs"
+        }
     }
 
     private var grid: some View {
@@ -47,7 +106,7 @@ struct PDFPagesEditor: View {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 116), spacing: 14)], spacing: 16) {
                 ForEach(Array(pages.enumerated()), id: \.element.id) { position, page in
                     PageCell(
-                        image: thumbnails[page.sourceIndex],
+                        image: thumbnails[index][page.sourceIndex],
                         number: position + 1,
                         rotation: page.rotation,
                         isSelected: selection.contains(page.id),
@@ -59,16 +118,18 @@ struct PDFPagesEditor: View {
                         dragged = page.id
                         return NSItemProvider(object: page.id.uuidString as NSString)
                     }
-                    .onDrop(of: [.text], delegate: PageReorderDelegate(target: page.id, pages: $pages, dragged: $dragged))
+                    .onDrop(of: [.text], delegate: PageReorderDelegate(target: page.id, pages: pagesBinding, dragged: $dragged))
                 }
             }
             .padding(14)
             .animation(.snappy, value: pages)
         }
+        // Each PDF starts at its first page, without animating from the last one.
+        .id(index)
         .frame(maxHeight: .infinity)
         .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.primary.opacity(0.04)))
         .overlay {
-            if let loadError {
+            if let loadError = loadErrors[index] {
                 Label(loadError, systemImage: "exclamationmark.triangle")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
@@ -130,8 +191,10 @@ struct PDFPagesEditor: View {
         selection = []
     }
 
-    private func load() async {
-        let url = url
+    /// Reads the PDF at `index` the first time it's shown.
+    private func load(_ index: Int) async {
+        guard originals[index] == nil, loadErrors[index] == nil else { return }
+        let url = urls[index]
         let result = await Task.detached(priority: .userInitiated) { () -> Result<[Int: ThumbnailImage], PDFToolError> in
             guard let document = PDFDocument(url: url) else { return .failure(.unreadable(url)) }
             guard !document.isLocked else { return .failure(.locked(url)) }
@@ -146,28 +209,35 @@ struct PDFPagesEditor: View {
             return .success(images)
         }.value
 
+        // Shown again while loading, it may have been read already.
+        guard originals[index] == nil else { return }
         switch result {
         case .success(let images):
-            let edits = images.keys.sorted().map { PDFPageEdit(sourceIndex: $0) }
-            thumbnails = images.mapValues(\.image)
-            original = edits
-            pages = edits
+            let pages = images.keys.sorted().map { PDFPageEdit(sourceIndex: $0) }
+            thumbnails[index] = images.mapValues(\.image)
+            originals[index] = pages
+            edits[index] = pages
         case .failure(let error):
-            loadError = error.localizedDescription
+            loadErrors[index] = error.localizedDescription
         }
     }
 
     private func save() {
         isWorking = true
-        let url = url
-        let pages = pages
+        let isBatch = isBatch
+        // PDFs never shown, or put back as they were, are left alone.
+        let jobs = urls.indices.map { (url: urls[$0], pages: edited[$0] ? edits[$0] : nil) }
         Task {
             let result = await Task.detached(priority: .userInitiated) {
-                Result { try PDFTools.saveEditedPages(of: url, pages: pages) }
+                Result {
+                    isBatch
+                        ? try PDFTools.saveEditedPages(jobs)
+                        : SaveOutcome(saved: [try PDFTools.saveEditedPages(of: jobs[0].url, pages: jobs[0].pages ?? [])])
+                }
             }.value
             isWorking = false
             switch result {
-            case .success(let saved): actions.saved([saved])
+            case .success(let outcome): actions.finished(outcome)
             case .failure(let error): actions.failed(error)
             }
         }
