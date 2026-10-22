@@ -2,39 +2,84 @@ import AppKit
 import SwiftUI
 
 /// Places an image on a gradient, colour or picture background with padding,
-/// rounded corners and a drop shadow.
+/// rounded corners and a drop shadow. Given several images, a filmstrip moves
+/// between them, and one look can apply to all of them or each can have its own.
 struct AddBackgroundEditor: View {
-    static let windowSize = CGSize(width: 460, height: 660)
-
-    let image: EditableImage
-    let actions: EditorActions
-    /// A smaller copy of the image so the live preview stays fast.
-    private let previewSource: CGImage
-    private let gradientSwatches: [CGImage]
-    /// Whether the background shows through the image itself.
-    private let isTransparent: Bool
-
-    @State private var choice = BackgroundChoice.gradient(0)
-    @State private var customColor = Color(red: 0.96, green: 0.62, blue: 0.45)
-    @State private var backgroundImage: CGImage?
-    @State private var padding = 160.0
-    @State private var corners = 24.0
-    @State private var shadow = 24.0
-    @State private var ratio = CanvasRatio.auto
-
-    init(image: EditableImage, actions: EditorActions) {
-        self.image = image
-        self.actions = actions
-        previewSource = BackgroundRenderer.downscaled(image.cgImage, maxDimension: 900) ?? image.cgImage
-        gradientSwatches = GradientStyle.all.compactMap { BackgroundRenderer.swatch(for: .gradient($0)) }
-        isTransparent = image.isTransparent
+    static func windowSize(for count: Int) -> CGSize {
+        CGSize(width: 460, height: count > 1 ? 660 + EditorFilmstrip.height : 660)
     }
+
+    let images: [EditableImage]
+    let actions: EditorActions
+    private let gradientSwatches: [CGImage]
+    /// Whether the background shows through each image itself.
+    private let transparency: [Bool]
+
+    @State private var index = 0
+    /// A smaller copy of the shown image so the live preview stays fast.
+    @State private var previewSource: CGImage
+    /// Each image's background and layout.
+    @State private var allSettings: [BackgroundSettings]
+    /// One background and layout for every image.
+    @State private var sameForAll = true
+    @State private var isWorking = false
+    @State private var thumbnails: [CGImage]
+
+    init(images: [EditableImage], actions: EditorActions) {
+        self.images = images
+        self.actions = actions
+        gradientSwatches = GradientStyle.all.compactMap { BackgroundRenderer.swatch(for: .gradient($0)) }
+        transparency = images.map(\.isTransparent)
+        _previewSource = State(initialValue: Self.previewSource(for: images[0]))
+        _allSettings = State(initialValue: images.map { _ in BackgroundSettings() })
+        _thumbnails = State(initialValue: images.count > 1 ? images.map { $0.thumbnail() } : [])
+    }
+
+    private static func previewSource(for image: EditableImage) -> CGImage {
+        BackgroundRenderer.downscaled(image.cgImage, maxDimension: 900) ?? image.cgImage
+    }
+
+    private var image: EditableImage { images[index] }
+    private var isBatch: Bool { images.count > 1 }
+
+    /// The shown image's background and layout. With Same for All on,
+    /// changing them changes every image's.
+    private var settings: BackgroundSettings {
+        get { allSettings[index] }
+        nonmutating set {
+            guard isBatch, sameForAll else {
+                allSettings[index] = newValue
+                return
+            }
+            allSettings = images.map { _ in newValue }
+        }
+    }
+
+    private var settingsBinding: Binding<BackgroundSettings> {
+        Binding(get: { settings }, set: { settings = $0 })
+    }
+
+    /// Picking a custom colour also selects it.
+    private var customColorBinding: Binding<Color> {
+        Binding(get: { settings.customColor }) { color in
+            var changed = settings
+            changed.customColor = color
+            changed.choice = .customColor
+            settings = changed
+        }
+    }
+
+    /// Images the background would change.
+    private var edited: [Bool] {
+        images.indices.map { composition(for: allSettings[$0]).changesImage(of: images[$0].pixelSize, isTransparent: transparency[$0]) }
+    }
+    private var editedCount: Int { edited.filter { $0 }.count }
 
     var body: some View {
         EditorChrome(
             title: "Add BG",
-            primaryTitle: "Save with Background",
-            isPrimaryEnabled: composition.changesImage(of: image.pixelSize, isTransparent: isTransparent),
+            primaryTitle: primaryTitle,
+            isPrimaryEnabled: !isWorking && editedCount > 0,
             actions: actions,
             onReset: reset,
             onPrimary: save
@@ -44,18 +89,33 @@ struct AddBackgroundEditor: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 290)
 
+                if isBatch {
+                    EditorFilmstrip(
+                        thumbnails: thumbnails,
+                        names: images.map(\.url.lastPathComponent),
+                        selection: $index,
+                        edited: edited,
+                        sameForAll: $sameForAll
+                    )
+                    .onChange(of: index) { _, newIndex in previewSource = Self.previewSource(for: images[newIndex]) }
+                    .onChange(of: sameForAll) { _, isOn in
+                        // Turning it on spreads the shown image's look to the rest.
+                        if isOn { settings = allSettings[index] }
+                    }
+                }
+
                 EditorRow(label: "Background") {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 3) {
                             ForEach(gradientSwatches.indices, id: \.self) { index in
-                                swatch(isSelected: choice == .gradient(index), help: "Gradient \(index + 1)") {
-                                    choice = .gradient(index)
+                                swatch(isSelected: settings.choice == .gradient(index), help: "Gradient \(index + 1)") {
+                                    settings.choice = .gradient(index)
                                 } content: {
                                     Image(decorative: gradientSwatches[index], scale: 2).resizable()
                                 }
                             }
-                            swatch(isSelected: choice == .customImage, help: "Choose a background image…", action: chooseBackgroundImage) {
-                                if let backgroundImage {
+                            swatch(isSelected: settings.choice == .customImage, help: "Choose a background image…", action: chooseBackgroundImage) {
+                                if let backgroundImage = settings.backgroundImage {
                                     Image(decorative: backgroundImage, scale: 1).resizable().scaledToFill()
                                 } else {
                                     Image(systemName: "photo")
@@ -68,31 +128,30 @@ struct AddBackgroundEditor: View {
                         }
                         HStack(spacing: 3) {
                             ForEach(SolidColors.all.indices, id: \.self) { index in
-                                swatch(isSelected: choice == .solid(index), help: SolidColors.names[index]) {
-                                    choice = .solid(index)
+                                swatch(isSelected: settings.choice == .solid(index), help: SolidColors.names[index]) {
+                                    settings.choice = .solid(index)
                                 } content: {
                                     Color(cgColor: SolidColors.all[index].cgColor)
                                 }
                             }
-                            ColorPicker("Custom colour", selection: $customColor, supportsOpacity: false)
+                            ColorPicker("Custom colour", selection: customColorBinding, supportsOpacity: false)
                                 .labelsHidden()
                                 .padding(2)
                                 .overlay {
                                     RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                        .strokeBorder(choice == .customColor ? Color.accentColor : .clear, lineWidth: 2)
+                                        .strokeBorder(settings.choice == .customColor ? Color.accentColor : .clear, lineWidth: 2)
                                 }
-                                .onChange(of: customColor) { _, _ in choice = .customColor }
                                 .help("Custom colour")
                         }
                     }
                 }
 
-                EditorSlider(label: "Padding", value: $padding, range: 0...1000)
-                EditorSlider(label: "Corners", value: $corners, range: 0...400)
-                EditorSlider(label: "Shadow", value: $shadow, range: 0...200)
+                EditorSlider(label: "Padding", value: settingsBinding.padding, range: 0...1000)
+                EditorSlider(label: "Corners", value: settingsBinding.corners, range: 0...400)
+                EditorSlider(label: "Shadow", value: settingsBinding.shadow, range: 0...200)
 
                 EditorRow(label: "Ratio") {
-                    Picker("Ratio", selection: $ratio) {
+                    Picker("Ratio", selection: settingsBinding.ratio) {
                         ForEach(CanvasRatio.allCases) { Text($0.title).tag($0) }
                     }
                     .pickerStyle(.segmented)
@@ -102,18 +161,35 @@ struct AddBackgroundEditor: View {
         }
     }
 
-    // MARK: Preview
-
-    private var composition: BackgroundComposition {
-        BackgroundComposition(paint: paint, padding: padding, cornerRadius: corners, shadow: shadow, ratio: ratio)
+    private var primaryTitle: String {
+        guard isBatch else { return "Save with Background" }
+        switch editedCount {
+        case 0: return "Save Images"
+        case 1: return "Save 1 Image"
+        default: return "Save \(editedCount) Images"
+        }
     }
 
-    private var paint: BackgroundPaint {
-        switch choice {
+    // MARK: Preview
+
+    private var composition: BackgroundComposition { composition(for: settings) }
+
+    private func composition(for settings: BackgroundSettings) -> BackgroundComposition {
+        BackgroundComposition(
+            paint: paint(for: settings),
+            padding: settings.padding,
+            cornerRadius: settings.corners,
+            shadow: settings.shadow,
+            ratio: settings.ratio
+        )
+    }
+
+    private func paint(for settings: BackgroundSettings) -> BackgroundPaint {
+        switch settings.choice {
         case .gradient(let index): .gradient(GradientStyle.all[index])
         case .solid(let index): .solid(SolidColors.all[index].cgColor)
-        case .customColor: .solid(NSColor(customColor).usingColorSpace(.sRGB)?.cgColor ?? .white)
-        case .customImage: backgroundImage.map(BackgroundPaint.image) ?? .solid(.white)
+        case .customColor: .solid(NSColor(settings.customColor).usingColorSpace(.sRGB)?.cgColor ?? .white)
+        case .customImage: settings.backgroundImage.map(BackgroundPaint.image) ?? .solid(.white)
         }
     }
 
@@ -172,32 +248,59 @@ struct AddBackgroundEditor: View {
         panel.message = "Choose a background image"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
-            backgroundImage = try EditableImage.load(url).cgImage
-            choice = .customImage
+            var changed = settings
+            changed.backgroundImage = try EditableImage.load(url).cgImage
+            changed.choice = .customImage
+            settings = changed
         } catch {
             actions.failed(error)
         }
     }
 
+    /// Resets the shown image, or every image while they share one look. The
+    /// custom colour and picture stay, ready to pick again.
     private func reset() {
-        choice = .gradient(0)
-        padding = 160
-        corners = 24
-        shadow = 24
-        ratio = .auto
+        var defaults = BackgroundSettings()
+        defaults.customColor = settings.customColor
+        defaults.backgroundImage = settings.backgroundImage
+        settings = defaults
     }
 
     private func save() {
-        guard let rendered = composition.render(image.cgImage, imageSize: image.pixelSize, scale: 1) else {
-            actions.failed(EditableImageError.unwritable(image.url))
+        let jobs = images.indices.map { (images[$0], composition(for: allSettings[$0])) }
+        guard isBatch else {
+            do {
+                actions.saved([try BackgroundAdder.save(jobs[0].0, on: jobs[0].1)])
+            } catch {
+                actions.failed(error)
+            }
             return
         }
-        do {
-            actions.saved([try image.save(rendered, suffix: "With Background", as: .png)])
-        } catch {
-            actions.failed(error)
+        isWorking = true
+        Task.detached {
+            let result = Result { try BackgroundAdder.run(jobs) }
+            await MainActor.run {
+                isWorking = false
+                switch result {
+                case .success(let outcome):
+                    actions.finished(outcome)
+                case .failure(let error):
+                    actions.failed(error)
+                }
+            }
         }
     }
+}
+
+/// One image's background and layout.
+private struct BackgroundSettings: Equatable {
+    var choice = BackgroundChoice.gradient(0)
+    var customColor = Color(red: 0.96, green: 0.62, blue: 0.45)
+    var backgroundImage: CGImage?
+    var padding = 160.0
+    var corners = 24.0
+    var shadow = 24.0
+    var ratio = CanvasRatio.auto
 }
 
 private enum BackgroundChoice: Equatable {
@@ -205,6 +308,31 @@ private enum BackgroundChoice: Equatable {
     case solid(Int)
     case customColor
     case customImage
+}
+
+/// Saves copies on their backgrounds next to the originals.
+enum BackgroundAdder {
+    /// Saves `image` laid out by `composition` as "<name> With Background.png".
+    static func save(_ image: EditableImage, on composition: BackgroundComposition) throws -> URL {
+        guard let rendered = composition.render(image.cgImage, imageSize: image.pixelSize, scale: 1) else {
+            throw EditableImageError.unwritable(image.url)
+        }
+        return try image.save(rendered, suffix: "With Background", as: .png)
+    }
+
+    /// Saves each image on its background; images it wouldn't change (no
+    /// margin or corners, nothing see-through) are left alone and counted.
+    static func run(_ jobs: [(EditableImage, BackgroundComposition)]) throws -> SaveOutcome {
+        var outcome = SaveOutcome(saved: [], savedLabel: "saved", unchangedLabel: "unchanged")
+        for (image, composition) in jobs {
+            guard composition.changesImage(of: image.pixelSize, isTransparent: image.isTransparent) else {
+                outcome.unchanged += 1
+                continue
+            }
+            outcome.saved.append(try save(image, on: composition))
+        }
+        return outcome
+    }
 }
 
 enum CanvasRatio: CaseIterable, Identifiable {

@@ -77,7 +77,8 @@ enum ToolLauncher {
             return
         }
         guard let first = images.first else { return }
-        if tool != .compress && tool != .metadata && tool != .resize && tool != .crop {
+        if tool != .compress && tool != .metadata && tool != .resize && tool != .crop
+            && tool != .edit && tool != .addBackground && tool != .removeBackground {
             showOneFileNote(tool, urls: urls)
         }
 
@@ -85,13 +86,13 @@ enum ToolLauncher {
         case .crop:
             EditorWindowController.present(size: CropEditor.windowSize(for: images.count), near: location) { CropEditor(images: images, actions: $0) }
         case .addBackground:
-            EditorWindowController.present(size: AddBackgroundEditor.windowSize, near: location) { AddBackgroundEditor(image: first, actions: $0) }
+            EditorWindowController.present(size: AddBackgroundEditor.windowSize(for: images.count), near: location) { AddBackgroundEditor(images: images, actions: $0) }
         case .annotate:
             EditorWindowController.present(size: AnnotateEditor.windowSize, near: location) { AnnotateEditor(image: first, actions: $0) }
         case .redact:
             EditorWindowController.present(size: RedactEditor.windowSize, near: location) { RedactEditor(image: first, actions: $0) }
         case .edit:
-            EditorWindowController.present(size: AdjustEditor.windowSize, near: location) { AdjustEditor(image: first, actions: $0) }
+            EditorWindowController.present(size: AdjustEditor.windowSize(for: images.count), near: location) { AdjustEditor(images: images, actions: $0) }
         case .compress:
             EditorWindowController.present(size: CompressEditor.windowSize, near: location) { CompressEditor(images: images, actions: $0) }
         case .metadata:
@@ -99,7 +100,7 @@ enum ToolLauncher {
         case .resize:
             EditorWindowController.present(size: ResizeEditor.windowSize, near: location) { ResizeEditor(images: images, actions: $0) }
         case .removeBackground:
-            EditorWindowController.present(size: RemoveBackgroundEditor.windowSize, near: location) { RemoveBackgroundEditor(image: first, actions: $0) }
+            EditorWindowController.present(size: RemoveBackgroundEditor.windowSize(for: images.count), near: location) { RemoveBackgroundEditor(images: images, actions: $0) }
         default:
             break
         }

@@ -105,49 +105,109 @@ enum AdjustRenderer {
     }
 }
 
-/// The "Edit" tool: exposure, colour and orientation adjustments with a live preview.
+/// The "Edit" tool: exposure, colour and orientation adjustments with a live
+/// preview. Given several images, a filmstrip moves between them, and one set
+/// of adjustments can apply to all of them or each can have its own.
 struct AdjustEditor: View {
-    static let windowSize = CGSize(width: 480, height: 700)
+    static func windowSize(for count: Int) -> CGSize {
+        CGSize(width: 480, height: count > 1 ? 700 + EditorFilmstrip.height : 700)
+    }
 
-    let image: EditableImage
+    let images: [EditableImage]
     let actions: EditorActions
 
-    @State private var settings = AdjustSettings()
+    @State private var index = 0
+    /// Each image's adjustments.
+    @State private var allSettings: [AdjustSettings]
+    /// One set of adjustments for every image.
+    @State private var sameForAll = true
     @State private var preview: CGImage?
     @State private var previewTask: Task<Void, Never>?
     @State private var isSaving = false
+    @State private var thumbnails: [CGImage]
 
-    init(image: EditableImage, actions: EditorActions) {
-        self.image = image
+    init(images: [EditableImage], actions: EditorActions) {
+        self.images = images
         self.actions = actions
+        _allSettings = State(initialValue: images.map { _ in AdjustSettings() })
+        _thumbnails = State(initialValue: images.count > 1 ? images.map { $0.thumbnail() } : [])
     }
+
+    private var image: EditableImage { images[index] }
+    private var isBatch: Bool { images.count > 1 }
+
+    /// The shown image's adjustments. With Same for All on, changing them
+    /// changes every image's.
+    private var settings: AdjustSettings {
+        get { allSettings[index] }
+        nonmutating set {
+            guard isBatch, sameForAll else {
+                allSettings[index] = newValue
+                return
+            }
+            allSettings = images.map { _ in newValue }
+        }
+    }
+
+    private var settingsBinding: Binding<AdjustSettings> {
+        Binding(get: { settings }, set: { settings = $0 })
+    }
+
+    /// Images the adjustments would change.
+    private var edited: [Bool] { allSettings.map(\.changesImage) }
+    private var editedCount: Int { edited.filter { $0 }.count }
 
     var body: some View {
         EditorChrome(
-            title: "Edit Image",
-            primaryTitle: isSaving ? "Saving…" : "Save",
-            isPrimaryEnabled: !isSaving && settings.changesImage,
+            title: isBatch ? "Edit Images" : "Edit Image",
+            primaryTitle: primaryTitle,
+            isPrimaryEnabled: !isSaving && editedCount > 0,
             actions: actions,
+            // Resets the shown image, or every image while they share settings.
             onReset: { settings = AdjustSettings() },
             onPrimary: save
         ) {
             VStack(spacing: 12) {
                 previewView
+                if isBatch {
+                    EditorFilmstrip(
+                        thumbnails: thumbnails,
+                        names: images.map(\.url.lastPathComponent),
+                        selection: $index,
+                        edited: edited,
+                        sameForAll: $sameForAll
+                    )
+                    .onChange(of: sameForAll) { _, isOn in
+                        // Turning it on spreads the shown image's settings to the rest.
+                        if isOn { settings = allSettings[index] }
+                    }
+                }
                 transformButtons
                 VStack(spacing: 6) {
-                    EditorSlider(label: "Exposure", value: $settings.exposure, range: -100...100, unit: "")
-                    EditorSlider(label: "Brightness", value: $settings.brightness, range: -100...100, unit: "")
-                    EditorSlider(label: "Contrast", value: $settings.contrast, range: -100...100, unit: "")
-                    EditorSlider(label: "Saturation", value: $settings.saturation, range: -100...100, unit: "")
-                    EditorSlider(label: "Warmth", value: $settings.warmth, range: -100...100, unit: "")
-                    EditorSlider(label: "Vibrance", value: $settings.vibrance, range: -100...100, unit: "")
-                    EditorSlider(label: "Sharpness", value: $settings.sharpness, range: 0...100, unit: "%")
-                    EditorSlider(label: "Vignette", value: $settings.vignette, range: 0...100, unit: "%")
+                    EditorSlider(label: "Exposure", value: settingsBinding.exposure, range: -100...100, unit: "")
+                    EditorSlider(label: "Brightness", value: settingsBinding.brightness, range: -100...100, unit: "")
+                    EditorSlider(label: "Contrast", value: settingsBinding.contrast, range: -100...100, unit: "")
+                    EditorSlider(label: "Saturation", value: settingsBinding.saturation, range: -100...100, unit: "")
+                    EditorSlider(label: "Warmth", value: settingsBinding.warmth, range: -100...100, unit: "")
+                    EditorSlider(label: "Vibrance", value: settingsBinding.vibrance, range: -100...100, unit: "")
+                    EditorSlider(label: "Sharpness", value: settingsBinding.sharpness, range: 0...100, unit: "%")
+                    EditorSlider(label: "Vignette", value: settingsBinding.vignette, range: 0...100, unit: "%")
                 }
             }
         }
         .onAppear { renderPreview(after: .zero) }
         .onChange(of: settings) { renderPreview(after: .milliseconds(30)) }
+        .onChange(of: index) { renderPreview(after: .zero) }
+    }
+
+    private var primaryTitle: String {
+        if isSaving { return "Saving…" }
+        guard isBatch else { return "Save" }
+        switch editedCount {
+        case 0: return "Save Images"
+        case 1: return "Save 1 Image"
+        default: return "Save \(editedCount) Images"
+        }
     }
 
     private var previewView: some View {
@@ -213,23 +273,46 @@ struct AdjustEditor: View {
 
     private func save() {
         isSaving = true
-        let source = image
-        let settings = settings
+        let jobs = images.indices.map { (images[$0], allSettings[$0]) }
+        let isBatch = isBatch
         Task {
-            let result = await Task.detached(priority: .userInitiated) { () -> Result<URL, Error> in
+            let result = await Task.detached(priority: .userInitiated) { () -> Result<SaveOutcome, Error> in
                 Result {
-                    guard let rendered = AdjustRenderer.render(source.cgImage, with: settings) else {
-                        throw EditableImageError.unwritable(source.url)
-                    }
-                    return try source.save(rendered, suffix: "Edited")
+                    guard isBatch else { return SaveOutcome(saved: [try ImageAdjuster.save(jobs[0].0, with: jobs[0].1)]) }
+                    return try ImageAdjuster.run(jobs)
                 }
             }.value
             isSaving = false
             switch result {
-            case .success(let url): actions.saved([url])
+            case .success(let outcome): actions.finished(outcome)
             case .failure(let error): actions.failed(error)
             }
         }
+    }
+}
+
+/// Saves adjusted copies next to the originals.
+enum ImageAdjuster {
+    /// Saves `image` with `settings` applied as "<name> Edited".
+    static func save(_ image: EditableImage, with settings: AdjustSettings) throws -> URL {
+        guard let rendered = AdjustRenderer.render(image.cgImage, with: settings) else {
+            throw EditableImageError.unwritable(image.url)
+        }
+        return try image.save(rendered, suffix: "Edited")
+    }
+
+    /// Adjusts and saves each image; images whose settings change nothing are
+    /// left alone and counted.
+    static func run(_ jobs: [(EditableImage, AdjustSettings)]) throws -> SaveOutcome {
+        var outcome = SaveOutcome(saved: [], savedLabel: "edited", unchangedLabel: "not edited")
+        for (image, settings) in jobs {
+            guard settings.changesImage else {
+                outcome.unchanged += 1
+                continue
+            }
+            outcome.saved.append(try save(image, with: settings))
+        }
+        return outcome
     }
 }
 
