@@ -48,23 +48,19 @@ enum ToolLauncher {
             EditorWindowController.present(size: PDFMetadataEditor.windowSize, near: location) { PDFMetadataEditor(urls: urls, actions: $0) }
 
         case .trim:
-            showOneFileNote(tool, urls: urls)
-            EditorWindowController.present(size: MediaTrimEditor.windowSize, near: location) { MediaTrimEditor(url: first, actions: $0) }
+            EditorWindowController.present(size: MediaTrimEditor.windowSize(for: urls.count), near: location) { MediaTrimEditor(urls: urls, actions: $0) }
         case .speed:
             EditorWindowController.present(size: MediaSpeedEditor.windowSize, near: location) { MediaSpeedEditor(urls: urls, actions: $0) }
         case .cropVideo:
-            showOneFileNote(tool, urls: urls)
-            EditorWindowController.present(size: VideoCropEditor.windowSize, near: location) { VideoCropEditor(url: first, actions: $0) }
+            EditorWindowController.present(size: VideoCropEditor.windowSize(for: urls.count), near: location) { VideoCropEditor(urls: urls, actions: $0) }
         case .compressVideo:
             EditorWindowController.present(size: VideoCompressEditor.windowSize, near: location) { VideoCompressEditor(urls: urls, actions: $0) }
         case .mergeMedia:
             EditorWindowController.present(size: MediaMergeEditor.windowSize, near: location) { MediaMergeEditor(urls: urls, actions: $0) }
         case .splitMedia:
-            showOneFileNote(tool, urls: urls)
-            EditorWindowController.present(size: MediaSplitEditor.windowSize, near: location) { MediaSplitEditor(url: first, actions: $0) }
+            EditorWindowController.present(size: MediaSplitEditor.windowSize(for: urls.count), near: location) { MediaSplitEditor(urls: urls, actions: $0) }
         case .rotateVideo:
-            showOneFileNote(tool, urls: urls)
-            EditorWindowController.present(size: VideoRotateEditor.windowSize, near: location) { VideoRotateEditor(url: first, actions: $0) }
+            EditorWindowController.present(size: VideoRotateEditor.windowSize(for: urls.count), near: location) { VideoRotateEditor(urls: urls, actions: $0) }
         }
     }
 

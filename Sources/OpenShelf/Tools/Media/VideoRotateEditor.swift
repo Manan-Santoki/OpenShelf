@@ -2,26 +2,44 @@
 import Observation
 import SwiftUI
 
-/// Turns a video a quarter or half turn, or mirrors it, with a preview.
+/// Turns a video a quarter or half turn, or mirrors it, with a preview. Given
+/// several videos, a filmstrip moves between them, and one turn can apply to
+/// all of them or each can have its own.
 struct VideoRotateEditor: View {
-    static let windowSize = CGSize(width: 460, height: 520)
+    static func windowSize(for count: Int) -> CGSize {
+        CGSize(width: 460, height: count > 1 ? 520 + EditorFilmstrip.height : 520)
+    }
 
     let actions: EditorActions
-    @State private var model: RotateModel
+    @State private var models: [RotateModel]
+    @State private var index = 0
+    /// One turn for every video.
+    @State private var sameForAll = true
+    @State private var thumbnails: [CGImage?]
+    @State private var batch = MediaBatchExport()
 
-    init(url: URL, actions: EditorActions) {
+    init(urls: [URL], actions: EditorActions) {
         self.actions = actions
-        _model = State(initialValue: RotateModel(url: url))
+        _models = State(initialValue: urls.map(RotateModel.init))
+        _thumbnails = State(initialValue: urls.map { _ in nil })
     }
+
+    private var model: RotateModel { models[index] }
+    private var isBatch: Bool { models.count > 1 }
+    /// Every video that can be read gets turned.
+    private var edited: [Bool] { models.map { $0.loadError == nil } }
+    private var editedCount: Int { edited.filter { $0 }.count }
 
     var body: some View {
         EditorChrome(
             title: "Rotate",
-            primaryTitle: "Apply",
-            isPrimaryEnabled: model.frame != nil && model.exportProgress == nil,
+            primaryTitle: primaryTitle,
+            isPrimaryEnabled: isBatch
+                ? batch.progress == nil && editedCount > 0
+                : model.frame != nil && model.exportProgress == nil,
             actions: actions,
-            onReset: { model.rotation = .right },
-            onPrimary: { model.save(actions: actions) }
+            onReset: { choose(.right) },
+            onPrimary: save
         ) {
             VStack(spacing: 14) {
                 GeometryReader { proxy in
@@ -38,11 +56,27 @@ struct VideoRotateEditor: View {
                 .frame(height: 300)
                 .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.black.opacity(0.18)))
 
+                if isBatch {
+                    EditorFilmstrip(
+                        thumbnails: thumbnails,
+                        names: models.map(\.url.lastPathComponent),
+                        selection: $index,
+                        edited: edited,
+                        sameForAll: $sameForAll,
+                        placeholder: "film",
+                        itemName: "video"
+                    )
+                    .onChange(of: sameForAll) { _, isOn in
+                        // Turning it on gives every video the shown one's turn.
+                        if isOn { choose(model.rotation) }
+                    }
+                }
+
                 HStack(spacing: 8) {
                     ForEach(VideoRotation.allCases) { rotation in
                         let isSelected = model.rotation == rotation
                         Button {
-                            model.rotation = rotation
+                            choose(rotation)
                         } label: {
                             VStack(spacing: 4) {
                                 Image(systemName: rotation.systemImage)
@@ -70,14 +104,53 @@ struct VideoRotateEditor: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
 
-                if let progress = model.exportProgress {
-                    MediaExportProgress(progress: progress)
+                if let progress = isBatch ? batch.progress : model.exportProgress {
+                    MediaExportProgress(progress: progress, detail: batch.detail)
                 }
                 Spacer(minLength: 0)
             }
         }
-        .task { await model.load() }
-        .onDisappear(perform: model.cancel)
+        .task(id: index) { await model.load() }
+        .task {
+            guard isBatch else { return }
+            for index in models.indices {
+                thumbnails[index] = await MediaBatch.thumbnail(of: models[index].url)
+            }
+        }
+        .onDisappear {
+            models.forEach { $0.cancel() }
+            batch.cancel()
+        }
+    }
+
+    private var primaryTitle: String {
+        guard isBatch else { return "Apply" }
+        switch editedCount {
+        case 0: return "Rotate Videos"
+        case 1: return "Rotate 1 Video"
+        default: return "Rotate \(editedCount) Videos"
+        }
+    }
+
+    /// Turns the shown video, or every video while they share one turn.
+    private func choose(_ rotation: VideoRotation) {
+        if isBatch && sameForAll {
+            models.forEach { $0.rotation = rotation }
+        } else {
+            model.rotation = rotation
+        }
+    }
+
+    private func save() {
+        guard isBatch else {
+            model.save(actions: actions)
+            return
+        }
+        let jobs = models.filter { $0.loadError == nil }.map { ($0.url, $0.rotation) }
+        let outcome = SaveOutcome(saved: [], unchanged: models.count - jobs.count, savedLabel: "rotated", unchangedLabel: "not rotated")
+        batch.start(jobs.count, outcome: outcome, actions: actions) { index, progress in
+            [try await MediaTools.rotate(jobs[index].0, by: jobs[index].1, progress: progress)]
+        }
     }
 
     /// The frame as it will look after the change.
@@ -113,9 +186,12 @@ final class RotateModel {
     }
 
     func load() async {
+        guard frame == nil, loadError == nil else { return }
         do {
             frame = try await MediaLoading.poster(of: url, maximumSize: 1200)
         } catch {
+            // Moving to another video cancels this; it loads again when shown.
+            guard !Task.isCancelled else { return }
             loadError = MediaLoading.loadError(error, otherwise: "This video can’t be read.")
         }
     }

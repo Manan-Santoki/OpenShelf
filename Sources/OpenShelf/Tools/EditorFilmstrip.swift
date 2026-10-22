@@ -6,12 +6,18 @@ import SwiftUI
 /// waiting to be saved. With `sameForAll`, it also offers applying one edit to
 /// every file instead of editing each on its own.
 struct EditorFilmstrip: View {
-    let thumbnails: [CGImage]
+    /// A picture of each file; nil shows `placeholder`, for files without one
+    /// (sound) or whose picture is still loading.
+    let thumbnails: [CGImage?]
     let names: [String]
     @Binding var selection: Int
     /// Whether each file has an edit waiting to be saved.
     let edited: [Bool]
     var sameForAll: Binding<Bool>?
+    /// The SF Symbol shown for a file without a picture.
+    var placeholder = "waveform"
+    /// What the files are called in the Same for All help, e.g. "video".
+    var itemName = "image"
 
     static let height: CGFloat = 104
 
@@ -31,7 +37,7 @@ struct EditorFilmstrip: View {
                         .toggleStyle(.switch)
                         .controlSize(.mini)
                         .font(.system(size: 11))
-                        .help("On: one edit applies to every image. Off: edit each image on its own.")
+                        .help("On: one edit applies to every \(itemName). Off: edit each \(itemName) on its own.")
                 }
             }
 
@@ -63,9 +69,7 @@ struct EditorFilmstrip: View {
         return Button {
             selection = index
         } label: {
-            Image(decorative: thumbnails[index], scale: 1)
-                .resizable()
-                .aspectRatio(contentMode: .fill)
+            picture(thumbnails[index])
                 .frame(width: 52, height: 52)
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 .overlay {
@@ -88,6 +92,21 @@ struct EditorFilmstrip: View {
         .accessibilityLabel(names[index])
         .accessibilityValue(edited[index] ? "Edited" : "")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    @ViewBuilder
+    private func picture(_ image: CGImage?) -> some View {
+        if let image {
+            Image(decorative: image, scale: 1)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+        } else {
+            Image(systemName: placeholder)
+                .font(.system(size: 18, weight: .light))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.primary.opacity(0.07))
+        }
     }
 
     private func stepButton(_ systemImage: String, label: String, to index: Int) -> some View {
