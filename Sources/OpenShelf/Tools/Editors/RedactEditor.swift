@@ -32,7 +32,6 @@ struct RedactRegion: Identifiable, Equatable {
 }
 
 /// Applies redactions with Core Image.
-@MainActor
 enum Redaction {
     private static let context = CIContext()
 
@@ -98,22 +97,35 @@ enum Redaction {
     }
 }
 
+/// Hides parts of an image. Given several images, a filmstrip moves between
+/// them; each keeps its own areas, undo history and selection, and only images
+/// with areas are saved.
 struct RedactEditor: View {
-    static let windowSize = CGSize(width: 560, height: 640)
+    static func windowSize(for count: Int) -> CGSize {
+        CGSize(width: 560, height: count > 1 ? 640 + EditorFilmstrip.height : 640)
+    }
 
-    let image: EditableImage
+    let images: [EditableImage]
     let actions: EditorActions
-    private let previewImage: CGImage
+    private let previewImages: [CGImage]
 
-    @State private var regions: [RedactRegion] = []
-    @State private var history = EditHistory<[RedactRegion]>()
+    @State private var index = 0
+    @State private var marks: [ImageRegions]
     @State private var draftRect: CGRect?
-    @State private var selectedID: RedactRegion.ID?
     @State private var hoveredID: RedactRegion.ID?
     @State private var style = RedactionStyle.box
     @State private var strength = 50.0
     @State private var dragMode: DragMode?
     @State private var renderedPreview: CGImage?
+    @State private var isWorking = false
+    @State private var thumbnails: [CGImage]
+
+    /// What belongs to one image: its areas, their undo history and the selection.
+    private struct ImageRegions {
+        var regions: [RedactRegion] = []
+        var history = EditHistory<[RedactRegion]>()
+        var selectedID: RedactRegion.ID?
+    }
 
     private enum DragMode {
         case move(RedactRegion, start: CGPoint)
@@ -121,21 +133,49 @@ struct RedactEditor: View {
     }
 
     private struct PreviewKey: Equatable {
+        var image: Int
         var rects: [CGRect]
         var looks: [RedactionLook]
     }
 
-    init(image: EditableImage, actions: EditorActions) {
-        self.image = image
+    init(images: [EditableImage], actions: EditorActions) {
+        self.images = images
         self.actions = actions
-        previewImage = AnnotationPreviewImage.downscaled(image.cgImage)
+        previewImages = images.map { AnnotationPreviewImage.downscaled($0.cgImage) }
+        _marks = State(initialValue: images.map { _ in ImageRegions() })
+        _thumbnails = State(initialValue: images.count > 1 ? images.map { $0.thumbnail() } : [])
     }
+
+    private var image: EditableImage { images[index] }
+    private var previewImage: CGImage { previewImages[index] }
+    private var isBatch: Bool { images.count > 1 }
+
+    // The shown image's areas, history and selection: undo, ⌫ and the
+    // controls only ever reach the image on screen.
+    private var regions: [RedactRegion] {
+        get { marks[index].regions }
+        nonmutating set { marks[index].regions = newValue }
+    }
+
+    private var history: EditHistory<[RedactRegion]> {
+        get { marks[index].history }
+        nonmutating set { marks[index].history = newValue }
+    }
+
+    private var selectedID: RedactRegion.ID? {
+        get { marks[index].selectedID }
+        nonmutating set { marks[index].selectedID = newValue }
+    }
+
+    /// Images with areas waiting to be saved.
+    private var edited: [Bool] { marks.map { !$0.regions.isEmpty } }
+    private var editedCount: Int { edited.filter { $0 }.count }
 
     var body: some View {
         EditorChrome(
             title: "Redact",
-            primaryTitle: "Save",
-            isPrimaryEnabled: !regions.isEmpty,
+            primaryTitle: primaryTitle,
+            isPrimaryEnabled: !isWorking && editedCount > 0,
             actions: actions,
             onReset: reset,
             onPrimary: save
@@ -144,6 +184,15 @@ struct RedactEditor: View {
                 preview
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.05)))
+
+                if isBatch {
+                    EditorFilmstrip(
+                        thumbnails: thumbnails,
+                        names: images.map(\.url.lastPathComponent),
+                        selection: Binding(get: { index }, set: show),
+                        edited: edited
+                    )
+                }
 
                 HStack {
                     Text(hint)
@@ -185,6 +234,25 @@ struct RedactEditor: View {
         .onChange(of: strength) { _, _ in updateSelectedLook(coalescing: "strength") }
     }
 
+    private var primaryTitle: String {
+        guard isBatch else { return "Save" }
+        switch editedCount {
+        case 0: return "Save Images"
+        case 1: return "Save 1 Image"
+        default: return "Save \(editedCount) Images"
+        }
+    }
+
+    /// Moves to another image, dropping anything half-drawn on this one.
+    private func show(_ newIndex: Int) {
+        guard newIndex != index else { return }
+        draftRect = nil
+        dragMode = nil
+        hoveredID = nil
+        history.endCoalescing()
+        index = newIndex
+    }
+
     private var hint: String {
         switch regions.count {
         case 0: "Drag over anything you want to hide."
@@ -199,6 +267,7 @@ struct RedactEditor: View {
 
     private var previewKey: PreviewKey {
         PreviewKey(
+            image: index,
             rects: regions.map(\.rect) + (draftRect.map { [$0] } ?? []),
             looks: regions.map(\.look) + (draftRect == nil ? [] : [currentLook])
         )
@@ -360,6 +429,7 @@ struct RedactEditor: View {
         if !snapshot.contains(where: { $0.id == hoveredID }) { hoveredID = nil }
     }
 
+    /// Clears the shown image's areas.
     private func reset() {
         draftRect = nil
         selectedID = nil
@@ -370,15 +440,53 @@ struct RedactEditor: View {
     }
 
     private func save() {
-        do {
-            guard let output = Redaction.apply(to: image.cgImage, areas: regions.map { (rect: $0.rect, look: $0.look) }) else {
-                throw EditableImageError.unwritable(image.url)
+        let jobs = images.indices.map { (images[$0], marks[$0].regions) }
+        guard isBatch else {
+            do {
+                actions.saved([try ImageRedactor.save(jobs[0].0, hiding: jobs[0].1)])
+            } catch {
+                actions.failed(error)
             }
-            // Redacted copies shouldn't carry location or camera details either.
-            let url = try image.save(output, suffix: "Redacted", keepsMetadata: false)
-            actions.saved([url])
-        } catch {
-            actions.failed(error)
+            return
         }
+        isWorking = true
+        Task.detached {
+            let result = Result { try ImageRedactor.run(jobs) }
+            await MainActor.run {
+                isWorking = false
+                switch result {
+                case .success(let outcome):
+                    actions.finished(outcome)
+                case .failure(let error):
+                    actions.failed(error)
+                }
+            }
+        }
+    }
+}
+
+/// Saves redacted copies next to the originals.
+enum ImageRedactor {
+    /// Saves `image` with `regions` hidden as "<name> Redacted".
+    static func save(_ image: EditableImage, hiding regions: [RedactRegion]) throws -> URL {
+        guard let output = Redaction.apply(to: image.cgImage, areas: regions.map { (rect: $0.rect, look: $0.look) }) else {
+            throw EditableImageError.unwritable(image.url)
+        }
+        // Redacted copies shouldn't carry location or camera details either.
+        return try image.save(output, suffix: "Redacted", keepsMetadata: false)
+    }
+
+    /// Hides each image's areas and saves it; images without areas are left
+    /// alone and counted.
+    static func run(_ jobs: [(EditableImage, [RedactRegion])]) throws -> SaveOutcome {
+        var outcome = SaveOutcome(saved: [], savedLabel: "redacted", unchangedLabel: "not redacted")
+        for (image, regions) in jobs {
+            guard !regions.isEmpty else {
+                outcome.unchanged += 1
+                continue
+            }
+            outcome.saved.append(try save(image, hiding: regions))
+        }
+        return outcome
     }
 }

@@ -224,23 +224,36 @@ enum AnnotationRenderer {
     }
 }
 
+/// Draws on an image. Given several images, a filmstrip moves between them;
+/// each keeps its own marks, undo history and selection, and only images with
+/// marks are saved.
 struct AnnotateEditor: View {
-    static let windowSize = CGSize(width: 560, height: 660)
+    static func windowSize(for count: Int) -> CGSize {
+        CGSize(width: 560, height: count > 1 ? 660 + EditorFilmstrip.height : 660)
+    }
 
-    let image: EditableImage
+    let images: [EditableImage]
     let actions: EditorActions
-    private let previewImage: CGImage
+    private let previewImages: [CGImage]
 
-    @State private var annotations: [Annotation] = []
-    @State private var history = EditHistory<[Annotation]>()
+    @State private var index = 0
+    @State private var marks: [ImageMarks]
     @State private var draft: Annotation?
-    @State private var selectedID: Annotation.ID?
     @State private var tool = AnnotationTool.draw
     @State private var color = NSColor.systemRed.cgColor
     @State private var lineWidth: Double
     @State private var textDraft: TextDraft?
     @State private var dragMode: DragMode?
+    @State private var isWorking = false
+    @State private var thumbnails: [CGImage]
     @FocusState private var isTextFieldFocused: Bool
+
+    /// What belongs to one image: its marks, their undo history and the selection.
+    private struct ImageMarks {
+        var annotations: [Annotation] = []
+        var history = EditHistory<[Annotation]>()
+        var selectedID: Annotation.ID?
+    }
 
     private struct TextDraft {
         var origin: CGPoint
@@ -254,19 +267,46 @@ struct AnnotateEditor: View {
         case ignore
     }
 
-    init(image: EditableImage, actions: EditorActions) {
-        self.image = image
+    init(images: [EditableImage], actions: EditorActions) {
+        self.images = images
         self.actions = actions
-        previewImage = AnnotationPreviewImage.downscaled(image.cgImage)
-        let longSide = Double(max(image.cgImage.width, image.cgImage.height))
+        previewImages = images.map { AnnotationPreviewImage.downscaled($0.cgImage) }
+        _marks = State(initialValue: images.map { _ in ImageMarks() })
+        _thumbnails = State(initialValue: images.count > 1 ? images.map { $0.thumbnail() } : [])
+        let longSide = Double(max(images[0].cgImage.width, images[0].cgImage.height))
         _lineWidth = State(initialValue: min(max(longSide / 200, 2), 24))
     }
+
+    private var image: EditableImage { images[index] }
+    private var previewImage: CGImage { previewImages[index] }
+    private var isBatch: Bool { images.count > 1 }
+
+    // The shown image's marks, history and selection: undo, ⌫ and the
+    // controls only ever reach the image on screen.
+    private var annotations: [Annotation] {
+        get { marks[index].annotations }
+        nonmutating set { marks[index].annotations = newValue }
+    }
+
+    private var history: EditHistory<[Annotation]> {
+        get { marks[index].history }
+        nonmutating set { marks[index].history = newValue }
+    }
+
+    private var selectedID: Annotation.ID? {
+        get { marks[index].selectedID }
+        nonmutating set { marks[index].selectedID = newValue }
+    }
+
+    /// Images with marks waiting to be saved.
+    private var edited: [Bool] { marks.map { !$0.annotations.isEmpty } }
+    private var editedCount: Int { edited.filter { $0 }.count }
 
     var body: some View {
         EditorChrome(
             title: "Annotate",
-            primaryTitle: "Save",
-            isPrimaryEnabled: textDraft == nil && !annotations.isEmpty,
+            primaryTitle: primaryTitle,
+            isPrimaryEnabled: textDraft == nil && !isWorking && editedCount > 0,
             // While typing, Esc finishes the text instead of closing the editor.
             closesOnEscape: textDraft == nil,
             actions: actions,
@@ -277,6 +317,15 @@ struct AnnotateEditor: View {
                 preview
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.05)))
+
+                if isBatch {
+                    EditorFilmstrip(
+                        thumbnails: thumbnails,
+                        names: images.map(\.url.lastPathComponent),
+                        selection: Binding(get: { index }, set: show),
+                        edited: edited
+                    )
+                }
 
                 VStack(spacing: 6) {
                     HStack(spacing: 10) {
@@ -334,6 +383,25 @@ struct AnnotateEditor: View {
         .onChange(of: color) { _, newColor in updateSelection(coalescing: "color") { $0.color = newColor } }
         .onChange(of: lineWidth) { _, newWidth in updateSelection(coalescing: "width") { $0.lineWidth = CGFloat(newWidth) } }
         .onChange(of: selectedID) { _, _ in history.endCoalescing() }
+    }
+
+    private var primaryTitle: String {
+        guard isBatch else { return "Save" }
+        switch editedCount {
+        case 0: return "Save Images"
+        case 1: return "Save 1 Image"
+        default: return "Save \(editedCount) Images"
+        }
+    }
+
+    /// Moves to another image, first finishing any text being typed on this one.
+    private func show(_ newIndex: Int) {
+        guard newIndex != index else { return }
+        commitText()
+        draft = nil
+        dragMode = nil
+        history.endCoalescing()
+        index = newIndex
     }
 
     private var preview: some View {
@@ -580,6 +648,7 @@ struct AnnotateEditor: View {
         }
     }
 
+    /// Clears the shown image's marks.
     private func reset() {
         textDraft = nil
         draft = nil
@@ -591,19 +660,57 @@ struct AnnotateEditor: View {
 
     private func save() {
         commitText()
-        do {
-            guard let rendered = AnnotationRenderer.render(annotations, over: image.cgImage) else {
-                throw EditableImageError.unwritable(image.url)
+        let jobs = images.indices.map { (images[$0], marks[$0].annotations) }
+        guard isBatch else {
+            do {
+                actions.saved([try ImageAnnotator.save(jobs[0].0, with: jobs[0].1)])
+            } catch {
+                actions.failed(error)
             }
-            let url = try image.save(rendered, suffix: "Annotated")
-            actions.saved([url])
-        } catch {
-            actions.failed(error)
+            return
+        }
+        isWorking = true
+        Task.detached {
+            let result = Result { try ImageAnnotator.run(jobs) }
+            await MainActor.run {
+                isWorking = false
+                switch result {
+                case .success(let outcome):
+                    actions.finished(outcome)
+                case .failure(let error):
+                    actions.failed(error)
+                }
+            }
         }
     }
 
     private static var presetColors: [CGColor] {
         [NSColor.systemRed, .systemOrange, .systemYellow, .systemGreen, .systemBlue, .black, .white].map(\.cgColor)
+    }
+}
+
+/// Saves annotated copies next to the originals.
+enum ImageAnnotator {
+    /// Saves `image` with `annotations` drawn over it as "<name> Annotated".
+    static func save(_ image: EditableImage, with annotations: [Annotation]) throws -> URL {
+        guard let rendered = AnnotationRenderer.render(annotations, over: image.cgImage) else {
+            throw EditableImageError.unwritable(image.url)
+        }
+        return try image.save(rendered, suffix: "Annotated")
+    }
+
+    /// Draws on and saves each image; images without marks are left alone and
+    /// counted.
+    static func run(_ jobs: [(EditableImage, [Annotation])]) throws -> SaveOutcome {
+        var outcome = SaveOutcome(saved: [], savedLabel: "annotated", unchangedLabel: "not annotated")
+        for (image, annotations) in jobs {
+            guard !annotations.isEmpty else {
+                outcome.unchanged += 1
+                continue
+            }
+            outcome.saved.append(try save(image, with: annotations))
+        }
+        return outcome
     }
 }
 

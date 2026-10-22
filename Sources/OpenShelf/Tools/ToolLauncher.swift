@@ -77,7 +77,7 @@ enum ToolLauncher {
             return
         }
         guard let first = images.first else { return }
-        if tool != .compress && tool != .metadata && tool != .resize && tool != .crop {
+        if tool != .compress && tool != .metadata && tool != .resize && tool != .crop && tool != .annotate && tool != .redact {
             showOneFileNote(tool, urls: urls)
         }
 
@@ -87,9 +87,9 @@ enum ToolLauncher {
         case .addBackground:
             EditorWindowController.present(size: AddBackgroundEditor.windowSize, near: location) { AddBackgroundEditor(image: first, actions: $0) }
         case .annotate:
-            EditorWindowController.present(size: AnnotateEditor.windowSize, near: location) { AnnotateEditor(image: first, actions: $0) }
+            EditorWindowController.present(size: AnnotateEditor.windowSize(for: images.count), near: location) { AnnotateEditor(images: images, actions: $0) }
         case .redact:
-            EditorWindowController.present(size: RedactEditor.windowSize, near: location) { RedactEditor(image: first, actions: $0) }
+            EditorWindowController.present(size: RedactEditor.windowSize(for: images.count), near: location) { RedactEditor(images: images, actions: $0) }
         case .edit:
             EditorWindowController.present(size: AdjustEditor.windowSize, near: location) { AdjustEditor(image: first, actions: $0) }
         case .compress:
