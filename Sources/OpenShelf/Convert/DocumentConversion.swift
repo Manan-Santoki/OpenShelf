@@ -10,7 +10,14 @@ enum PDFConversion {
     ///   - original: Where results are saved and what they're named after, when
     ///     `source` is an intermediate PDF (e.g. made from slides).
     ///   - pageLabel: How numbered image files are labelled ("Page 2", "Slide 2").
-    static func convert(_ source: URL, to format: OutputFormat, savingNextTo original: URL? = nil, pageLabel: String = "Page") throws -> [URL] {
+    ///   - imageQuality: JPEG quality for page images; nil for the usual 0.92.
+    static func convert(
+        _ source: URL,
+        to format: OutputFormat,
+        savingNextTo original: URL? = nil,
+        pageLabel: String = "Page",
+        imageQuality: Double? = nil
+    ) throws -> [URL] {
         guard let document = PDFDocument(url: source) else { throw ConversionError.unreadable(source) }
         let original = original ?? source
         // A locked PDF opens, but every page renders blank and has no text.
@@ -55,7 +62,7 @@ enum PDFConversion {
             return try pages.enumerated().map { index, image in
                 let suffix = pages.count == 1 ? nil : "\(pageLabel) \(index + 1)"
                 let destination = OutputNaming.destination(for: original, suffix: suffix, pathExtension: format.rawValue)
-                try EditableImage.write(image, to: destination, type: type, quality: 0.92)
+                try EditableImage.write(image, to: destination, type: type, quality: imageQuality ?? 0.92)
                 return destination
             }
 

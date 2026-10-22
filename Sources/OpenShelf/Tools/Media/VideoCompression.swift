@@ -99,7 +99,9 @@ struct VideoSourceInfo: Equatable, Sendable {
         }
     }
 
-    private static func loadWithAVFoundation(_ url: URL) async throws -> VideoSourceInfo {
+    /// The same, from AVFoundation only: for callers whose own fallback
+    /// takes files it can't read to ffmpeg.
+    static func loadWithAVFoundation(_ url: URL) async throws -> VideoSourceInfo {
         let asset = AVURLAsset(url: url)
         guard let video = try await asset.loadTracks(withMediaType: .video).first else { throw MediaToolError.noVideo(url) }
         let (naturalSize, transform, frameRate, dataRate) = try await video.load(.naturalSize, .preferredTransform, .nominalFrameRate, .estimatedDataRate)
@@ -223,14 +225,30 @@ struct VideoCompressionPlan: Equatable, Sendable {
     let audio: [Audio]
     let estimatedBytes: Int64
 
+    /// Compress's plan: the codec HDR needs, else H.264, at a resolution and quality.
     init(source: VideoSourceInfo, resolution: VideoResolution, quality: VideoQuality) {
-        codec = source.isHDR ? .hevc : .h264
-        encodedSize = Self.encodedSize(for: source.naturalSize, resolution: resolution)
+        let codec: Codec = source.isHDR ? .hevc : .h264
+        let encodedSize = Self.encodedSize(for: source.naturalSize, resolution: resolution)
+        self.init(
+            source: source,
+            codec: codec,
+            encodedSize: encodedSize,
+            videoBitRate: Self.videoBitRate(for: encodedSize, quality: quality, codec: codec, source: source),
+            audio: source.audioTracks.map { Self.audio(for: $0, quality: quality) }
+        )
+    }
+
+    /// A plan with every choice made: the rotation and display size follow
+    /// `encodedSize`, and the estimate follows the bitrates.
+    /// - Parameter audio: One entry per sound track in `source`, in order.
+    init(source: VideoSourceInfo, codec: Codec, encodedSize: CGSize, videoBitRate: Int, audio: [Audio]) {
+        self.codec = codec
+        self.encodedSize = encodedSize
         transform = Self.transform(source.preferredTransform, fitting: encodedSize)
         let shown = CGRect(origin: .zero, size: encodedSize).applying(transform)
         displaySize = CGSize(width: abs(shown.width).rounded(), height: abs(shown.height).rounded())
-        videoBitRate = Self.videoBitRate(for: encodedSize, quality: quality, codec: codec, source: source)
-        audio = source.audioTracks.map { Self.audio(for: $0, quality: quality) }
+        self.videoBitRate = videoBitRate
+        self.audio = audio
 
         let bitsPerSecond: Double = Double(videoBitRate + audio.reduce(0) { $0 + $1.bitRate })
         let bytes: Double = bitsPerSecond / 8 * max(source.duration, 0) * Self.containerOverhead
@@ -240,10 +258,16 @@ struct VideoCompressionPlan: Equatable, Sendable {
     /// Fits `naturalSize` inside the resolution's bounds, keeping its shape,
     /// never enlarging, with even sides as video encoders need.
     static func encodedSize(for naturalSize: CGSize, resolution: VideoResolution) -> CGSize {
+        encodedSize(for: naturalSize, bounds: resolution.bounds)
+    }
+
+    /// Fits `naturalSize` inside `bounds` (long and short edges, so either
+    /// orientation fits), as above; nil bounds only even out the sides.
+    static func encodedSize(for naturalSize: CGSize, bounds: (long: Double, short: Double)?) -> CGSize {
         let width = Double(abs(naturalSize.width))
         let height = Double(abs(naturalSize.height))
         var scale: Double = 1
-        if let bounds = resolution.bounds, width > 0, height > 0 {
+        if let bounds, width > 0, height > 0 {
             let long: Double = max(width, height)
             let short: Double = min(width, height)
             scale = min(1, bounds.long / long, bounds.short / short)
@@ -269,17 +293,23 @@ struct VideoCompressionPlan: Equatable, Sendable {
     /// pixel, so the rate grows with pixels^0.75; frame rates above 30 cost
     /// half as much again per frame. Capped by what the source itself spent.
     static func videoBitRate(for size: CGSize, quality: VideoQuality, codec: Codec, source: VideoSourceInfo) -> Int {
+        videoBitRate(for: size, factor: quality.videoFactor, sourceShare: sourceShare, codec: codec, source: source)
+    }
+
+    /// The same for any `factor` of High's rate, capped at `share` of what
+    /// the source spent.
+    static func videoBitRate(for size: CGSize, factor: Double, sourceShare share: Double, codec: Codec, source: VideoSourceInfo) -> Int {
         let pixels = Double(size.width * size.height)
         let sizeScale: Double = pow(pixels / referencePixels, 0.75)
         let fps: Double = source.frameRate > 0 ? source.frameRate : 30
         let motion: Double = (fps <= 30 ? fps : 30 + (fps - 30) / 2) / 30
-        var rate: Double = referenceBitRate * sizeScale * motion * quality.videoFactor * codec.efficiency
+        var rate: Double = referenceBitRate * sizeScale * motion * factor * codec.efficiency
 
         if source.bitRate > 0 {
             let sourcePixels = Double(max(source.naturalSize.width * source.naturalSize.height, 1))
             let sourceCodec: Codec = source.isHEVC ? .hevc : .h264
             let asH264: Double = Double(source.bitRate) / sourceCodec.efficiency
-            let cap: Double = asH264 * codec.efficiency * pow(pixels / sourcePixels, 0.75) * sourceShare
+            let cap: Double = asH264 * codec.efficiency * pow(pixels / sourcePixels, 0.75) * share
             rate = min(rate, cap)
         }
         return max(Int(rate), 100_000)
@@ -288,14 +318,24 @@ struct VideoCompressionPlan: Equatable, Sendable {
     /// AAC tracks already at or below the target are copied untouched;
     /// anything else becomes AAC at the shared audio policy's rate.
     static func audio(for track: VideoSourceInfo.AudioTrack, quality: VideoQuality) -> Audio {
-        let target = AudioBitRate.target(for: .aac, source: track.audio, limit: quality.audioLimit)
+        audio(for: track, limit: quality.audioLimit)
+    }
+
+    /// The same with an optional stereo ceiling (see `AudioBitRate.target`).
+    static func audio(for track: VideoSourceInfo.AudioTrack, limit: Int?) -> Audio {
+        let target = AudioBitRate.target(for: .aac, source: track.audio, limit: limit)
         if track.audio.codec == .aac {
             let rate = track.audio.bitRate ?? target
             if Double(rate) <= Double(target) * 1.1 { return .passthrough(bitRate: rate) }
         }
-        // AAC tops out at 48 kHz; lower rates are lifted to 44.1 kHz.
+        return aac(for: track, bitRate: target)
+    }
+
+    /// `track` re-encoded as AAC at `bitRate`, in mono or stereo. AAC tops
+    /// out at 48 kHz; lower rates are lifted to 44.1 kHz.
+    static func aac(for track: VideoSourceInfo.AudioTrack, bitRate: Int) -> Audio {
         let sampleRate: Double = track.sampleRate >= 44_100 ? min(track.sampleRate, 48_000) : 44_100
-        return .aac(bitRate: target, channels: min(track.audio.channels, 2), sampleRate: sampleRate)
+        return .aac(bitRate: bitRate, channels: min(track.audio.channels, 2), sampleRate: sampleRate)
     }
 }
 
@@ -349,18 +389,93 @@ extension MediaTools {
         return destination
     }
 
+    /// Re-encodes a video into `destination`, an MP4 or MOV, as `plan` lays
+    /// out: how the Convert wheel applies output settings. Like `compress`,
+    /// it writes a hidden file and moves it into place once it's complete,
+    /// but keeps it whatever its size.
+    static func encode(
+        _ url: URL,
+        source: VideoSourceInfo,
+        plan: VideoCompressionPlan,
+        fileType: AVFileType,
+        to destination: URL,
+        progress: @escaping @Sendable (Double) -> Void
+    ) async throws {
+        let name = fileType == .mov ? "MOV" : "MP4"
+        let failure = EncodeFailure(detail: "as \(name)", message: "Converting to \(name) failed.")
+        let partial = partialURL(for: destination)
+        do {
+            try await transcode(url, source: source, plan: plan, fileType: fileType, to: partial, failure: failure, progress: progress)
+        } catch {
+            discardPartial(partial)
+            throw error
+        }
+        try moveIntoPlace(partial, destination: destination)
+        progress(1)
+    }
+
+    /// Writes every sound track of `url` as AAC at `kbps` into an M4A at
+    /// `destination`, through a hidden partial file. The M4A export preset
+    /// picks its own bitrate, so a fixed one needs this.
+    static func encodeAAC(
+        _ url: URL,
+        kbps: Int,
+        to destination: URL,
+        progress: @escaping @Sendable (Double) -> Void
+    ) async throws {
+        let failure = EncodeFailure(detail: "as M4A", message: "Converting to M4A failed.")
+        let asset = AVURLAsset(url: url)
+        let duration = try await asset.load(.duration).seconds
+        let tracks = try await asset.loadTracks(withMediaType: .audio)
+        guard !tracks.isEmpty else { throw ConversionError.failed("“\(url.lastPathComponent)” has no audio track.") }
+
+        let partial = partialURL(for: destination)
+        do {
+            let reader = try AVAssetReader(asset: asset)
+            let writer = try AVAssetWriter(outputURL: partial, fileType: .m4a)
+            writer.metadata = await mp4Metadata(of: asset)
+            var pairs: [(AVAssetReaderOutput, AVAssetWriterInput)] = []
+            for track in tracks {
+                let (rate, formats) = try await track.load(.estimatedDataRate, .formatDescriptions)
+                let description = formats.first.flatMap { CMAudioFormatDescriptionGetStreamBasicDescription($0)?.pointee }
+                let source = VideoSourceInfo.AudioTrack(
+                    audio: description.map { SourceAudio($0, bitRate: rate) } ?? SourceAudio(channels: 2, bitRate: nil),
+                    sampleRate: description?.mSampleRate ?? 44_100
+                )
+                let channels = min(source.audio.channels, 2)
+                let plan = VideoCompressionPlan.aac(for: source, bitRate: OutputSettings.Audio.aacBitRate(kbps: kbps, channels: channels))
+                pairs.append(try await audioPair(track, as: plan))
+            }
+            try await pump(reader: reader, writer: writer, pairs: pairs, duration: duration.isFinite ? duration : 0, failure: failure, progress: progress)
+        } catch {
+            discardPartial(partial)
+            throw error
+        }
+        try moveIntoPlace(partial, destination: destination)
+        progress(1)
+    }
+
+    /// What a failed encode says: "This file can’t be exported <detail>."
+    /// when it can't start, `message` when it fails partway.
+    private struct EncodeFailure {
+        var detail = "smaller"
+        var message = "Compressing failed."
+    }
+
     private static func transcode(
         _ url: URL,
         source: VideoSourceInfo,
         plan: VideoCompressionPlan,
+        fileType: AVFileType = .mp4,
         to output: URL,
+        failure: EncodeFailure = EncodeFailure(),
         progress: @escaping @Sendable (Double) -> Void
     ) async throws {
         let asset = AVURLAsset(url: url)
         guard let videoTrack = try await asset.loadTracks(withMediaType: .video).first else { throw MediaToolError.noVideo(url) }
         let audioTracks = try await asset.loadTracks(withMediaType: .audio)
         let reader = try AVAssetReader(asset: asset)
-        let writer = try AVAssetWriter(outputURL: output, fileType: .mp4)
+        let writer = try AVAssetWriter(outputURL: output, fileType: fileType)
         writer.shouldOptimizeForNetworkUse = true
         writer.metadata = await mp4Metadata(of: asset)
 
@@ -371,46 +486,62 @@ extension MediaTools {
         var pairs: [(AVAssetReaderOutput, AVAssetWriterInput)] = [(videoOutput, videoInput)]
 
         for (track, audio) in zip(audioTracks, plan.audio) {
-            switch audio {
-            case .passthrough:
-                let formats = try await track.load(.formatDescriptions)
-                let input = AVAssetWriterInput(mediaType: .audio, outputSettings: nil, sourceFormatHint: formats.first)
-                pairs.append((AVAssetReaderTrackOutput(track: track, outputSettings: nil), input))
-            case .aac(let bitRate, let channels, let sampleRate):
-                let layout = channelLayout(channels: channels)
-                let pcm: [String: Any] = [
-                    AVFormatIDKey: kAudioFormatLinearPCM,
-                    AVSampleRateKey: sampleRate,
-                    AVNumberOfChannelsKey: channels,
-                    AVChannelLayoutKey: layout,
-                ]
-                let aac: [String: Any] = [
-                    AVFormatIDKey: kAudioFormatMPEG4AAC,
-                    AVSampleRateKey: sampleRate,
-                    AVNumberOfChannelsKey: channels,
-                    AVChannelLayoutKey: layout,
-                    AVEncoderBitRateKey: bitRate,
-                ]
-                pairs.append((AVAssetReaderTrackOutput(track: track, outputSettings: pcm), AVAssetWriterInput(mediaType: .audio, outputSettings: aac)))
-            }
+            pairs.append(try await audioPair(track, as: audio))
         }
+        try await pump(reader: reader, writer: writer, pairs: pairs, duration: source.duration, failure: failure, progress: progress)
+    }
 
+    /// Reads `track` and writes it as `audio` says: copied, or as AAC.
+    private static func audioPair(_ track: AVAssetTrack, as audio: VideoCompressionPlan.Audio) async throws -> (AVAssetReaderOutput, AVAssetWriterInput) {
+        switch audio {
+        case .passthrough:
+            let formats = try await track.load(.formatDescriptions)
+            let input = AVAssetWriterInput(mediaType: .audio, outputSettings: nil, sourceFormatHint: formats.first)
+            return (AVAssetReaderTrackOutput(track: track, outputSettings: nil), input)
+        case .aac(let bitRate, let channels, let sampleRate):
+            let layout = channelLayout(channels: channels)
+            let pcm: [String: Any] = [
+                AVFormatIDKey: kAudioFormatLinearPCM,
+                AVSampleRateKey: sampleRate,
+                AVNumberOfChannelsKey: channels,
+                AVChannelLayoutKey: layout,
+            ]
+            let aac: [String: Any] = [
+                AVFormatIDKey: kAudioFormatMPEG4AAC,
+                AVSampleRateKey: sampleRate,
+                AVNumberOfChannelsKey: channels,
+                AVChannelLayoutKey: layout,
+                AVEncoderBitRateKey: bitRate,
+            ]
+            return (AVAssetReaderTrackOutput(track: track, outputSettings: pcm), AVAssetWriterInput(mediaType: .audio, outputSettings: aac))
+        }
+    }
+
+    /// Moves every pair's samples from `reader` to `writer` and finishes the
+    /// file. The first pair's timestamps drive progress over `duration`.
+    private static func pump(
+        reader: AVAssetReader,
+        writer: AVAssetWriter,
+        pairs: [(AVAssetReaderOutput, AVAssetWriterInput)],
+        duration: Double,
+        failure: EncodeFailure,
+        progress: @escaping @Sendable (Double) -> Void
+    ) async throws {
         for (readerOutput, writerInput) in pairs {
             readerOutput.alwaysCopiesSampleData = false
             writerInput.expectsMediaDataInRealTime = false
-            guard reader.canAdd(readerOutput), writer.canAdd(writerInput) else { throw MediaToolError.cannotExport("smaller") }
+            guard reader.canAdd(readerOutput), writer.canAdd(writerInput) else { throw MediaToolError.cannotExport(failure.detail) }
             reader.add(readerOutput)
             writer.add(writerInput)
         }
-        guard reader.startReading() else { throw reader.error ?? MediaToolError.cannotExport("smaller") }
+        guard reader.startReading() else { throw reader.error ?? MediaToolError.cannotExport(failure.detail) }
         guard writer.startWriting() else {
             reader.cancelReading()
-            throw writer.error ?? MediaToolError.cannotExport("smaller")
+            throw writer.error ?? MediaToolError.cannotExport(failure.detail)
         }
         writer.startSession(atSourceTime: .zero)
 
         let job = TranscodeJob(reader: reader, writer: writer, pairs: pairs)
-        let duration = source.duration
         let reporter = Task {
             while !Task.isCancelled {
                 if duration > 0 { progress(min(job.videoSeconds / duration, 0.99)) }
@@ -435,11 +566,11 @@ extension MediaTools {
             reader.cancelReading()
             writer.cancelWriting()
             if Task.isCancelled { throw CancellationError() }
-            throw writer.error ?? reader.error ?? MediaToolError.failed("Compressing failed.")
+            throw writer.error ?? reader.error ?? MediaToolError.failed(failure.message)
         }
         await writer.finishWriting()
         guard writer.status == .completed else {
-            throw writer.error ?? MediaToolError.failed("Compressing failed.")
+            throw writer.error ?? MediaToolError.failed(failure.message)
         }
     }
 
@@ -522,7 +653,8 @@ private final class TranscodeJob: @unchecked Sendable {
             pumps.append(SamplePump(output: pair.0, input: pair.1, writer: writer, label: "OpenShelf.compress.\(index)"))
         }
         self.pumps = pumps
-        // The first pump is the picture; its timestamps drive progress.
+        // The first pump is the picture (the first sound in an M4A); its
+        // timestamps drive progress.
         let lastVideoTime = lastVideoTime
         pumps.first?.onSample = { time in
             lastVideoTime.withLock { $0 = time.seconds }

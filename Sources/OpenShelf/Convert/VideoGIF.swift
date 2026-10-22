@@ -14,7 +14,8 @@ import VideoToolbox
 /// frames are encoded one at a time instead. ffmpeg's two-pass palette still
 /// looks better, so it's used when installed (see `MediaConversion`).
 enum VideoGIF {
-    /// The same rate and width cap as the ffmpeg path (`FFmpegArguments`).
+    /// The default rate and width cap, as on the ffmpeg path (`FFmpegArguments`);
+    /// Settings → Output can choose others (`OutputSettings.GIF`).
     static let framesPerSecond: Double = 12
     static let maxWidth: Double = 720
     /// Longer videos are sampled less often rather than cut short, so the GIF
@@ -42,9 +43,16 @@ enum VideoGIF {
         }
     }
 
-    /// Like ffmpeg's `fps=12,scale='min(720,iw)':-2`: at most 720 px wide, the
-    /// height kept in proportion and even, and at most `maxFrames` frames.
-    static func plan(displayWidth: Double, displayHeight: Double, duration: Double) -> Plan {
+    /// Like ffmpeg's `fps=12,scale='min(720,iw)':-2`: at most 720 px wide (or
+    /// `maxWidth`), the height kept in proportion and even, `framesPerSecond`
+    /// frames a second and at most `maxFrames` frames.
+    static func plan(
+        displayWidth: Double,
+        displayHeight: Double,
+        duration: Double,
+        maxWidth: Double = VideoGIF.maxWidth,
+        framesPerSecond: Double = VideoGIF.framesPerSecond
+    ) -> Plan {
         let sourceWidth: Double = max(displayWidth.rounded(), 2)
         let sourceHeight: Double = max(displayHeight.rounded(), 2)
         let width: Double = min(maxWidth, sourceWidth)
@@ -66,6 +74,7 @@ enum VideoGIF {
     static func write(
         _ source: URL,
         to destination: URL,
+        settings: OutputSettings.GIF = OutputSettings.GIF(),
         progress: @escaping @Sendable (Double) -> Void
     ) async throws {
         let asset = AVURLAsset(url: source)
@@ -75,7 +84,13 @@ enum VideoGIF {
         let (naturalSize, transform) = try await track.load(.naturalSize, .preferredTransform)
         let duration = try await asset.load(.duration).seconds
         let oriented = CGRect(origin: .zero, size: naturalSize).applying(transform)
-        let plan = plan(displayWidth: abs(oriented.width), displayHeight: abs(oriented.height), duration: duration)
+        let plan = plan(
+            displayWidth: abs(oriented.width),
+            displayHeight: abs(oriented.height),
+            duration: duration,
+            maxWidth: Double(settings.width.maxWidth),
+            framesPerSecond: Double(settings.frameRate)
+        )
 
         let partial = MediaTools.partialURL(for: destination)
         let job = GIFJob(asset: asset, track: track, naturalSize: naturalSize, transform: transform, plan: plan, output: partial, progress: progress)

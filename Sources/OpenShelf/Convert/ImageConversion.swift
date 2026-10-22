@@ -3,7 +3,13 @@ import Foundation
 import ImageIO
 
 enum ImageConversion {
-    static func convert(_ source: URL, to format: OutputFormat, tools: ExternalTools) async throws -> URL {
+    /// `settings` choose the quality of lossy formats and whether metadata is kept.
+    static func convert(
+        _ source: URL,
+        to format: OutputFormat,
+        tools: ExternalTools,
+        settings: OutputSettings.Image = OutputSettings.Image()
+    ) async throws -> URL {
         guard let pathExtension = format.fileExtension else {
             throw ConversionError.unsupported("image to \(format.title)")
         }
@@ -16,12 +22,14 @@ enum ImageConversion {
         case .docx:
             try DocxWriter.write(images: [image.cgImage], to: destination)
         case .webp:
-            try await writeWebP(image, to: destination, tools: tools)
+            try await writeWebP(image, to: destination, quality: settings.webPQuality, tools: tools)
         default:
             guard let type = format.imageIOType else {
                 throw ConversionError.unsupported("image to \(format.title)")
             }
-            try EditableImage.write(image.cgImage, to: destination, type: type, quality: 0.9, metadata: image.properties)
+            // PNG, TIFF, BMP and GIF ignore the quality.
+            let metadata = settings.keepsMetadata ? image.properties : nil
+            try EditableImage.write(image.cgImage, to: destination, type: type, quality: settings.quality(otherwise: 0.9), metadata: metadata)
         }
         return destination
     }
@@ -40,8 +48,9 @@ enum ImageConversion {
         context.closePDF()
     }
 
-    /// ImageIO can't encode WebP, so go through a temporary PNG and cwebp or ffmpeg.
-    private static func writeWebP(_ image: EditableImage, to url: URL, tools: ExternalTools) async throws {
+    /// ImageIO can't encode WebP, so go through a temporary PNG and cwebp or
+    /// ffmpeg. `quality` is 0–100.
+    private static func writeWebP(_ image: EditableImage, to url: URL, quality: String, tools: ExternalTools) async throws {
         // Check ffmpeg (usually known already) before doing any work.
         var encoders: Set<String> = []
         if tools.cwebp == nil, let ffmpeg = tools.ffmpeg {
@@ -55,9 +64,9 @@ enum ImageConversion {
 
         switch encoder {
         case .cwebp(let cwebp):
-            try await ProcessRunner.run(cwebp, ["-quiet", "-q", "88", temporary.path, "-o", url.path])
+            try await ProcessRunner.run(cwebp, ["-quiet", "-q", quality, temporary.path, "-o", url.path])
         case .ffmpeg(let ffmpeg):
-            try await ProcessRunner.run(ffmpeg, ["-y", "-loglevel", "error", "-i", temporary.path, "-c:v", "libwebp", "-quality", "88", url.path])
+            try await ProcessRunner.run(ffmpeg, ["-y", "-loglevel", "error", "-i", temporary.path, "-c:v", "libwebp", "-quality", quality, url.path])
         }
     }
 }

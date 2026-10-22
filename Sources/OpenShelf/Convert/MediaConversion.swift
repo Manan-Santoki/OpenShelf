@@ -10,6 +10,7 @@ enum MediaConversion {
         _ source: URL,
         to format: OutputFormat,
         tools: ExternalTools,
+        settings: OutputSettings = .automatic,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws -> URL {
         guard let pathExtension = format.fileExtension else {
@@ -25,16 +26,16 @@ enum MediaConversion {
         let usesFFmpeg = !isNative || format.needsFFmpeg || (format == .gif && tools.ffmpeg != nil)
         do {
             if usesFFmpeg {
-                try await convertWithFFmpeg(source, to: format, destination: destination, tools: tools, progress: progress)
+                try await convertWithFFmpeg(source, to: format, destination: destination, tools: tools, settings: settings, progress: progress)
             } else {
                 // A file named like one AVFoundation reads may not be one (an
                 // MPEG-TS stream saved as .mp4); ffmpeg gets a go at those.
                 try await MediaFallback.run(source, tools: tools) {
-                    try await convertNatively(source, to: format, destination: destination, progress: progress)
+                    try await convertNatively(source, to: format, destination: destination, settings: settings, progress: progress)
                 } fallback: { _ in
                     // AVFoundation may have started the file before giving up.
                     try? FileManager.default.removeItem(at: destination)
-                    try await convertWithFFmpeg(source, to: format, destination: destination, tools: tools, progress: progress)
+                    try await convertWithFFmpeg(source, to: format, destination: destination, tools: tools, settings: settings, progress: progress)
                 }
             }
         } catch {
@@ -49,15 +50,27 @@ enum MediaConversion {
         _ source: URL,
         to format: OutputFormat,
         destination: URL,
+        settings: OutputSettings,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws {
         switch format {
-        case .mp4:
-            try await export(source, to: destination, preset: AVAssetExportPresetHighestQuality, fileType: .mp4, progress: progress)
-        case .mov:
-            try await export(source, to: destination, preset: AVAssetExportPresetHighestQuality, fileType: .mov, progress: progress)
+        case .mp4, .mov:
+            let fileType: AVFileType = format == .mp4 ? .mp4 : .mov
+            guard settings.reencodesVideo else {
+                try await export(source, to: destination, preset: AVAssetExportPresetHighestQuality, fileType: fileType, progress: progress)
+                return
+            }
+            // The preset chooses its own codec, size and bitrate, so settings
+            // that choose any of them re-encode the way Compress does.
+            let info = try await VideoSourceInfo.loadWithAVFoundation(source)
+            let plan = VideoCompressionPlan(source: info, settings: settings)
+            try await MediaTools.encode(source, source: info, plan: plan, fileType: fileType, to: destination, progress: progress)
         case .m4a:
-            try await export(source, to: destination, preset: AVAssetExportPresetAppleM4A, fileType: .m4a, progress: progress)
+            if let kbps = settings.audio.kbps {
+                try await MediaTools.encodeAAC(source, kbps: kbps, to: destination, progress: progress)
+            } else {
+                try await export(source, to: destination, preset: AVAssetExportPresetAppleM4A, fileType: .m4a, progress: progress)
+            }
         case .wav:
             try await ProcessRunner.run(afconvert, ["-f", "WAVE", "-d", "LEI16", source.path, destination.path])
         case .aiff:
@@ -65,7 +78,7 @@ enum MediaConversion {
         case .flac:
             try await ProcessRunner.run(afconvert, ["-f", "flac", "-d", "flac", source.path, destination.path])
         case .gif:
-            try await VideoGIF.write(source, to: destination, progress: progress)
+            try await VideoGIF.write(source, to: destination, settings: settings.gif, progress: progress)
         default:
             throw ConversionError.unsupported("media to \(format.title)")
         }
@@ -76,6 +89,7 @@ enum MediaConversion {
         to format: OutputFormat,
         destination: URL,
         tools: ExternalTools,
+        settings: OutputSettings,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws {
         guard let ffmpeg = tools.ffmpeg else {
@@ -86,17 +100,31 @@ enum MediaConversion {
         let audio = await sourceAudio(of: source, tools: tools)
         let input: [String] = ["-i", source.path]
 
+        // MP4 and MOV may be copied; MKV only needs looking at for its codec
+        // setting, which HDR overrides (see `FFmpegArguments`).
+        let needsProbe = format == .mp4 || format == .mov || (format == .mkv && settings.reencodesVideo)
+        let probed: ProbedMedia? = needsProbe ? try? await ProbedMedia.load(source, ffprobe: tools.ffprobe) : nil
+
         var attempts: [[String]] = []
-        if format == .mkv {
-            // Matroska holds almost any codec, so try copying every stream first.
-            attempts.append(input + ["-map", "0", "-c", "copy"])
-        } else if format == .mp4 || format == .mov,
-                  let probed = try? await ProbedMedia.load(source, ffprobe: tools.ffprobe),
-                  let copy = FFmpegArguments.streamCopy(to: format, from: probed) {
-            // H.264 or HEVC with AAC, as in most MPEG-TS recordings, only needs a new container.
-            attempts.append(input + copy)
+        // Copying streams would ignore settings that ask for a re-encode.
+        if !settings.reencodesVideo {
+            if format == .mkv {
+                // Matroska holds almost any codec, so try copying every stream first.
+                attempts.append(input + ["-map", "0", "-c", "copy"])
+            } else if let probed, let copy = FFmpegArguments.streamCopy(to: format, from: probed) {
+                // H.264 or HEVC with AAC, as in most MPEG-TS recordings, only needs a new container.
+                attempts.append(input + copy)
+            }
         }
-        attempts.append(input + FFmpegArguments.arguments(for: format, encoders: encoders, audio: audio))
+        let isHDR = probed?.video?.isHDR ?? false
+        let arguments = FFmpegArguments.arguments(for: format, encoders: encoders, audio: audio, settings: settings, isHDR: isHDR)
+        attempts.append(input + arguments)
+        if arguments.contains(FFmpegArguments.hevcToolbox) {
+            // Only Apple silicon encodes to a constant quality; elsewhere fall
+            // back to the next encoder (see `FFmpegArguments.hevc`).
+            let others = encoders.subtracting([FFmpegArguments.hevcToolbox])
+            attempts.append(input + FFmpegArguments.arguments(for: format, encoders: others, audio: audio, settings: settings, isHDR: isHDR))
+        }
         try await FFmpegJob.export(ffmpeg, attempts: attempts, to: destination, duration: duration, progress: progress)
     }
 
@@ -169,18 +197,29 @@ enum MediaConversion {
 
 /// ffmpeg codec settings for each output format.
 enum FFmpegArguments {
+    static let hevcToolbox = "hevc_videotoolbox"
+
     /// Arguments between the input and the output path. `encoders` is what the
     /// installed ffmpeg offers, so OGG can fall back when libvorbis is missing.
-    /// Lossy audio bitrates follow `audio`, the source's sound (see `AudioBitRate`).
-    static func arguments(for format: OutputFormat, encoders: Set<String>, audio: SourceAudio? = nil) -> [String] {
+    /// Lossy audio bitrates follow `audio`, the source's sound (see
+    /// `AudioBitRate`), unless `settings` fix one; `isHDR` says the source is
+    /// HDR, which keeps HEVC once video settings are chosen.
+    static func arguments(
+        for format: OutputFormat,
+        encoders: Set<String>,
+        audio: SourceAudio? = nil,
+        settings: OutputSettings = .automatic,
+        isHDR: Bool = false
+    ) -> [String] {
         func bitRate(_ codec: AudioBitRate.Codec) -> [String] {
-            ["-b:a", AudioBitRate.argument(for: codec, source: audio)]
+            ["-b:a", settings.audio.argument(for: codec, source: audio)]
         }
-        let h264 = ["-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p"]
+        let video = settings.video
+        let scale: [String] = video.maxSize.bounds.map { ["-vf", scaleFilter(fitting: $0)] } ?? []
         let aac = ["-c:a", "aac"] + bitRate(.aac)
         switch format {
-        case .mp4: return h264 + aac + ["-movflags", "+faststart"]
-        case .mov, .mkv: return h264 + aac
+        case .mp4: return scale + videoEncoding(for: format, video, encoders: encoders, isHDR: isHDR) + aac + ["-movflags", "+faststart"]
+        case .mov, .mkv: return scale + videoEncoding(for: format, video, encoders: encoders, isHDR: isHDR) + aac
         case .m4a: return ["-vn"] + aac
         case .mp3: return ["-vn", "-c:a", "libmp3lame"] + bitRate(.mp3)
         case .wav: return ["-vn", "-c:a", "pcm_s16le"]
@@ -195,17 +234,111 @@ enum FFmpegArguments {
             // ffmpeg's own Vorbis encoder is experimental, stereo-only and ignores bitrates.
             return ["-vn", "-c:a", "vorbis", "-strict", "experimental", "-ac", "2"]
         case .webm:
-            return ["-c:v", "libvpx-vp9", "-crf", "32", "-b:v", "0", "-deadline", "good", "-cpu-used", "4", "-row-mt", "1", "-c:a", "libopus"] + bitRate(.opus)
+            return scale + ["-c:v", "libvpx-vp9"] + vp9Rate(video) + ["-deadline", "good", "-cpu-used", "4", "-row-mt", "1", "-c:a", "libopus"] + bitRate(.opus)
         case .avi:
-            return ["-c:v", "mpeg4", "-vtag", "xvid", "-q:v", "4", "-c:a", "libmp3lame"] + bitRate(.mp3)
+            return scale + ["-c:v", "mpeg4", "-vtag", "xvid"] + quantizer(video) + ["-c:a", "libmp3lame"] + bitRate(.mp3)
         case .wmv:
-            return ["-c:v", "wmv2", "-q:v", "4", "-c:a", "wmav2"] + bitRate(.wma)
+            return scale + ["-c:v", "wmv2"] + quantizer(video) + ["-c:a", "wmav2"] + bitRate(.wma)
         case .gif:
-            // Two-pass palette for clean colours; capped at 720 px wide and 12 fps to keep files small.
-            return ["-vf", "fps=12,scale='min(720,iw)':-2:flags=lanczos,split[a][b];[a]palettegen[p];[b][p]paletteuse", "-loop", "0"]
+            // Two-pass palette for clean colours. By default capped at 720 px
+            // wide and 12 fps to keep files small.
+            let gif = settings.gif
+            return ["-vf", "fps=\(gif.frameRate),scale='min(\(gif.width.maxWidth),iw)':-2:flags=lanczos,split[a][b];[a]palettegen[p];[b][p]paletteuse", "-loop", "0"]
         default:
             return []
         }
+    }
+
+    /// The picture in MP4, MOV and MKV: H.264 with x264 unless HEVC is
+    /// chosen, or the source is HDR and any video setting is (H.264 can't
+    /// hold HDR's colours). Automatic settings give x264 at CRF 20, as always.
+    static func videoEncoding(for format: OutputFormat, _ video: OutputSettings.Video, encoders: Set<String>, isHDR: Bool) -> [String] {
+        let wantsHEVC = video.codec == .hevc || (isHDR && !video.isAutomatic)
+        if wantsHEVC, let hevc = hevc(for: format, video, encoders: encoders, isHDR: isHDR) {
+            return hevc
+        }
+        let rate: [String] = customRate(video) ?? ["-crf", "\(x264CRF(video.quality))"]
+        return ["-c:v", "libx264", "-preset", "medium"] + rate + ["-pix_fmt", "yuv420p"]
+    }
+
+    /// HEVC with x265 when this ffmpeg has it, else VideoToolbox; nil with
+    /// neither. HDR is kept 10-bit. QuickTime only plays HEVC tagged "hvc1".
+    static func hevc(for format: OutputFormat, _ video: OutputSettings.Video, encoders: Set<String>, isHDR: Bool) -> [String]? {
+        let tag: [String] = format == .mp4 || format == .mov ? ["-tag:v", "hvc1"] : []
+        if encoders.contains("libx265") {
+            // x265 needs about five more CRF for the same size as x264.
+            let rate: [String] = customRate(video) ?? ["-crf", "\(x264CRF(video.quality) + 5)"]
+            return ["-c:v", "libx265", "-preset", "medium"] + rate + ["-pix_fmt", isHDR ? "yuv420p10le" : "yuv420p"] + tag + ["-x265-params", "log-level=error"]
+        }
+        if encoders.contains(hevcToolbox) {
+            let rate: [String] = customRate(video) ?? ["-q:v", "\(toolboxQuality(video.quality))"]
+            let depth: [String] = isHDR ? ["-pix_fmt", "p010le", "-profile:v", "main10"] : ["-pix_fmt", "yuv420p"]
+            return ["-c:v", hevcToolbox] + rate + depth + tag
+        }
+        return nil
+    }
+
+    /// x264's constant rate factor; lower is better and larger.
+    static func x264CRF(_ quality: OutputSettings.Video.Quality) -> Int {
+        switch quality {
+        case .best: 18
+        case .automatic, .custom: 20
+        case .balanced: 23
+        case .smaller: 28
+        }
+    }
+
+    /// VideoToolbox's constant quality, 1–100; higher is better and larger.
+    static func toolboxQuality(_ quality: OutputSettings.Video.Quality) -> Int {
+        switch quality {
+        case .best: 75
+        case .automatic, .custom: 65
+        case .balanced: 55
+        case .smaller: 40
+        }
+    }
+
+    /// VP9 in constant quality mode (CRF with no bitrate), or a target bitrate.
+    static func vp9Rate(_ video: OutputSettings.Video) -> [String] {
+        if video.quality == .custom { return ["-b:v", "\(video.customBitRate)"] }
+        let crf: Int = switch video.quality {
+        case .best: 28
+        case .automatic, .custom: 32
+        case .balanced: 33
+        case .smaller: 38
+        }
+        return ["-crf", "\(crf)", "-b:v", "0"]
+    }
+
+    /// MPEG-4 (Xvid) and WMV's fixed quantizer, 2–31; lower is better and
+    /// larger. Or a target bitrate.
+    static func quantizer(_ video: OutputSettings.Video) -> [String] {
+        if video.quality == .custom { return ["-b:v", "\(video.customBitRate)"] }
+        let scale: Int = switch video.quality {
+        case .best: 2
+        case .automatic, .custom: 4
+        case .balanced: 5
+        case .smaller: 8
+        }
+        return ["-q:v", "\(scale)"]
+    }
+
+    /// A custom bitrate as x264, x265 and VideoToolbox take it, with room for
+    /// busy scenes; nil for the other qualities.
+    static func customRate(_ video: OutputSettings.Video) -> [String]? {
+        guard video.quality == .custom else { return nil }
+        let rate = video.customBitRate
+        return ["-b:v", "\(rate)", "-maxrate", "\(rate * 3 / 2)", "-bufsize", "\(rate * 2)"]
+    }
+
+    /// Scales a video to fit inside `bounds` (long and short edges) in
+    /// either orientation, keeping its shape, never enlarging, with even
+    /// sides. Frames are already upright here, so portrait fits turned.
+    static func scaleFilter(fitting bounds: (long: Double, short: Double)) -> String {
+        let long = Int(bounds.long)
+        let short = Int(bounds.short)
+        return "scale=w='if(gte(iw,ih),min(\(long),iw),min(\(short),iw))':h='if(gte(iw,ih),min(\(short),ih),min(\(long),ih))'"
+            + ":force_original_aspect_ratio=decrease:force_divisible_by=2"
     }
 
     /// Arguments that copy `probed`'s picture and sound into an MP4 or MOV
