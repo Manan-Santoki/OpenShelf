@@ -5,7 +5,7 @@ import AppKit
 @MainActor
 enum ToolLauncher {
     static func open(_ tool: FileTool, with urls: [URL], near location: NSPoint = NSEvent.mouseLocation) {
-        guard let first = urls.first else { return }
+        guard !urls.isEmpty else { return }
         let runner = ConversionRunner.shared
 
         switch tool {
@@ -96,11 +96,5 @@ enum ToolLauncher {
         default:
             break
         }
-    }
-
-    /// Editors that work on a single file open the first one and say so.
-    private static func showOneFileNote(_ tool: FileTool, urls: [URL]) {
-        guard urls.count > 1 else { return }
-        ToastController.shared.show(Toast(systemImage: "info.circle", title: "\(tool.title) works on one file", subtitle: "Opened \(urls[0].lastPathComponent)"))
     }
 }
