@@ -2,30 +2,47 @@
 import Observation
 import SwiftUI
 
-/// Crops a video's frame, with the same handles and presets as the image Crop editor.
+/// Crops a video's frame, with the same handles and presets as the image Crop
+/// editor. Given several videos, a filmstrip moves between them, and one crop
+/// can apply to all of them (as fractions of each frame) or each can have its own.
 struct VideoCropEditor: View {
-    static let windowSize = CGSize(width: 520, height: 620)
+    static func windowSize(for count: Int) -> CGSize {
+        CGSize(width: 520, height: count > 1 ? 620 + EditorFilmstrip.height : 620)
+    }
 
     let actions: EditorActions
-    @State private var model: VideoCropModel
+    @State private var models: [VideoCropModel]
+    @State private var index = 0
+    /// One crop for every video, kept as fractions of its frame.
+    @State private var sameForAll = true
+    @State private var thumbnails: [CGImage?]
+    @State private var batch = MediaBatchExport()
     @State private var dragStart: CGRect?
 
     private let minimumSize: CGFloat = 16
 
-    init(url: URL, actions: EditorActions) {
+    init(urls: [URL], actions: EditorActions) {
         self.actions = actions
-        _model = State(initialValue: VideoCropModel(url: url))
+        _models = State(initialValue: urls.map(VideoCropModel.init))
+        _thumbnails = State(initialValue: urls.map { _ in nil })
     }
+
+    private var model: VideoCropModel { models[index] }
+    private var isBatch: Bool { models.count > 1 }
+    private var edited: [Bool] { models.map(\.isEdited) }
+    private var editedCount: Int { edited.filter { $0 }.count }
 
     var body: some View {
         EditorChrome(
-            title: "Crop Video",
-            primaryTitle: "Apply",
+            title: isBatch ? "Crop Videos" : "Crop Video",
+            primaryTitle: primaryTitle,
             // Cropping to the whole frame would only re-encode the video.
-            isPrimaryEnabled: model.frame != nil && model.exportProgress == nil && model.crop != model.bounds,
+            isPrimaryEnabled: isBatch
+                ? batch.progress == nil && editedCount > 0
+                : model.frame != nil && model.exportProgress == nil && model.crop != model.bounds,
             actions: actions,
             onReset: model.reset,
-            onPrimary: { model.save(actions: actions) }
+            onPrimary: save
         ) {
             VStack(spacing: 14) {
                 GeometryReader { proxy in
@@ -41,13 +58,29 @@ struct VideoCropEditor: View {
                 }
                 .frame(height: 400)
 
+                if isBatch {
+                    EditorFilmstrip(
+                        thumbnails: thumbnails,
+                        names: models.map(\.url.lastPathComponent),
+                        selection: $index,
+                        edited: edited,
+                        sameForAll: $sameForAll,
+                        placeholder: "film",
+                        itemName: "video"
+                    )
+                    .onChange(of: index) { _, _ in dragStart = nil }
+                    .onChange(of: sameForAll) { _, isOn in
+                        // Turning it on spreads the shown video's crop to the rest.
+                        if isOn { spread() }
+                    }
+                }
+
                 EditorRow(label: "Aspect ratio") {
-                    Picker("Aspect ratio", selection: $model.ratio) {
+                    Picker("Aspect ratio", selection: model.ratioBinding) {
                         ForEach(CropRatio.allCases) { Text($0.title).tag($0) }
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
-                    .onChange(of: model.ratio) { _, newRatio in model.snap(to: newRatio) }
                 }
 
                 EditorRow(label: "Size") {
@@ -65,13 +98,78 @@ struct VideoCropEditor: View {
                     .font(.system(size: 12))
                 }
 
-                if let progress = model.exportProgress {
-                    MediaExportProgress(progress: progress)
+                if let progress = isBatch ? batch.progress : model.exportProgress {
+                    MediaExportProgress(progress: progress, detail: batch.detail)
                 }
             }
         }
-        .task { await model.load() }
-        .onDisappear(perform: model.cancel)
+        .task { await load() }
+        .task(id: index) {
+            if isBatch { await model.load() }
+        }
+        .onChange(of: Shown(index: index, crop: model.crop, ratio: model.ratio)) { old, new in
+            // Only edits to the shown video, not moving to another one.
+            if isBatch && sameForAll && old.index == new.index { spread() }
+        }
+        .onDisappear {
+            models.forEach { $0.cancel() }
+            batch.cancel()
+        }
+    }
+
+    private var primaryTitle: String {
+        guard isBatch else { return "Apply" }
+        switch editedCount {
+        case 0: return "Crop Videos"
+        case 1: return "Crop 1 Video"
+        default: return "Crop \(editedCount) Videos"
+        }
+    }
+
+    /// What the crop of the shown video depends on, to notice it changing.
+    private struct Shown: Equatable {
+        var index: Int
+        var crop: CGRect
+        var ratio: CropRatio
+    }
+
+    /// Loads the one video; or, for several, every video's size (so one crop
+    /// can be carried to all), then their filmstrip pictures. The shown
+    /// video's frame loads when it's shown.
+    private func load() async {
+        guard isBatch else {
+            await model.load()
+            return
+        }
+        for model in models { await model.loadSize() }
+        if sameForAll { spread() }
+        for index in models.indices {
+            thumbnails[index] = await MediaBatch.thumbnail(of: models[index].url)
+        }
+    }
+
+    /// Gives every other video the shown video's crop, as fractions of its
+    /// frame, and its aspect ratio.
+    private func spread() {
+        let shown = model
+        guard shown.isSized else { return }
+        let unit = CropMath.unit(shown.crop, in: shown.bounds)
+        for other in models where other !== shown && other.isSized {
+            other.ratio = shown.ratio
+            other.crop = CropMath.mapped(unit, to: other.bounds, ratio: shown.ratio.value)
+        }
+    }
+
+    private func save() {
+        guard isBatch else {
+            model.save(actions: actions)
+            return
+        }
+        let jobs = models.filter(\.isEdited).map { ($0.url, $0.crop) }
+        let outcome = SaveOutcome(saved: [], unchanged: models.count - jobs.count, savedLabel: "cropped", unchangedLabel: "not cropped")
+        batch.start(jobs.count, outcome: outcome, actions: actions) { index, progress in
+            [try await MediaTools.crop(jobs[index].0, to: jobs[index].1, progress: progress)]
+        }
     }
 
     private func canvas(_ frame: CGImage, in available: CGSize) -> some View {
@@ -136,11 +234,14 @@ final class VideoCropModel {
     private(set) var loadError: String?
     /// The upright video size in pixels; crops are expressed in this space.
     private(set) var bounds = CGRect(x: 0, y: 0, width: 1, height: 1)
+    /// Whether `bounds` has been read yet.
+    private(set) var isSized = false
     /// The crop in video pixels, origin at the top left.
     var crop = CGRect(x: 0, y: 0, width: 1, height: 1)
     var ratio = CropRatio.free
     private(set) var exportProgress: Double?
     @ObservationIgnored private var exportTask: Task<Void, Never>?
+    @ObservationIgnored private var sizeTask: Task<Void, Never>?
 
     private let minimumSize: CGFloat = 16
 
@@ -148,15 +249,37 @@ final class VideoCropModel {
         self.url = url
     }
 
+    /// Whether the crop would change the video.
+    var isEdited: Bool { isSized && loadError == nil && crop != bounds }
+
     func load() async {
+        await loadSize()
+        guard loadError == nil, frame == nil else { return }
         do {
-            guard let size = try await MediaLoading.basics(of: url).displaySize else { throw MediaToolError.noVideo(url) }
             frame = try await MediaLoading.poster(of: url, maximumSize: 1600)
-            bounds = CGRect(origin: .zero, size: size)
-            crop = bounds
         } catch {
+            // Moving to another video cancels this; it loads again when shown.
+            guard !Task.isCancelled else { return }
             loadError = MediaLoading.loadError(error, otherwise: "This video can’t be read.")
         }
+    }
+
+    /// Reads the video's size and starts the crop as the whole frame, once
+    /// however often it's asked for.
+    func loadSize() async {
+        if sizeTask == nil {
+            sizeTask = Task {
+                do {
+                    guard let size = try await MediaLoading.basics(of: url).displaySize else { throw MediaToolError.noVideo(url) }
+                    bounds = CGRect(origin: .zero, size: size)
+                    crop = bounds
+                    isSized = true
+                } catch {
+                    loadError = MediaLoading.loadError(error, otherwise: "This video can’t be read.")
+                }
+            }
+        }
+        await sizeTask?.value
     }
 
     func cancel() {
@@ -171,6 +294,15 @@ final class VideoCropModel {
     func snap(to ratio: CropRatio) {
         guard let value = ratio.value else { return }
         crop = CropMath.largest(ratio: value, centeredAt: CGPoint(x: crop.midX, y: crop.midY), in: bounds)
+    }
+
+    /// The aspect ratio; choosing one fits the crop to it. (Only a choice
+    /// does: moving between videos with different ratios mustn't refit them.)
+    var ratioBinding: Binding<CropRatio> {
+        Binding { self.ratio } set: { newRatio in
+            self.ratio = newRatio
+            self.snap(to: newRatio)
+        }
     }
 
     func dimensionBinding(_ keyPath: KeyPath<CGRect, CGFloat>) -> Binding<Int> {
