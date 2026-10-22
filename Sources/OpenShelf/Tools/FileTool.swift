@@ -130,8 +130,7 @@ enum FileTool: CaseIterable, Hashable {
             return [.compress, .metadata, .edit, .annotate, .addBackground, .crop, .resize, .removeBackground, .redact, .readQR] + combine
         }
         if kinds == [.pdf] {
-            let singlePage: [FileTool] = urls.count == 1 ? [.organizePages, .splitPDF] : []
-            return combine + singlePage + [.compressPDF, .pdfMetadata]
+            return combine + [.organizePages, .splitPDF, .compressPDF, .pdfMetadata]
         }
         if kinds.isSubset(of: [.video, .audio]),
            !urls.allSatisfy({ editableMediaExtensions.contains($0.resolvingSymlinksInPath().pathExtension.lowercased()) }) {

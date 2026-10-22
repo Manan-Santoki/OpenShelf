@@ -39,9 +39,9 @@ enum ToolLauncher {
             }
 
         case .organizePages:
-            EditorWindowController.present(size: PDFPagesEditor.windowSize, near: location) { PDFPagesEditor(url: first, actions: $0) }
+            EditorWindowController.present(size: PDFPagesEditor.windowSize(for: urls.count), near: location) { PDFPagesEditor(urls: urls, actions: $0) }
         case .splitPDF:
-            EditorWindowController.present(size: PDFSplitEditor.windowSize, near: location) { PDFSplitEditor(url: first, actions: $0) }
+            EditorWindowController.present(size: PDFSplitEditor.windowSize(for: urls.count), near: location) { PDFSplitEditor(urls: urls, actions: $0) }
         case .compressPDF:
             EditorWindowController.present(size: PDFCompressEditor.windowSize, near: location) { PDFCompressEditor(urls: urls, actions: $0) }
         case .pdfMetadata:

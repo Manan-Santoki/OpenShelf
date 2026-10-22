@@ -175,6 +175,26 @@ enum PDFTools {
         return destination
     }
 
+    /// Saves each PDF's edited pages; PDFs never opened (nil) or with every
+    /// page where it was are left alone and counted.
+    static func saveEditedPages(_ jobs: [(url: URL, pages: [PDFPageEdit]?)]) throws -> SaveOutcome {
+        var outcome = SaveOutcome(saved: [], savedLabel: "edited")
+        for (url, pages) in jobs {
+            try Task.checkCancellation()
+            guard let pages, !keepsDocument(pages, pageCount: try open(url).pageCount) else {
+                outcome.unchanged += 1
+                continue
+            }
+            outcome.saved.append(try saveEditedPages(of: url, pages: pages))
+        }
+        return outcome
+    }
+
+    /// Whether `pages` are every page of the document, in order and unturned.
+    static func keepsDocument(_ pages: [PDFPageEdit], pageCount: Int) -> Bool {
+        pages.map(\.sourceIndex) == Array(0..<pageCount) && pages.allSatisfy { $0.rotation % 360 == 0 }
+    }
+
     // MARK: Split
 
     /// Page groups (0-based) for one file per page.
@@ -238,6 +258,25 @@ enum PDFTools {
             try write(output, to: destination)
             return destination
         }
+    }
+
+    /// Splits each PDF into its groups; PDFs the groups wouldn't split (no
+    /// pages, or every page in one file) are left alone and counted.
+    static func split(_ jobs: [(url: URL, groups: [[Int]])]) throws -> SaveOutcome {
+        var outcome = SaveOutcome(saved: [], unchangedLabel: "not split")
+        for (url, groups) in jobs {
+            guard !groups.isEmpty, splits(groups, pageCount: try open(url).pageCount) else {
+                outcome.unchanged += 1
+                continue
+            }
+            outcome.saved += try split(url, into: groups)
+        }
+        return outcome
+    }
+
+    /// Whether `groups` make something other than one copy of the whole PDF.
+    static func splits(_ groups: [[Int]], pageCount: Int) -> Bool {
+        !groups.isEmpty && groups != [Array(0..<pageCount)]
     }
 
     // MARK: Compress
@@ -401,6 +440,36 @@ enum PDFTools {
         guard let document = PDFDocument(url: url) else { throw PDFToolError.unreadable(url) }
         guard !document.isLocked else { throw PDFToolError.locked(url) }
         return document
+    }
+
+    /// The first page on white, its long edge at most `maxPixelSize`, for a
+    /// filmstrip. A blank page stands in when the PDF can't be read or is
+    /// password-protected. Fine on the main thread.
+    static func firstPageThumbnail(of url: URL, maxPixelSize: CGFloat = 160) -> CGImage {
+        var size = CGSize(width: maxPixelSize * 0.75, height: maxPixelSize)
+        var page: CGImage?
+        if let document = PDFDocument(url: url), !document.isLocked, let first = document.page(at: 0) {
+            let bounds = first.bounds(for: .cropBox)
+            let turned = first.rotation % 180 != 0
+            let pageSize = turned ? CGSize(width: bounds.height, height: bounds.width) : bounds.size
+            if pageSize.width > 0, pageSize.height > 0 {
+                let scale = maxPixelSize / max(pageSize.width, pageSize.height)
+                size = CGSize(width: max(1, (pageSize.width * scale).rounded()), height: max(1, (pageSize.height * scale).rounded()))
+                var rect = CGRect(origin: .zero, size: size)
+                page = first.thumbnail(of: size, for: .cropBox).cgImage(forProposedRect: &rect, context: nil, hints: nil)
+            }
+        }
+        let context = CGContext(
+            data: nil, width: Int(size.width), height: Int(size.height), bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!
+        context.setFillColor(page == nil ? CGColor(gray: 0.88, alpha: 1) : CGColor(gray: 1, alpha: 1))
+        context.fill(CGRect(origin: .zero, size: size))
+        if let page {
+            context.interpolationQuality = .high
+            context.draw(page, in: CGRect(origin: .zero, size: size))
+        }
+        return context.makeImage()!
     }
 
     static func fileSize(_ url: URL) -> Int64 {
