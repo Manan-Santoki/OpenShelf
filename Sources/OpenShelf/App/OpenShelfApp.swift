@@ -6,6 +6,14 @@ struct OpenShelfApp: App {
 
     var body: some Scene {
         MenuBarExtra {
+            if let version = Updater.shared.availableVersion {
+                Button {
+                    Updater.shared.checkForUpdates()
+                } label: {
+                    Label("Update to Version \(version)…", systemImage: "arrow.down.circle.fill")
+                }
+                Divider()
+            }
             Button("New Shelf") { appDelegate.shelves.newShelf() }
                 .keyboardShortcut("n")
             Button("Show Shelves") { appDelegate.shelves.showAll() }
@@ -29,7 +37,7 @@ struct OpenShelfApp: App {
             Button("Quit OpenShelf") { NSApp.terminate(nil) }
                 .keyboardShortcut("q")
         } label: {
-            Image(nsImage: MenuBarIcon.image)
+            Image(nsImage: Updater.shared.availableVersion == nil ? MenuBarIcon.image : MenuBarIcon.updateAvailableImage)
         }
     }
 

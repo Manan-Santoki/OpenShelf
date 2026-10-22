@@ -1,11 +1,17 @@
 import AppKit
 import SwiftUI
 
-/// The app icon's Monoline wheel as a menu-bar template image: outlined petals
-/// with one filled, around an outlined hub. Template images adapt to light and
-/// dark menu bars automatically.
+/// The app icon's Monoline wheel as a menu-bar image: outlined petals with one
+/// filled, around an outlined hub.
 enum MenuBarIcon {
-    static let image: NSImage = {
+    /// A template image, which adapts to light and dark menu bars automatically.
+    static let image = wheel(color: nil)
+
+    /// The wheel in blue, shown while an update is waiting to be installed.
+    static let updateAvailableImage = wheel(color: .systemBlue)
+
+    /// The wheel drawn in `color`, or as a template image when `color` is nil.
+    private static func wheel(color: NSColor?) -> NSImage {
         let size = NSSize(width: 18, height: 18)
         // Flipped so the shape's y-down geometry puts the lit petal at the top right.
         let image = NSImage(size: size, flipped: true) { rect in
@@ -13,8 +19,9 @@ enum MenuBarIcon {
             let lineWidth: CGFloat = 1.1
             let segments = 6
             let sweep = 2 * CGFloat.pi / CGFloat(segments)
-            context.setStrokeColor(NSColor.black.cgColor)
-            context.setFillColor(NSColor.black.cgColor)
+            let ink = (color ?? .black).cgColor
+            context.setStrokeColor(ink)
+            context.setFillColor(ink)
             context.setLineWidth(lineWidth)
 
             for index in 0..<segments {
@@ -39,8 +46,8 @@ enum MenuBarIcon {
             context.strokeEllipse(in: CGRect(x: rect.midX - hubRadius, y: rect.midY - hubRadius, width: hubRadius * 2, height: hubRadius * 2))
             return true
         }
-        image.isTemplate = true
-        image.accessibilityDescription = "OpenShelf"
+        image.isTemplate = color == nil
+        image.accessibilityDescription = color == nil ? "OpenShelf" : "OpenShelf, update available"
         return image
-    }()
+    }
 }
