@@ -111,15 +111,28 @@ out of the drop point; saving writes a suffixed copy beside the original
 ("Name Cropped.jpg") and closes with a toast, so results can be dragged straight
 back into a wheel. One-click tools run with the progress toast instead.
 
+Every editor takes several files. With one file it looks exactly as it does
+alone; with several, a filmstrip under the canvas ("2 of 5 · name", thumbnails,
+‹ ›, a dot on files with an edit waiting) moves between them, and the button
+counts the files that would change ("Crop 3 Images"); untouched files are left
+alone and counted in the closing toast ("2 cropped · 1 not cropped").
+
+- **Same for all** applies one edit to every file; turning it on copies the
+  shown file's settings to the rest, off lets each keep its own. On by default
+  for Crop, Edit, Add BG, video Crop, Rotate and PDF Split; off by default for
+  Trim and Split (clips differ in length). Crops are kept as fractions of each
+  file's size, so "the top half" stays the top half on files of any size.
+- **Annotate, Redact, Remove BG and PDF Pages** have no switch: marks, cutouts
+  and page edits belong to one file, and each keeps its own undo history.
+- With Same for all, Trim cuts the same seconds from the start and end of each
+  file, Split uses the same times or parts where they fall inside a file, and
+  PDF Split reads ranges against the longest PDF and cuts them to each one.
+
 **Images:** Compress · Metadata · Edit · Annotate · Add BG · Crop · Resize ·
 Remove BG · Redact · Read QR (+ Combine for several files)
 
 - **Crop:** dimmed outside area, 8 handles, aspect presets (Free, 1:1, 16:9,
-  9:16, 4:3, 3:4), live W × H fields in px. Reset / Apply. With several
-  images, a filmstrip under the canvas moves between them and "Same for all"
-  (on by default) carries one crop to every image as fractions of its size,
-  so "the top half" stays the top half on images of any size; turned off,
-  each image keeps its own crop. "Crop N Images" saves every changed image.
+  9:16, 4:3, 3:4), live W × H fields in px. Reset / Apply.
 - **Add BG:** gradient and solid swatches, custom image and colour; Padding,
   Corners and Shadow sliders in px; ratio Auto, 1:1, 16:9, 4:5. Saves PNG.
 - **Annotate:** draw, arrow, box, highlight, text, numbered callouts; colours
