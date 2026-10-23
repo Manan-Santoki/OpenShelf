@@ -115,6 +115,12 @@ struct OutputSettings: Codable, Equatable, Sendable {
         var customBitRate: Int {
             Int((customMbps * 1_000_000).rounded())
         }
+
+        /// `mbps` within `customMbpsRange`; the default for something that isn't a number.
+        static func clampedMbps(_ mbps: Double) -> Double {
+            guard mbps.isFinite else { return Video().customMbps }
+            return min(max(mbps, customMbpsRange.lowerBound), customMbpsRange.upperBound)
+        }
     }
 
     /// The sound in lossy outputs: MP3, M4A, OGG, Opus, WMA and video.
@@ -260,10 +266,7 @@ extension OutputSettings.Video {
         self.init()
         codec = container.value(.codec, or: codec)
         quality = container.value(.quality, or: quality)
-        let mbps: Double = container.value(.customMbps, or: customMbps)
-        if mbps.isFinite {
-            customMbps = min(max(mbps, Self.customMbpsRange.lowerBound), Self.customMbpsRange.upperBound)
-        }
+        customMbps = Self.clampedMbps(container.value(.customMbps, or: customMbps))
         maxSize = container.value(.maxSize, or: maxSize)
     }
 }

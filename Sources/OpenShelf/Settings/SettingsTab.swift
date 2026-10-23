@@ -5,6 +5,7 @@ enum SettingsTab: String, CaseIterable, Sendable {
     case general
     case wheels
     case shelves
+    case output
     case extraFormats
     case updates
 
@@ -19,18 +20,20 @@ enum SettingsTab: String, CaseIterable, Sendable {
         case .general: "General"
         case .wheels: "Wheels"
         case .shelves: "Shelves"
+        case .output: "Output"
         case .extraFormats: "Extra Formats"
         case .updates: "Updates"
         }
     }
 
     /// Wheels shows the wheel's wedges; Shelves and Extra Formats use the
-    /// symbols their toasts already use.
+    /// symbols their toasts already use; Output has encoder-like sliders.
     var symbolName: String {
         switch self {
         case .general: "gearshape"
         case .wheels: "chart.pie"
         case .shelves: "tray.full"
+        case .output: "slider.horizontal.3"
         case .extraFormats: "puzzlepiece.extension"
         case .updates: "arrow.down.circle"
         }
@@ -47,19 +50,24 @@ enum SettingsTab: String, CaseIterable, Sendable {
         case .general: GeneralSettingsPane()
         case .wheels: WheelsSettingsPane()
         case .shelves: ShelvesSettingsPane()
+        case .output: OutputSettingsPane()
         case .extraFormats: ExtraFormatsPane(installer: .shared)
         case .updates: UpdatesSettingsPane()
         }
     }
 
     /// The state that changes this pane's height (a conflict warning, a
-    /// failed install's message and buttons), read through Observation so
-    /// the window can follow it. Empty for panes that never change height.
+    /// custom bitrate's row, a failed install's message and buttons), read
+    /// through Observation so the window can follow it. Empty for panes that
+    /// never change height.
     @MainActor
     var heightSignature: [String] {
         switch self {
         case .wheels:
             Preferences.shared.conflictingWheels.map(\.title).sorted()
+        case .output:
+            // The custom bitrate's row comes and goes.
+            [Preferences.shared.output.video.quality == .custom ? "custom" : ""]
         case .extraFormats:
             ExtraTool.allCases.map { ExtraFormatsPane.layout(of: $0, installer: .shared) }
         case .general, .shelves, .updates:
