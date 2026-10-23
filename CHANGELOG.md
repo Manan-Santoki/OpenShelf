@@ -6,6 +6,30 @@ tags `v<version>` and publishes a GitHub release with that section as notes.
 
 Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
 
+## [1.4.0] - 2026-10-23
+
+Choose how conversions come out.
+
+### New
+
+- **Output settings.** The new **Output** tab in Settings sets how converted
+  files are made. Everything starts on **Automatic**, which converts exactly
+  as before. Thanks to [@wada3n](https://github.com/wada3n) for the idea in
+  [#4](https://github.com/Manan-Santoki/OpenShelf/issues/4).
+  - **Video:** codec (H.264 or HEVC), quality (Smaller, Balanced, Best or a
+    bitrate of your choice) and largest size (4K, 1080p, 720p or 480p). MP4
+    and MOV don't need ffmpeg for any of these; MKV, WebM, AVI and WMV follow
+    them through ffmpeg. HDR videos stay HEVC so their colours survive.
+  - **Audio:** a fixed bitrate for MP3, M4A, OGG, Opus, WMA and the sound in
+    videos.
+  - **Images:** quality for JPEG, HEIC, AVIF and WebP, and whether to keep
+    metadata such as the camera and location.
+  - **GIFs from videos:** width and frame rate.
+- **Choose just once with ⌥.** Hold **⌥** as you drop on a Convert wedge (or
+  press **⌥Return** in the keyboard wheel) to pick the settings for that one
+  conversion. Videos show roughly how big the result will be before you
+  convert, and **Use as default** keeps your choice for next time.
+
 ## [1.3.0] - 2026-10-22
 
 Every editor now works on several files at once.
