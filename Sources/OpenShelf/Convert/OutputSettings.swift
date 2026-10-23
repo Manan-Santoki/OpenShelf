@@ -330,6 +330,11 @@ struct OutputOptions: Equatable {
         self == OutputOptions()
     }
 
+    /// What applies when `urls` are converted to `format`.
+    init(format: OutputFormat, urls: [URL]) {
+        self.init(format: format, kinds: Set(urls.map { FileKind(url: $0) }))
+    }
+
     /// What applies when files of `kinds` are converted to `format`.
     init(format: OutputFormat, kinds: Set<FileKind>) {
         let isMedia = !kinds.isDisjoint(with: [.video, .audio])
@@ -362,6 +367,25 @@ struct OutputOptions: Equatable {
     }
 
     init() {}
+}
+
+extension OutputSettings {
+    /// These settings with the parts `options` cover taken from `other`: to
+    /// save what the ⌥ window shows without touching the rest, or to reset it.
+    func applying(_ options: OutputOptions, from other: OutputSettings) -> OutputSettings {
+        var result = self
+        if options.videoCodec { result.video.codec = other.video.codec }
+        if options.video {
+            result.video.quality = other.video.quality
+            result.video.customMbps = other.video.customMbps
+            result.video.maxSize = other.video.maxSize
+        }
+        if options.audioBitRate { result.audio = other.audio }
+        if options.imageQuality { result.image.quality = other.image.quality }
+        if options.imageMetadata { result.image.keepsMetadata = other.image.keepsMetadata }
+        if options.gif { result.gif = other.gif }
+        return result
+    }
 }
 
 // MARK: - Native MP4 and MOV

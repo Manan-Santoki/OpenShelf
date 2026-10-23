@@ -11,8 +11,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Keeps the app out of the Dock when launched without the bundle's LSUIElement (e.g. `swift run`).
         NSApp.setActivationPolicy(.accessory)
 
-        wheel.onDrop = { [weak self] item, urls in
-            self?.perform(item.command, on: urls)
+        wheel.onDrop = { [weak self] item, urls, modifiers in
+            self?.perform(item.command, on: urls, modifiers: modifiers)
         }
         wheel.itemsProvider = { [weak self] kind, urls in
             self?.items(for: kind, urls: urls) ?? []
@@ -124,11 +124,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func perform(_ command: WheelCommand, on urls: [URL]) {
+    /// Runs a wedge. With ⌥ held, a format with output settings opens them
+    /// for this conversion first (see `ConvertOptionsView`).
+    private func perform(_ command: WheelCommand, on urls: [URL], modifiers: NSEvent.ModifierFlags) {
         switch command {
         case .action(let action):
             perform(action, on: urls)
         case .convert(let format):
+            if modifiers.contains(.option), ConvertOptionsView.present(urls, to: format) { return }
             ConversionRunner.shared.convert(urls, to: format)
         case .tool(let tool):
             ToolLauncher.open(tool, with: urls)

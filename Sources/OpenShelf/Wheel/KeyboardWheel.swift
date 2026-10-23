@@ -52,6 +52,30 @@ struct ModifierTapTracker {
     mutating func keyPressed() {
         if !pressed.isEmpty { interrupted = true }
     }
+
+    /// The keys of `flags` pressed on purpose: those still down from before
+    /// tracking began (the ⌃⌥ of the shortcut) don't count.
+    func chosen(_ flags: NSEvent.ModifierFlags) -> NSEvent.ModifierFlags {
+        flags.intersection(TriggerKey.relevantFlags).subtracting(heldOver)
+    }
+}
+
+/// What the label above a keyboard wheel says as it opens.
+enum KeyboardWheelHint {
+    /// Shown when Tab or a tap switches to a Convert wheel with options.
+    static let options = "⌥Return for options"
+
+    /// For a wheel that `canSwitch` to others with Tab, and whose wedges
+    /// have options (see `OutputOptions`). The label has to fit above the
+    /// wheel, so with options "Arrows choose" makes way.
+    static func opening(canSwitch: Bool, hasOptions: Bool) -> String {
+        switch (canSwitch, hasOptions) {
+        case (true, false): "Arrows choose · Return runs · Tab switches wheel"
+        case (false, false): "Arrows choose · Return runs"
+        case (true, true): "Return runs · \(options) · Tab switches wheel"
+        case (false, true): "Arrows choose · Return runs · \(options)"
+        }
+    }
 }
 
 extension WheelKind {

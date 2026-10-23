@@ -1,3 +1,4 @@
+import AppKit
 @preconcurrency import AVFoundation
 import CoreGraphics
 import Foundation
@@ -115,6 +116,63 @@ struct OutputSettingsStorageTests {
         #expect(fixed.argument(for: .opus, source: SourceAudio(channels: 2, bitRate: nil)) == "320k")
         // Unknown sound is taken as stereo.
         #expect(fixed.argument(for: .opus, source: nil) == "320k")
+    }
+}
+
+/// Holding ⌥ for one conversion's options.
+struct ConvertOptionsTests {
+    @Test func savingOrResettingTouchesOnlyWhatsShown() {
+        var saved = OutputSettings.automatic
+        saved.image.quality = 0.6
+        saved.gif.frameRate = 24
+        var chosen = saved
+        chosen.video = .init(codec: .hevc, quality: .custom, customMbps: 3, maxSize: .p720)
+        chosen.audio.kbps = 128
+        chosen.image.quality = 1
+        let webm = OutputOptions(format: .webm, kinds: [.video])
+        let merged = saved.applying(webm, from: chosen)
+        // WebM has no codec choice, so the saved one stays.
+        #expect(merged.video == .init(codec: .automatic, quality: .custom, customMbps: 3, maxSize: .p720))
+        #expect(merged.audio.kbps == 128)
+        #expect(merged.image.quality == 0.6 && merged.gif.frameRate == 24)
+
+        let reset = chosen.applying(OutputOptions(format: .mp3, kinds: [.audio]), from: .automatic)
+        #expect(reset.audio.kbps == nil && reset.video == chosen.video && reset.image.quality == 1)
+        #expect(chosen.applying(OutputOptions(format: .mp4, kinds: [.video]), from: .automatic).video.isAutomatic)
+    }
+
+    /// The ⌃⌥ of the shortcut that opened a keyboard wheel isn't ⌥ held for options.
+    @Test func keysHeldFromTheShortcutDontCount() {
+        var taps = ModifierTapTracker(alreadyHeld: [.control, .option])
+        #expect(taps.chosen([.control, .option]).isEmpty)
+        _ = taps.flagsChanged([.control])
+        #expect(taps.chosen([.control]).isEmpty)
+        _ = taps.flagsChanged([])
+        _ = taps.flagsChanged([.option])
+        #expect(taps.chosen([.option]) == .option)
+        #expect(ModifierTapTracker().chosen([.option, .shift]) == [.option, .shift])
+    }
+
+    @MainActor
+    @Test func hintsFitAboveTheWheel() {
+        let font = NSFont.systemFont(ofSize: 12, weight: .semibold)
+        for canSwitch in [false, true] {
+            for hasOptions in [false, true] {
+                let hint = KeyboardWheelHint.opening(canSwitch: canSwitch, hasOptions: hasOptions)
+                // The label pill's padding is 12 pt a side.
+                let width = (hint as NSString).size(withAttributes: [.font: font]).width + 24
+                #expect(width < WheelGeometry.panelSide - 20, "\(hint): \(width)")
+                #expect(hint.contains("⌥Return") == hasOptions)
+            }
+        }
+    }
+
+    @Test func theWindowGrowsWithItsRows() {
+        let mp3 = ConvertOptionsView.windowSize(for: OutputOptions(format: .mp3, kinds: [.audio]))
+        let mp4 = ConvertOptionsView.windowSize(for: OutputOptions(format: .mp4, kinds: [.video]))
+        let jpeg = ConvertOptionsView.windowSize(for: OutputOptions(format: .jpg, kinds: [.image]))
+        #expect(mp3.height < jpeg.height && jpeg.height < mp4.height)
+        #expect(mp4.height < 500)
     }
 }
 
