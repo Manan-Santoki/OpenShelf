@@ -12,7 +12,8 @@ the file on a wedge and it's done, saved right next to the original.
 - **⇧ Convert wheel:** images, PDFs, documents, spreadsheets, slides, audio,
   video, subtitles and archives into the formats that make sense for them (JPG,
   PNG, HEIC, AVIF, WEBP, PDF, DOCX, Markdown, EPUB, PPTX, XLSX, CSV, MP3, OGG,
-  MKV, WebM, GIF, ZIP, TAR.GZ, …)
+  MKV, WebM, GIF, ZIP, TAR.GZ, …), with the codec, quality, size and
+  bitrate yours to choose
 - **⇧⌥ Tools wheel:** for images — Crop, Resize, Remove Background, Add
   Background, Annotate, Redact, Edit, Compress, Metadata, Read QR; for PDFs —
   Combine, Pages, Split, Compress, Metadata; for video and audio — Trim,
@@ -129,6 +130,32 @@ a PowerPoint deck) says which one it needs. GIFs from video are made without
 ffmpeg, though it makes slightly cleaner ones when installed. Keynote files
 can't be converted, and Apple's Pages format isn't offered.
 
+#### Output settings
+
+Out of the box, every conversion picks its own encoding. To choose instead,
+open **Settings → Output**:
+
+- **Video** (MP4, MOV, MKV, WebM, AVI, WMV): the codec (H.264 or HEVC, for
+  MP4, MOV and MKV), the quality (Best, Balanced, Smaller, or a custom bitrate
+  in Mb/s) and the largest size (4K, 1080p, 720p or 480p; videos are never
+  enlarged and keep their shape). HDR videos stay HEVC to keep their colours.
+- **Audio:** a fixed bitrate, 96–320 kb/s, for MP3, M4A, OGG, Opus and WMA and
+  for the sound in converted videos. Automatic follows the original's quality.
+- **Images:** the quality of JPEG, HEIC, AVIF and WebP, and whether the
+  camera, date and location are kept.
+- **GIFs from videos:** the width (480, 720 or 1080 px, or the video's own up
+  to 1920) and the frame rate (10–24 fps).
+
+Automatic, the default for each, converts exactly as before. **Reset to
+Automatic** goes back to it.
+
+**Just this once:** hold **⌥ Option** as you drop on a format, or press
+**⌥Return** (or ⌥-click) in the keyboard wheel. A small window shows the
+settings for that format, filled in from Settings → Output, with an estimate
+of the size for video. Click **Convert** to use them for this conversion only,
+or tick **Use as default** to keep them. Formats with nothing to choose (PNG,
+WAV, ZIP, …) convert right away.
+
 ### Tools (⇧⌥)
 
 | Drag a… | Tools |
@@ -208,6 +235,8 @@ tab you used last:
   for Finder's selection
 - **Shelves:** remove files from a shelf after dragging them out, restore
   shelves at launch, hide docked shelves at the screen edge
+- **Output:** how conversions encode video, audio, images and GIFs (see
+  [Output settings](#output-settings))
 - **Extra Formats:** install or remove ffmpeg and LibreOffice
 - **Updates:** automatic checks and installs, and Check Now
 

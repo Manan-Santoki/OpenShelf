@@ -45,9 +45,12 @@ this spec; it does not contain or derive from any other app's code or assets.
   permission) opens the Convert wheel at the pointer for the files selected in
   Finder (read over Apple Events, which asks for Automation permission once).
   Arrows move the highlight (starting on the first wedge), Return runs it,
-  clicking a wedge runs it, Tab / ⇧Tab or tapping a wheel's trigger keys
-  switches wheels (the label above names the wheel), Esc or clicking elsewhere
-  closes. Starting a drag closes it. If Finder isn't in front or nothing is
+  clicking a wedge runs it, ⌥Return or ⌥-click opens a format's output options
+  (§2.3.1; keys still held from the shortcut itself don't count), Tab / ⇧Tab or
+  tapping a wheel's trigger keys switches wheels (the label above names the
+  wheel), Esc or clicking elsewhere closes. On a Convert wheel with options the
+  opening hint reads "Return runs · ⌥Return for options · Tab switches wheel"
+  to fit above the wheel. Starting a drag closes it. If Finder isn't in front or nothing is
   selected, a toast says "Select files in Finder first".
 
 ### 2.1 Wheels
@@ -103,6 +106,38 @@ private profile and a 120-second limit; hidden when not installed.
 
 Not offered: Apple Pages (private format) and Keynote (no converter can read it).
 Wheels hold at most 12 wedges (the largest, images, has 10).
+
+#### 2.3.1 Output settings
+
+Settings → Output (§5) chooses how conversions encode; each batch takes a copy
+when it starts. Every setting defaults to Automatic, which converts exactly as
+before: MP4/MOV through AVFoundation's Highest Quality preset (or an ffmpeg
+stream copy), M4A through the Apple M4A preset, ffmpeg's x264 at CRF 20, VP9 at
+CRF 32, MPEG-4/WMV2 at q 4, lossy audio at `AudioBitRate`'s rate, JPEG/HEIC/
+AVIF at 0.9 with metadata (WebP 88, PDF pages 0.92), GIFs 720 px wide at 12 fps.
+
+| Setting | Native (AVFoundation) | ffmpeg |
+|---|---|---|
+| Video codec: Automatic / H.264 / HEVC (MP4, MOV, MKV) | Any video or fixed audio setting re-encodes MP4/MOV like Compress (AVAssetReader/Writer, `VideoCompressionPlan`); Automatic is H.264. HDR always stays 10-bit HEVC | libx264; HEVC with libx265, else `hevc_videotoolbox` (falling back to the next encoder if it fails), else libx264; `-tag:v hvc1` in MP4/MOV. HDR keeps HEVC once any video setting is chosen |
+| Quality: Automatic / Best / Balanced / Smaller / Custom Mb/s | 1.5×, 2×, 1× and 0.5× Compress's High bitrate; Automatic and Best capped at the source's own rate, Balanced and Smaller at 80% of it; Custom is used as is | x264 CRF 20/18/23/28 (x265 +5; VideoToolbox q 65/75/55/40); VP9 CRF 32/28/33/38; MPEG-4/WMV2 q 4/2/5/8; Custom is `-b:v` (with `-maxrate` 1.5× and `-bufsize` 2× for H.264/HEVC) |
+| Largest size: Original / 4K / 1080p / 720p / 480p | Fitted inside 3840×2160, 1920×1080, 1280×720 or 854×480 either way round, never enlarged, even sides | The same as a `scale` filter |
+| Audio bitrate: Automatic / 96–320 kb/s | AAC at that rate for every sound track (mono at most 256 kb/s); M4A is written with AVAssetWriter instead of the preset | `-b:a` for MP3, AAC, Opus, Vorbis and WMA (mono Opus at most 256, mono Vorbis 192) |
+| Image quality: Automatic / 40–100% | JPEG, HEIC, AVIF; PDF pages as JPEG | cwebp `-q`, ffmpeg `-quality` for WebP |
+| Keep metadata (on) | Off writes ImageIO formats without the source's properties | — |
+| GIF width 480 / 720 / 1080 / original up to 1920 px; 10 / 12 / 15 / 24 fps | `VideoGIF.plan` | `fps=…,scale='min(…,iw)':-2` |
+
+Stream copies (MP4/MOV remux, MKV copy-all) are skipped when video or audio
+settings ask for a re-encode.
+
+Holding ⌥ as a format's wedge runs (drop, click or Return) opens a small window
+first, for lossy outputs only: MP4, MOV, MKV, WebM, AVI, WMV (video and audio
+rows; the codec only for MP4/MOV/MKV), M4A, MP3, OGG, Opus, WMA (audio), JPEG,
+HEIC, AVIF (quality and metadata; JPEG from PDF pages, quality only), WebP
+(quality) and GIF from video (width, frame rate). It's prefilled from Settings
+→ Output; video shows an estimated size (summed over the files, "Estimating…"
+while they're read). Convert uses the choices once; "Use as default" also
+saves the rows shown, leaving the rest of Settings → Output as it was. Other
+formats convert at once.
 
 ### 2.4 Tools wheel
 
@@ -232,6 +267,10 @@ height (scrolling when the screen is shorter) and opens on the tab used last.
 - Shelves: remove files from a shelf after dragging them out (default off);
   restore shelves when OpenShelf opens (default on); hide docked shelves to the
   screen edge (default on).
+- Output: video codec, quality (or a custom bitrate) and largest size; audio
+  bitrate; image quality and metadata; GIF width and frame rate (§2.3.1), all
+  Automatic by default, with Reset to Automatic. Stored as one JSON value;
+  anything unreadable falls back to Automatic, setting by setting.
 - Extra Formats: install or remove ffmpeg and LibreOffice. ffmpeg comes from
   its build server, then OpenShelf's GitHub mirror of the same signed zips;
   when every download source is down, Install with Homebrew is offered if
