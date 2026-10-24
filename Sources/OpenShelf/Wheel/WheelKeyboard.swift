@@ -64,3 +64,31 @@ struct KeyRepeat {
         return true
     }
 }
+
+/// Number keys for a keyboard-opened wheel: holding ⌘ shows each wedge's
+/// number, and ⌘ with that number runs it. A page holds at most seven wedges,
+/// so items are 1 to 7 clockwise from 12 o'clock, and More or Back is 0.
+enum WheelBadges {
+    /// The key shown on each wedge of `slots`, by slot index; empty wedges have none.
+    static func keys(for slots: [WheelSlot]) -> [Int: String] {
+        var keys: [Int: String] = [:]
+        var number = 1
+        for (index, slot) in slots.enumerated() {
+            switch slot {
+            case .item:
+                keys[index] = "\(number)"
+                number += 1
+            case .more, .back:
+                keys[index] = "0"
+            case .empty:
+                continue
+            }
+        }
+        return keys
+    }
+
+    /// The wedge `key` ("1"…"9", "0") picks on `slots`, or nil.
+    static func slot(forKey key: String, in slots: [WheelSlot]) -> Int? {
+        keys(for: slots).first { $0.value == key }?.key
+    }
+}

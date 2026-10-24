@@ -34,9 +34,7 @@ enum MediaProbe {
     /// Runs a quick probe and returns its standard output, or nil on failure.
     /// Only for short-lived tools: it blocks until the process exits.
     static func runSync(_ executable: URL, _ arguments: [String]) -> String? {
-        let process = Process()
-        process.executableURL = executable
-        process.arguments = arguments
+        let process = ChildEnvironment.process(executable, arguments)
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = FileHandle.nullDevice

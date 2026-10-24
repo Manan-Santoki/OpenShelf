@@ -27,17 +27,14 @@ enum Homebrew {
         }
     }
 
-    /// The app's environment, adjusted for running brew from a GUI app,
-    /// which doesn't get the shell's PATH.
+    /// The minimal environment (see `ChildEnvironment`) plus the user's own
+    /// HOMEBREW_* settings, with this brew's folders and the system's as the
+    /// PATH, adjusted for running brew from a GUI app.
     static func environment(for brew: URL, base: [String: String] = ProcessInfo.processInfo.environment) -> [String: String] {
-        var environment = base
+        let settings = base.filter { $0.key.hasPrefix("HOMEBREW_") && !ChildEnvironment.isCredential($0.key) }
+        var environment = ChildEnvironment.minimal(from: base, extra: settings)
         let prefix = brew.deletingLastPathComponent().deletingLastPathComponent().path
-        let inherited = (base["PATH"] ?? "").split(separator: ":").map(String.init)
-        var path: [String] = []
-        for folder in ["\(prefix)/bin", "\(prefix)/sbin"] + inherited + ["/usr/bin", "/bin", "/usr/sbin", "/sbin"] where !path.contains(folder) {
-            path.append(folder)
-        }
-        environment["PATH"] = path.joined(separator: ":")
+        environment["PATH"] = ["\(prefix)/bin", "\(prefix)/sbin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"].joined(separator: ":")
         // Updating Homebrew first can take minutes; installing doesn't need it.
         environment["HOMEBREW_NO_AUTO_UPDATE"] = "1"
         // Fail instead of waiting for input nobody can type.
@@ -46,8 +43,6 @@ enum Homebrew {
         environment["HOMEBREW_NO_INSTALL_CLEANUP"] = "1"
         environment["HOMEBREW_NO_ENV_HINTS"] = "1"
         environment["HOMEBREW_NO_COLOR"] = "1"
-        // A password helper would let sudo ask; without one it just fails.
-        environment["SUDO_ASKPASS"] = nil
         return environment
     }
 

@@ -34,7 +34,7 @@ enum BackgroundRemover {
         )
         let output = CIImage(cvPixelBuffer: masked)
         let space = CGColorSpace(name: CGColorSpace.sRGB)!
-        guard let result = CIContext().createCGImage(output, from: output.extent, format: .RGBA8, colorSpace: space) else {
+        guard let result = ImageContexts.standard.createCGImage(output, from: output.extent, format: .RGBA8, colorSpace: space) else {
             throw BackgroundRemovalError.failed
         }
         return result

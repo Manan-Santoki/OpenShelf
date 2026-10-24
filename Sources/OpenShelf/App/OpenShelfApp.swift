@@ -43,7 +43,7 @@ struct OpenShelfApp: App {
 
     /// Shows the global shortcut next to the item when it can be expressed.
     @ViewBuilder private var openWheelButton: some View {
-        let button = Button("Open Wheel for Finder Selection") { appDelegate.openWheelForFinderSelection() }
+        let button = Button("Open Wheel for Selection") { appDelegate.openWheelForSelection() }
         if let combo = Preferences.shared.openWheelShortcut, let key = combo.keyEquivalent {
             button.keyboardShortcut(key, modifiers: combo.eventModifiers)
         } else {

@@ -35,10 +35,8 @@ enum PackageZip {
     }
 
     private static func run(_ arguments: [String], in directory: URL, output: URL) throws {
-        let zip = Process()
-        zip.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+        let zip = ChildEnvironment.process(URL(fileURLWithPath: "/usr/bin/zip"), arguments)
         zip.currentDirectoryURL = directory
-        zip.arguments = arguments
         // Failures surface as an error below; keep zip's own message out of the log.
         zip.standardOutput = FileHandle.nullDevice
         zip.standardError = FileHandle.nullDevice
@@ -50,9 +48,7 @@ enum PackageZip {
     /// Reads one entry of a zip archive (e.g. `xl/workbook.xml`), or nil when
     /// it's missing.
     static func readEntry(_ path: String, from archive: URL) -> Data? {
-        let unzip = Process()
-        unzip.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
-        unzip.arguments = ["-p", archive.path, path]
+        let unzip = ChildEnvironment.process(URL(fileURLWithPath: "/usr/bin/unzip"), ["-p", archive.path, path])
         let pipe = Pipe()
         unzip.standardOutput = pipe
         unzip.standardError = FileHandle.nullDevice

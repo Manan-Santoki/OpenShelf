@@ -295,7 +295,10 @@ struct HomebrewTests {
     }
 
     @Test func environmentForAGUIApp() {
-        let base = ["PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "HOME": "/Users/x", "SUDO_ASKPASS": "/usr/local/bin/askpass"]
+        let base = [
+            "PATH": "/Users/x/bin:/usr/bin:/bin:/usr/sbin:/sbin", "HOME": "/Users/x", "SUDO_ASKPASS": "/usr/local/bin/askpass",
+            "HOMEBREW_CASK_OPTS": "--appdir=~/Applications", "HOMEBREW_GITHUB_API_TOKEN": "never", "AWS_SECRET_ACCESS_KEY": "never",
+        ]
         let environment = Homebrew.environment(for: URL(fileURLWithPath: "/opt/homebrew/bin/brew"), base: base)
         #expect(environment["PATH"] == "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/bin:/bin:/usr/sbin:/sbin")
         #expect(environment["HOMEBREW_NO_AUTO_UPDATE"] == "1")
@@ -303,6 +306,11 @@ struct HomebrewTests {
         #expect(environment["HOMEBREW_NO_INSTALL_UPGRADE"] == "1")
         #expect(environment["HOME"] == "/Users/x")
         #expect(environment["SUDO_ASKPASS"] == nil)
+        // The user's own Homebrew settings go to brew, but not a token among
+        // them, and nothing else of theirs does.
+        #expect(environment["HOMEBREW_CASK_OPTS"] == "--appdir=~/Applications")
+        #expect(environment["HOMEBREW_GITHUB_API_TOKEN"] == nil)
+        #expect(environment["AWS_SECRET_ACCESS_KEY"] == nil)
 
         let intel = Homebrew.environment(for: URL(fileURLWithPath: "/usr/local/bin/brew"), base: [:])
         #expect(intel["PATH"] == "/usr/local/bin:/usr/local/sbin:/usr/bin:/bin:/usr/sbin:/sbin")

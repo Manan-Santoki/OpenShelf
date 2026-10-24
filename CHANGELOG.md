@@ -6,6 +6,46 @@ tags `v<version>` and publishes a GitHub release with that section as notes.
 
 Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
 
+## [1.5.0] - 2026-10-24
+
+Read scanned documents, work directly from shelves, and choose wheel actions faster.
+
+### New
+
+- **Recognise text in images and PDFs.** Drop screenshots, scanned documents,
+  PDFs, or a mixture onto **OCR** in the Tools wheel. Save a text file or a
+  searchable PDF beside each original. Recognition runs on your Mac in supported
+  system languages, and PDF pages that already have text keep it.
+- **Open the wheel for shelf selections.** Select files on a shelf and press
+  **⌃⌥Space**, or choose **Open Wheel for Selection** from the menu bar.
+  A focused shelf takes priority; otherwise the shortcut uses the most recent
+  shelf when OpenShelf is active, or Finder's selection.
+- **Numbered wheel shortcuts.** Hold **⌘** in a keyboard-opened wheel to see
+  each wedge's number, then press the number to run it. **⌘0** opens More or
+  Back; **⌘⌥number** opens conversion settings where available.
+
+### Fixed and improved
+
+- Shelves follow files moved through the Actions wheel, keeping their order,
+  selection, and selection anchor.
+- Command-line tools' final output is captured reliably, including an output
+  line without a closing newline. ffmpeg progress stops when its job ends.
+- Video preview frames remain usable after their temporary files are removed.
+- PDF image exports render and save one page at a time to reduce memory use.
+- Excel output exceeding 1,048,576 rows is refused before conversion. The
+  preflight supports quoted records, CR/CRLF line endings, and UTF-16 files.
+- Resize and Remove Background reuse rendering contexts, and Add Background's
+  colour swatches fit their window.
+- Child processes receive a limited environment rather than inherited shell
+  credentials.
+- OCR cancellation leaves no partial PDF output, rotated pages retain their
+  displayed dimensions, and recognition retries on CPU if acceleration fails.
+
+Thanks to **[David NeSmith (@djnesmith)](https://github.com/djnesmith)** for the
+original features and fixes in his OpenShelf fork. The
+[commit review and attribution](https://github.com/Manan-Santoki/OpenShelf/blob/main/docs/FORK_REVIEW.md)
+records the source commits and adaptations.
+
 ## [1.4.0] - 2026-10-23
 
 Choose how conversions come out.

@@ -18,7 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.items(for: kind, urls: urls) ?? []
         }
         GlobalHotKey.shared.onPress = { [weak self] in
-            self?.openWheelForFinderSelection()
+            self?.openWheelForSelection()
         }
         GlobalHotKey.shared.register(Preferences.shared.openWheelShortcut)
         dragMonitor.onTrigger = { [weak self] kind, location, urls in
@@ -50,6 +50,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         shelves.saveNow()
+    }
+
+    /// Opens a keyboard-driven wheel for the selected shelf items or, when no
+    /// shelf has focus with a selection, the files selected in Finder.
+    func openWheelForSelection() {
+        let source = WheelSelectionSource.choose(
+            keyShelfSelection: shelves.keyShelfSelection,
+            recentShelfSelection: shelves.recentShelfSelection,
+            isOpenShelfFrontmost: NSApp.isActive
+        )
+        guard case .shelf(let urls) = source else {
+            openWheelForFinderSelection()
+            return
+        }
+        let location = NSEvent.mouseLocation
+        if !wheel.presentForKeyboard(urls: urls, at: location) {
+            ToastController.shared.show(Toast(systemImage: "nosign", title: "Nothing to do with these files"), near: location)
+        }
     }
 
     /// Opens a keyboard-driven wheel for the files selected in Finder.
@@ -154,6 +172,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             toasts.show(Toast(systemImage: "doc.on.doc", title: "Copied \(count)", subtitle: "Paste in Finder to make a copy"))
         case .move:
             guard let result = FileActions.moveWithPrompt(urls), result.movedCount > 0 else { return }
+            shelves.relocate(result.moves)
             let moved = result.movedCount == 1 ? "1 file" : "\(result.movedCount) files"
             toasts.show(Toast(systemImage: "folder", title: "Moved \(moved)", subtitle: "to \(result.destination.lastPathComponent)"))
         case .copyPath:

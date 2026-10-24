@@ -70,8 +70,9 @@ enum MediaLoading {
         var arguments: [String] = ["-y", "-nostdin", "-loglevel", "error"] + FFmpegEdits.input(url, from: seconds, length: nil)
         arguments += ["-map", "0:V:0", "-frames:v", "1", "-vf", fit, "-update", "1", output.path]
         try await ProcessRunner.run(ffmpeg, arguments)
+        // Decoded now: ImageIO otherwise reads the file lazily, after it's been deleted.
         guard let source = CGImageSourceCreateWithURL(output as CFURL, nil),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
+              let image = CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary)
         else { throw ConversionError.unreadable(url) }
         return image
     }

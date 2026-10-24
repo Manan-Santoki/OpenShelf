@@ -9,8 +9,8 @@ struct FileToolTests {
         names.map { URL(fileURLWithPath: "/tmp/\($0)") }
     }
 
-    @Test func imagesGetTheVideoToolOrderPlusReadQR() {
-        #expect(FileTool.available(for: urls("a.jpg")) == [.compress, .metadata, .edit, .annotate, .addBackground, .crop, .resize, .removeBackground, .redact, .readQR])
+    @Test func imagesOfferImageToolsAndOCR() {
+        #expect(FileTool.available(for: urls("a.jpg")) == [.compress, .metadata, .edit, .annotate, .addBackground, .crop, .resize, .removeBackground, .redact, .readQR, .ocr])
     }
 
     @Test func severalImagesCanBeCombined() {
@@ -18,15 +18,15 @@ struct FileToolTests {
     }
 
     @Test func singlePDFGetsPageTools() {
-        #expect(FileTool.available(for: urls("a.pdf")) == [.organizePages, .splitPDF, .compressPDF, .pdfMetadata])
+        #expect(FileTool.available(for: urls("a.pdf")) == [.organizePages, .splitPDF, .compressPDF, .pdfMetadata, .ocr])
     }
 
     @Test func severalPDFsGetCombineAndThePageTools() {
-        #expect(FileTool.available(for: urls("a.pdf", "b.pdf")) == [.combinePDF, .organizePages, .splitPDF, .compressPDF, .pdfMetadata])
+        #expect(FileTool.available(for: urls("a.pdf", "b.pdf")) == [.combinePDF, .organizePages, .splitPDF, .compressPDF, .pdfMetadata, .ocr])
     }
 
-    @Test func imagesAndPDFsTogetherOnlyCombine() {
-        #expect(FileTool.available(for: urls("a.pdf", "b.jpg")) == [.combinePDF])
+    @Test func imagesAndPDFsTogetherOfferCombineAndOCR() {
+        #expect(FileTool.available(for: urls("a.pdf", "b.jpg")) == [.combinePDF, .ocr])
     }
 
     @Test func mediaTools() {

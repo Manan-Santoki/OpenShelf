@@ -42,7 +42,7 @@ struct GeneralSettingsPane: View {
 }
 
 /// Settings → Wheels: the keys that open each wheel during a drag, and the
-/// shortcut that opens one for Finder's selection.
+/// shortcut that opens one for selected files.
 struct WheelsSettingsPane: View {
     @Bindable private var preferences = Preferences.shared
 
@@ -61,13 +61,13 @@ struct WheelsSettingsPane: View {
             }
 
             Section {
-                LabeledContent("Open a wheel for Finder's selection") {
+                LabeledContent("Open a wheel for selected files") {
                     ShortcutRecorder(combo: $preferences.openWheelShortcut)
                 }
             } header: {
                 Text("Without dragging")
             } footer: {
-                Text("Select files in Finder and press the shortcut. Arrows choose, Return runs, Tab switches wheels, Esc closes.")
+                Text("Select files in Finder or on a shelf and press the shortcut. Arrows choose, Return runs, Tab switches wheels, Esc closes. Hold Command to see number shortcuts.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

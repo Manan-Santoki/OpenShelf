@@ -8,7 +8,7 @@ enum WheelOrdering {
     /// Image tools; Combine only appears for several files.
     static let imageTools: [FileTool] = [
         .compress, .crop, .resize, .annotate, .removeBackground, .edit,
-        .metadata, .redact, .addBackground, .readQR, .combinePDF,
+        .metadata, .redact, .addBackground, .readQR, .ocr, .combinePDF,
     ]
 
     /// Video tools; Merge only appears for several files.

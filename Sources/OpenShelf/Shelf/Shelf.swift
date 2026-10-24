@@ -50,6 +50,21 @@ final class Shelf: Identifiable {
         selection.subtract(ids)
     }
 
+    /// Follows files moved by the Actions wheel, retaining order and selection.
+    /// Adapted from David NeSmith's a2c6d6f (see docs/FORK_REVIEW.md).
+    func relocate(_ moves: [URL: URL]) {
+        var replaced: [ShelfItem.ID: ShelfItem.ID] = [:]
+        items = items.map { item in
+            guard let target = moves[item.url.standardizedFileURL] else { return item }
+            let moved = ShelfItem(url: target.standardizedFileURL)
+            replaced[item.id] = moved.id
+            return moved
+        }
+        selection = Set(selection.map { replaced[$0] ?? $0 })
+        if let anchor = selectionAnchor { selectionAnchor = replaced[anchor] ?? anchor }
+        if let target = scrollTarget { scrollTarget = replaced[target] ?? target }
+    }
+
     func removeMissingFiles() {
         remove(Set(items.filter { !$0.exists }.map(\.id)))
     }

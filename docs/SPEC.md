@@ -43,15 +43,21 @@ this spec; it does not contain or derive from any other app's code or assets.
 - Without a drag: a global shortcut (default ⌃⌥Space, set or turned off in
   Settings → Wheels; registered with Carbon hot keys, so no Accessibility
   permission) opens the Convert wheel at the pointer for the files selected in
-  Finder (read over Apple Events, which asks for Automation permission once).
+  Finder (read over Apple Events, which asks for Automation permission once), or
+  the focused shelf. If OpenShelf is frontmost with no focused shelf selection,
+  the most recently used shelf’s selection is used before Finder.
+  Holding Command shows number badges: ⌘1–⌘7 run the numbered wedge, ⌘0
+  opens More or Back; numbers restart on each page. ⌘⌥number requests output
+  options. Other Command shortcuts remain available to the app.
   Arrows move the highlight (starting on the first wedge), Return runs it,
   clicking a wedge runs it, ⌥Return or ⌥-click opens a format's output options
   (§2.3.1; keys still held from the shortcut itself don't count), Tab / ⇧Tab or
   tapping a wheel's trigger keys switches wheels (the label above names the
   wheel), Esc or clicking elsewhere closes. On a Convert wheel with options the
   opening hint reads "Return runs · ⌥Return for options · Tab switches wheel"
-  to fit above the wheel. Starting a drag closes it. If Finder isn't in front or nothing is
-  selected, a toast says "Select files in Finder first".
+  to fit above the wheel. Starting a drag closes it. If no shelf selection is
+  available and Finder is not in front or has no selection, a toast says
+  "Select files in Finder first".
 
 ### 2.1 Wheels
 
@@ -163,8 +169,15 @@ alone and counted in the closing toast ("2 cropped · 1 not cropped").
   file, Split uses the same times or parts where they fall inside a file, and
   PDF Split reads ranges against the longest PDF and cuts them to each one.
 
+**OCR (images and PDFs, including mixed selections):** choose Searchable PDF
+or Text. Vision recognition stays on this Mac and uses supported preferred system
+languages. PDF pages with existing text keep their content; scanned pages are
+rendered and released individually. Closing cancels between recognition operations;
+a cancelled or failed PDF save leaves no partial output. Copies are saved next to
+the originals with an OCR suffix. No extra tools or permissions are required.
+
 **Images:** Compress · Metadata · Edit · Annotate · Add BG · Crop · Resize ·
-Remove BG · Redact · Read QR (+ Combine for several files)
+Remove BG · Redact · Read QR · OCR (+ Combine for several files)
 
 - **Crop:** dimmed outside area, 8 handles, aspect presets (Free, 1:1, 16:9,
   9:16, 4:3, 3:4), live W × H fields in px. Reset / Apply.

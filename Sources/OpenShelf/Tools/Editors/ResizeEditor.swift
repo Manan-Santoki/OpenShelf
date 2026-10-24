@@ -85,8 +85,7 @@ enum ImageResizer {
         let rect = CGRect(x: 0, y: 0, width: width, height: height)
         guard let output = filter.outputImage?.cropped(to: rect) else { return nil }
         let space = image.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
-        let context = CIContext(options: [.workingColorSpace: space])
-        return context.createCGImage(output, from: rect, format: .RGBA8, colorSpace: space)
+        return ImageContexts.working(in: space).createCGImage(output, from: rect, format: .RGBA8, colorSpace: space)
     }
 
     /// Saves `resized` next to `image` as "<name> Resized" in the same format,

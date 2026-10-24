@@ -58,12 +58,16 @@ enum PDFConversion {
 
         case .jpg, .png:
             let type = format.imageIOType!
-            let pages = renderPages(of: document, dpi: renderDPI)
-            return try pages.enumerated().map { index, image in
-                let suffix = pages.count == 1 ? nil : "\(pageLabel) \(index + 1)"
-                let destination = OutputNaming.destination(for: original, suffix: suffix, pathExtension: format.rawValue)
-                try EditableImage.write(image, to: destination, type: type, quality: imageQuality ?? 0.92)
-                return destination
+            // Rendered and written a page at a time: 500 pages at 300 dpi held
+            // together came to about 16 GB.
+            return try (0..<document.pageCount).compactMap { index in
+                try autoreleasepool {
+                    guard let page = document.page(at: index), let image = renderPage(page, dpi: renderDPI) else { return nil }
+                    let suffix = document.pageCount == 1 ? nil : "\(pageLabel) \(index + 1)"
+                    let destination = OutputNaming.destination(for: original, suffix: suffix, pathExtension: format.rawValue)
+                    try EditableImage.write(image, to: destination, type: type, quality: imageQuality ?? 0.92)
+                    return destination
+                }
             }
 
         case .md:

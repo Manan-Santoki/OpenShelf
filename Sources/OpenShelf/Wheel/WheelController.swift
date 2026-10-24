@@ -26,6 +26,8 @@ final class WheelModel {
     var hint: String?
     /// Which wheel is showing, named in the label when opened from the keyboard.
     var wheelName: String?
+    /// Whether ⌘ is held on a keyboard wheel, showing each wedge's number key.
+    var showsBadges = false
     var isPresented = false
 
     var pageCount: Int { WheelPaging.pageCount(forItemCount: items.count) }
@@ -329,6 +331,7 @@ final class WheelController {
                 self.dismiss(after: .zero)
             }
         }
+        model.showsBadges = NSEvent.modifierFlags.contains(.command)
         showHint(hint)
     }
 
@@ -337,6 +340,7 @@ final class WheelController {
     func endKeyboardMode(hidingWheel: Bool = false) {
         guard keyboardSession != nil else { return }
         keyboardSession = nil
+        model.showsBadges = false
         dropView.isKeyboardMode = false
         panel.acceptsKeyboard = false
         panel.keyHandler = nil
@@ -380,9 +384,11 @@ final class WheelController {
         return ConversionCatalog.formats(in: items).contains { !OutputOptions(format: $0, urls: session.urls).isEmpty }
     }
 
-    private func handleKey(_ event: NSEvent) -> Bool {
+    /// The keyboard wheel's keys (internal, not private, for tests).
+    func handleKey(_ event: NSEvent) -> Bool {
         guard var session = keyboardSession else { return false }
         if event.type == .flagsChanged {
+            model.showsBadges = event.modifierFlags.contains(.command)
             let tapped = session.taps.flagsChanged(event.modifierFlags)
             keyboardSession = session
             if let tapped,
@@ -394,13 +400,16 @@ final class WheelController {
         }
         session.taps.keyPressed()
         keyboardSession = session
+        if event.modifierFlags.contains(.command) {
+            return runBadge(event.charactersIgnoringModifiers ?? "", modifiers: event.modifierFlags)
+        }
         switch Int(event.keyCode) {
         case kVK_RightArrow, kVK_DownArrow:
             step(.clockwise)
         case kVK_LeftArrow, kVK_UpArrow:
             step(.counterClockwise)
         case kVK_Return, kVK_ANSI_KeypadEnter:
-            runHighlighted()
+            runHighlighted(modifiers: event.modifierFlags)
         case kVK_Escape:
             dismiss(after: .zero)
         case kVK_Tab:
@@ -413,14 +422,22 @@ final class WheelController {
         return true
     }
 
+    /// ⌘ and a wedge's number: runs it as Return would, or turns the page for 0.
+    private func runBadge(_ key: String, modifiers: NSEvent.ModifierFlags) -> Bool {
+        guard let slot = WheelBadges.slot(forKey: key, in: model.slots) else { return false }
+        setHighlight(slot)
+        runHighlighted(modifiers: modifiers)
+        return true
+    }
+
     /// Runs the highlighted wedge, or turns the page when it's More or Back.
-    private func runHighlighted() {
+    private func runHighlighted(modifiers: NSEvent.ModifierFlags? = nil) {
         guard let session = keyboardSession, let slot = model.highlightedSlot, let highlighted = model.highlighted else { return }
         guard let item = highlighted.item else {
             turnPage(from: slot)
             return
         }
-        let modifiers = session.taps.chosen(NSEvent.modifierFlags)
+        let modifiers = session.taps.chosen(modifiers ?? NSEvent.modifierFlags)
         dismiss(after: .zero)
         onDrop?(item, session.urls, modifiers)
     }
@@ -566,6 +583,14 @@ final class WheelPanel: NSPanel {
     var keyHandler: ((NSEvent) -> Bool)?
 
     override var canBecomeKey: Bool { acceptsKeyboard }
+
+    /// ⌘ with a number reaches the wheel before any menu shortcut does.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if acceptsKeyboard, event.modifierFlags.contains(.command), keyHandler?(event) == true {
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
 
     override func keyDown(with event: NSEvent) {
         if keyHandler?(event) != true {

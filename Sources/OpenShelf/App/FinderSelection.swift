@@ -82,3 +82,19 @@ enum FinderSelection {
         }
     }
 }
+
+/// Whose selection the wheel shortcut opens a wheel for. Shelves are panels
+/// that take focus without bringing OpenShelf forward, so the shelf with
+/// keyboard focus is what's "in front": its selection wins. Otherwise, with
+/// OpenShelf itself in front (an editor or Settings), the most recently used
+/// shelf's; otherwise Finder's, as before.
+enum WheelSelectionSource: Equatable {
+    case shelf([URL])
+    case finder
+
+    static func choose(keyShelfSelection: [URL]?, recentShelfSelection: [URL], isOpenShelfFrontmost: Bool) -> WheelSelectionSource {
+        if let keyShelfSelection, !keyShelfSelection.isEmpty { return .shelf(keyShelfSelection) }
+        if isOpenShelfFrontmost, !recentShelfSelection.isEmpty { return .shelf(recentShelfSelection) }
+        return .finder
+    }
+}

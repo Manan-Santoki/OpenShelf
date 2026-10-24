@@ -9,11 +9,26 @@ final class ShelfManager {
     /// Ordered from least to most recently used.
     private var controllers: [ShelfWindowController] = []
     @ObservationIgnored private var saveTask: Task<Void, Never>?
+    @ObservationIgnored private let storeURL: URL
+
+    init(storeURL: URL = ShelfStore.defaultURL) {
+        self.storeURL = storeURL
+    }
 
     var hasShelves: Bool { !controllers.isEmpty }
 
     /// Open shelves, most recently used first, for the menu-bar menu.
     var openShelves: [Shelf] { controllers.reversed().map(\.shelf) }
+
+    /// The selected files of the shelf that has keyboard focus, or nil when none has.
+    var keyShelfSelection: [URL]? {
+        controllers.first { $0.window?.isKeyWindow == true }.map { $0.shelf.selectedItems.map(\.url) }
+    }
+
+    /// The selected files of the most recently used shelf.
+    var recentShelfSelection: [URL] {
+        controllers.last?.shelf.selectedItems.map(\.url) ?? []
+    }
 
     /// Brings every shelf to the front, sliding out any hidden at an edge, and
     /// focuses the most recently used one.
@@ -44,6 +59,13 @@ final class ShelfManager {
         recent.present()
     }
 
+    /// Updates every open reference after files move through the Actions wheel.
+    func relocate(_ moves: [URL: URL]) {
+        guard !moves.isEmpty else { return }
+        for controller in controllers { controller.shelf.relocate(moves) }
+        scheduleSave()
+    }
+
     func closeAll() {
         for controller in controllers {
             controller.dismiss()
@@ -55,7 +77,7 @@ final class ShelfManager {
     /// Reopens the shelves saved at the end of the last session. Files that no
     /// longer exist are skipped, and shelves left with nothing aren't reopened.
     func restoreSavedShelves() {
-        for snapshot in ShelfStore.load() {
+        for snapshot in ShelfStore.load(from: storeURL) {
             let urls = snapshot.items.compactMap { ShelfStore.resolve($0) }
             guard !urls.isEmpty else { continue }
             let shelf = Shelf()
@@ -72,7 +94,7 @@ final class ShelfManager {
     func saveNow() {
         saveTask?.cancel()
         saveTask = nil
-        try? ShelfStore.save(controllers.compactMap(\.snapshot))
+        try? ShelfStore.save(controllers.compactMap(\.snapshot), to: storeURL)
     }
 
     /// Coalesces bursts of changes (resizing, moving, adding files) into one write.

@@ -7,6 +7,93 @@ typealias Table = [[String]]
 
 /// Comma- and tab-separated text (RFC 4180 quoting).
 enum DelimitedText {
+    /// The number of records in a CSV or TSV file, read in chunks without
+    /// building the table: line breaks inside quoted fields don't count.
+    static func recordCount(_ url: URL, delimiter: Character = ",") throws -> Int {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        let separator: UInt16 = delimiter == "\t" ? 0x09 : 0x2C
+        var count = 0
+        var inQuotes = false
+        var pendingQuote = false
+        var fieldHasContent = false
+        var hasFields = false
+        var afterCR = false
+
+        // Use the same quote and record rules as parse, including CR-only
+        // records, escaped quotes, and a final record without a line break.
+        func consume(_ unit: UInt16) {
+            if afterCR {
+                afterCR = false
+                if unit == 0x0A { return }
+            }
+            if inQuotes {
+                if unit == 0x22 {
+                    if pendingQuote {
+                        fieldHasContent = true
+                        pendingQuote = false
+                    } else {
+                        pendingQuote = true
+                    }
+                    return
+                }
+                if pendingQuote {
+                    inQuotes = false
+                    pendingQuote = false
+                } else {
+                    fieldHasContent = true
+                    return
+                }
+            }
+            if unit == 0x22, !fieldHasContent {
+                inQuotes = true
+            } else if unit == separator {
+                hasFields = true
+                fieldHasContent = false
+            } else if unit == 0x0A || unit == 0x0D {
+                count += 1
+                fieldHasContent = false
+                hasFields = false
+                afterCR = unit == 0x0D
+            } else {
+                fieldHasContent = true
+            }
+        }
+
+        var first = true
+        var utf16LittleEndian: Bool?
+        var pendingByte: UInt8?
+        while let chunk = try handle.read(upToCount: 1 << 20), !chunk.isEmpty {
+            try Task.checkCancellation()
+            var bytes = chunk[...]
+            if first {
+                first = false
+                if bytes.starts(with: [0xFF, 0xFE]) {
+                    utf16LittleEndian = true
+                    bytes = bytes.dropFirst(2)
+                } else if bytes.starts(with: [0xFE, 0xFF]) {
+                    utf16LittleEndian = false
+                    bytes = bytes.dropFirst(2)
+                } else if bytes.starts(with: [0xEF, 0xBB, 0xBF]) {
+                    bytes = bytes.dropFirst(3)
+                }
+            }
+            for byte in bytes {
+                if let littleEndian = utf16LittleEndian {
+                    if let leading = pendingByte {
+                        consume(littleEndian ? UInt16(leading) | UInt16(byte) << 8 : UInt16(leading) << 8 | UInt16(byte))
+                        pendingByte = nil
+                    } else {
+                        pendingByte = byte
+                    }
+                } else {
+                    consume(UInt16(byte))
+                }
+            }
+        }
+        return count + (fieldHasContent || hasFields ? 1 : 0)
+    }
+
     static func parse(_ text: String, delimiter: Character) -> Table {
         var rows: Table = []
         var row: [String] = []
@@ -72,8 +159,22 @@ enum DelimitedText {
 }
 
 /// Writes a minimal Excel workbook with inline strings and numbers.
+/// Excel opens at most 1,048,576 rows a sheet, the header row included, so
+/// larger tables are refused before the (slow, memory-hungry) conversion.
+enum ExcelLimit {
+    static let rows = 1_048_576
+
+    static func check(rows count: Int, limit: Int = rows) throws {
+        guard count > limit else { return }
+        throw ConversionError.failed("Excel holds up to \(limit.formatted()) rows; this has \(count.formatted()). Save as CSV instead.")
+    }
+}
+
 enum XlsxWriter {
-    static func write(sheets: [(name: String, table: Table)], to url: URL) throws {
+    static func write(sheets: [(name: String, table: Table)], to url: URL, rowLimit: Int = ExcelLimit.rows) throws {
+        for sheet in sheets {
+            try ExcelLimit.check(rows: sheet.table.count, limit: rowLimit)
+        }
         let root = try PackageZip.makeWorkspace("xlsx")
         defer { try? FileManager.default.removeItem(at: root) }
         let header = #"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"# + "\n"
@@ -387,8 +488,11 @@ enum TablePDF {
 
 /// CSV, TSV and Excel files. ODS and XLS need LibreOffice (see OfficeConversion).
 enum SpreadsheetConversion {
-    static func convert(_ source: URL, to format: OutputFormat, tools: ExternalTools) async throws -> [URL] {
+    static func convert(_ source: URL, to format: OutputFormat, tools: ExternalTools, rowLimit: Int = ExcelLimit.rows) async throws -> [URL] {
         let ext = source.pathExtension.lowercased()
+        if format == .xlsx, ["csv", "tsv"].contains(ext) {
+            try ExcelLimit.check(rows: try DelimitedText.recordCount(source, delimiter: ext == "tsv" ? "\t" : ","), limit: rowLimit)
+        }
         // Formats only LibreOffice reads or writes.
         if format == .ods || !["csv", "tsv", "xlsx"].contains(ext) {
             return try await OfficeConversion.convert(source, to: format, tools: tools)
@@ -402,7 +506,7 @@ enum SpreadsheetConversion {
         case .tsv:
             try DelimitedText.write(table, delimiter: "\t").write(to: destination, atomically: true, encoding: .utf8)
         case .xlsx:
-            try XlsxWriter.write(sheets: [(name: source.deletingPathExtension().lastPathComponent, table: table)], to: destination)
+            try XlsxWriter.write(sheets: [(name: source.deletingPathExtension().lastPathComponent, table: table)], to: destination, rowLimit: rowLimit)
         case .pdf:
             try TablePDF.write(table, to: destination)
         default:

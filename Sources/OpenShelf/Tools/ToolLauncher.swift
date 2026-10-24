@@ -38,6 +38,9 @@ enum ToolLauncher {
                 [try await MediaTools.mute(sources[0], progress: progress)]
             }
 
+        case .ocr:
+            EditorWindowController.present(size: OCREditor.windowSize, near: location) { OCREditor(urls: urls, actions: $0) }
+
         case .organizePages:
             EditorWindowController.present(size: PDFPagesEditor.windowSize(for: urls.count), near: location) { PDFPagesEditor(urls: urls, actions: $0) }
         case .splitPDF:

@@ -40,10 +40,8 @@ enum DocxWriter {
         try write(document(body: body), to: root.appendingPathComponent("word/document.xml"))
 
         try? fileManager.removeItem(at: url)
-        let zip = Process()
-        zip.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+        let zip = ChildEnvironment.process(URL(fileURLWithPath: "/usr/bin/zip"), ["-X", "-r", "-q", url.path, "[Content_Types].xml", "_rels", "word"])
         zip.currentDirectoryURL = root
-        zip.arguments = ["-X", "-r", "-q", url.path, "[Content_Types].xml", "_rels", "word"]
         // Failures surface as an error below; keep zip's own message out of the log.
         zip.standardOutput = FileHandle.nullDevice
         zip.standardError = FileHandle.nullDevice

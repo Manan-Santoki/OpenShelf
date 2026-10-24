@@ -15,8 +15,8 @@ the file on a wedge and it's done, saved right next to the original.
   MKV, WebM, GIF, ZIP, TAR.GZ, …), with the codec, quality, size and
   bitrate yours to choose
 - **⇧⌥ Tools wheel:** for images — Crop, Resize, Remove Background, Add
-  Background, Annotate, Redact, Edit, Compress, Metadata, Read QR; for PDFs —
-  Combine, Pages, Split, Compress, Metadata; for video and audio — Trim,
+  Background, Annotate, Redact, Edit, Compress, Metadata, Read QR, OCR; for PDFs —
+  Combine, Pages, Split, Compress, Metadata, OCR; for video and audio — Trim,
   Speed, Crop, Rotate, Split, Merge, Compress, Mute
 - **⌃ Actions wheel:** Shelf · Add to Shelf · AirDrop · Copy · Move · Copy Path · Terminal
 - **Shelves:** stacked preview, expandable grid/list, multi-select, drag out to
@@ -76,12 +76,17 @@ page; **Back** in the same place turns back. Dropping on More or Back turns the
 page too and keeps the wheel open, so you can click the option you want. With
 the keyboard, choose More or Back and press Return.
 
-**Without dragging:** select files in Finder and press **⌃⌥Space**. The Convert
-wheel opens at the pointer; use the arrow keys and **Return** (or click a
-wedge), **Tab** to switch to Tools and Actions, **Esc** to close. The first
-time, macOS asks whether OpenShelf may control Finder; that's only used to read
-which files are selected. Change or turn off the shortcut in Settings →
-Wheels.
+**Without dragging:** select files in Finder or on a shelf and press
+**⌃⌥Space**. The Convert wheel opens at the pointer; use the arrow keys and
+**Return** (or click a wedge), **Tab** to switch to Tools and Actions, **Esc**
+to close. A focused shelf's selection takes priority; when Settings or an
+editor is in front, OpenShelf uses the most recently used shelf's selection.
+Otherwise it reads Finder's selection, asking for Automation permission the
+first time. Change or turn off the shortcut in Settings → Wheels.
+
+**Quick keyboard choices:** hold **⌘ Command** to show each wedge's number,
+then press that number to run it. **⌘0** turns More or Back. Numbering starts
+again on each page; **⌘⌥number** opens conversion settings where available.
 
 Tip: on a trackpad, press the key *after* the drag has started. Holding ⌃
 before you click turns the click into a right-click.
@@ -160,12 +165,17 @@ WAV, ZIP, …) convert right away.
 
 | Drag a… | Tools |
 |---|---|
-| Image | **Compress** · **Metadata** · **Edit** · **Annotate** · **Add BG** · **Crop** · **Resize** · **Remove BG** · **Redact** · **Read QR** |
+| Image | **Compress** · **Metadata** · **Edit** · **Annotate** · **Add BG** · **Crop** · **Resize** · **Remove BG** · **Redact** · **Read QR** · **OCR** |
 | Several images or PDFs | **Combine** into one PDF |
-| PDF | **Pages** (reorder, rotate, delete) · **Split** · **Compress** · **Metadata** |
+| PDF | **Pages** (reorder, rotate, delete) · **Split** · **Compress** · **Metadata** · **OCR** |
 | Video | **Trim** · **Speed** · **Crop** · **Rotate** · **Split** · **Compress** · **Mute** |
 | Audio | **Trim** · **Speed** · **Split** |
 | Several videos, or several audio files | **Merge** into one file |
+
+**OCR:** drop images, PDFs, or a mixture on OCR, choose **Searchable PDF** or
+**Text**, then Save. Recognition runs on this Mac in your supported system
+languages. Existing PDF text is preserved; scanned pages are read individually.
+Results are saved beside each original as `Name OCR.pdf` or `Name OCR.txt`.
 
 Most tools open a small editor. Make your changes and press the button at the
 bottom right (or Return); a copy is saved next to the original with a suffix,
@@ -232,7 +242,7 @@ tab you used last:
 - **General:** open OpenShelf at login, and show the welcome guide again (also
   in the menu as **How to Use OpenShelf**)
 - **Wheels:** the keys that open each wheel while dragging, and the shortcut
-  for Finder's selection
+  for Finder or shelf selections
 - **Shelves:** remove files from a shelf after dragging them out, restore
   shelves at launch, hide docked shelves at the screen edge
 - **Output:** how conversions encode video, audio, images and GIFs (see

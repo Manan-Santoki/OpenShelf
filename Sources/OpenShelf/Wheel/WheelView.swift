@@ -10,6 +10,7 @@ struct WheelView: View {
     var body: some View {
         let slots: [WheelSlot] = model.slots
         let geometry = WheelGeometry(wedgeCount: slots.count)
+        let badges: [Int: String] = model.showsBadges ? WheelBadges.keys(for: slots) : [:]
         let discDiameter: CGFloat = (geometry.outerRadius + rimWidth) * 2
         let hubDiameter: CGFloat = (geometry.innerRadius - 6) * 2
         let pageAnimation: Animation = reduceMotion ? .easeOut(duration: 0.15) : .easeInOut(duration: 0.18)
@@ -27,7 +28,8 @@ struct WheelView: View {
                         page: model.page,
                         pageCount: model.pageCount,
                         isHighlighted: model.highlightedSlot == index,
-                        isDwelling: model.dwellingSlot == index
+                        isDwelling: model.dwellingSlot == index,
+                        badge: badges[index]
                     )
                     // Petals bloom outward one after another.
                     .scaleEffect(model.isPresented || reduceMotion ? 1 : 0.6)
@@ -126,6 +128,8 @@ private struct PetalView: View {
     let pageCount: Int
     let isHighlighted: Bool
     let isDwelling: Bool
+    /// The number key shown while ⌘ is held on a keyboard wheel.
+    var badge: String?
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -165,10 +169,24 @@ private struct PetalView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .id(slot)
                 .transition(pageTurnTransition)
+
+            if let badge {
+                // Near the wedge's outer, clockwise corner.
+                let angle: CGFloat = center + geometry.sweep * 0.3
+                let radius: CGFloat = geometry.outerRadius - 13
+                Text(badge)
+                    .font(.system(size: 10, weight: .bold).monospacedDigit())
+                    .foregroundStyle(.white)
+                    .frame(width: 16, height: 16)
+                    .background(Circle().fill(Color.black.opacity(0.62)))
+                    .offset(x: sin(angle) * radius, y: -cos(angle) * radius)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transition(.opacity)
+            }
         }
         .shadow(color: isHighlighted ? Color.accentColor.opacity(0.45) : .clear, radius: 10, y: 3)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(slot.accessibilityLabel)
+        .accessibilityLabel(badge.map { "\(slot.accessibilityLabel), Command \($0)" } ?? slot.accessibilityLabel)
         .accessibilityAddTraits(isHighlighted ? .isSelected : [])
         .accessibilityHidden(slot.isEmpty)
     }

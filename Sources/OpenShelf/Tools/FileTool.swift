@@ -13,6 +13,7 @@ enum FileTool: CaseIterable, Hashable {
     case removeBackground
     case redact
     case readQR
+    case ocr
     // PDFs (and images, for Combine).
     case combinePDF
     case organizePages
@@ -40,6 +41,7 @@ enum FileTool: CaseIterable, Hashable {
         case .resize: "Resize"
         case .removeBackground: "Remove BG"
         case .redact: "Redact"
+        case .ocr: "OCR"
         case .readQR: "Read QR"
         case .combinePDF: "Combine"
         case .organizePages: "Pages"
@@ -68,6 +70,7 @@ enum FileTool: CaseIterable, Hashable {
         case .resize: "arrow.up.left.and.arrow.down.right"
         case .removeBackground: "person.crop.rectangle"
         case .redact: "eye.slash"
+        case .ocr: "text.viewfinder"
         case .readQR: "qrcode.viewfinder"
         case .combinePDF: "doc.on.doc"
         case .organizePages: "square.grid.2x2"
@@ -127,10 +130,10 @@ enum FileTool: CaseIterable, Hashable {
         let combine: [FileTool] = urls.count > 1 && kinds.isSubset(of: [.image, .pdf]) ? [.combinePDF] : []
 
         if kinds == [.image] {
-            return [.compress, .metadata, .edit, .annotate, .addBackground, .crop, .resize, .removeBackground, .redact, .readQR] + combine
+            return [.compress, .metadata, .edit, .annotate, .addBackground, .crop, .resize, .removeBackground, .redact, .readQR, .ocr] + combine
         }
         if kinds == [.pdf] {
-            return combine + [.organizePages, .splitPDF, .compressPDF, .pdfMetadata]
+            return combine + [.organizePages, .splitPDF, .compressPDF, .pdfMetadata, .ocr]
         }
         if kinds.isSubset(of: [.video, .audio]),
            !urls.allSatisfy({ editableMediaExtensions.contains($0.resolvingSymlinksInPath().pathExtension.lowercased()) }) {
@@ -143,6 +146,6 @@ enum FileTool: CaseIterable, Hashable {
         if kinds == [.audio] {
             return merge + [.trim, .speed, .splitMedia]
         }
-        return combine
+        return kinds.isSubset(of: [.image, .pdf]) ? combine + [.ocr] : combine
     }
 }

@@ -51,7 +51,7 @@ enum FileActions {
     /// are reported rather than overwritten. Returns where files went and how many
     /// moved, or nil when cancelled.
     @discardableResult
-    static func moveWithPrompt(_ urls: [URL]) -> (destination: URL, movedCount: Int)? {
+    static func moveWithPrompt(_ urls: [URL]) -> (destination: URL, movedCount: Int, moves: [URL: URL])? {
         let panel = NSOpenPanel()
         panel.title = urls.count == 1 ? "Move “\(urls[0].lastPathComponent)” to…" : "Move \(urls.count) Files to…"
         panel.prompt = "Move"
@@ -62,21 +62,32 @@ enum FileActions {
         NSApp.activate()
         guard panel.runModal() == .OK, let destination = panel.url else { return nil }
 
-        var failures: [String] = []
-        for url in urls {
-            do {
-                try FileManager.default.moveItem(at: url, to: destination.appendingPathComponent(url.lastPathComponent))
-            } catch {
-                failures.append("\(url.lastPathComponent): \(error.localizedDescription)")
-            }
-        }
+        let result = move(urls, into: destination)
+        let failures = result.failures
         if !failures.isEmpty {
             let alert = NSAlert()
             alert.messageText = failures.count == 1 ? "A file couldn’t be moved" : "\(failures.count) files couldn’t be moved"
             alert.informativeText = failures.joined(separator: "\n")
             alert.runModal()
         }
-        return (destination, urls.count - failures.count)
+        return (destination, result.moves.count, result.moves)
+    }
+
+    /// Reports successful moves so shelves can follow them; failed moves keep
+    /// their existing references. Does not replace files already at the target.
+    static func move(_ urls: [URL], into destination: URL) -> (moves: [URL: URL], failures: [String]) {
+        var moves: [URL: URL] = [:]
+        var failures: [String] = []
+        for url in urls {
+            let target = destination.appendingPathComponent(url.lastPathComponent)
+            do {
+                try FileManager.default.moveItem(at: url, to: target)
+                moves[url.standardizedFileURL] = target.standardizedFileURL
+            } catch {
+                failures.append("\(url.lastPathComponent): \(error.localizedDescription)")
+            }
+        }
+        return (moves, failures)
     }
 
     /// Total size of the regular files among `urls`, or nil if it includes a folder.

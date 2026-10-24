@@ -105,8 +105,9 @@ struct AddBackgroundEditor: View {
                 }
 
                 EditorRow(label: "Background") {
+                    // Swatches 1 pt apart, so both rows fit the 460 pt window.
                     VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 3) {
+                        HStack(spacing: 1) {
                             ForEach(gradientSwatches.indices, id: \.self) { index in
                                 swatch(isSelected: settings.choice == .gradient(index), help: "Gradient \(index + 1)") {
                                     settings.choice = .gradient(index)
@@ -126,7 +127,7 @@ struct AddBackgroundEditor: View {
                                 }
                             }
                         }
-                        HStack(spacing: 3) {
+                        HStack(spacing: 1) {
                             ForEach(SolidColors.all.indices, id: \.self) { index in
                                 swatch(isSelected: settings.choice == .solid(index), help: SolidColors.names[index]) {
                                     settings.choice = .solid(index)

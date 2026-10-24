@@ -16,10 +16,14 @@ enum FFmpegJob {
         // A process started after a cancel would run to the end.
         try Task.checkCancellation()
         let all: [String] = ["-y", "-nostdin", "-loglevel", "error"] + arguments + ["-progress", "pipe:1", "-nostats", output.path]
+        // Output lines can still arrive from the pipe after ffmpeg has exited;
+        // once this returns they're dropped, so progress never runs backwards.
+        let gate = ProgressGate(progress)
+        defer { gate.close() }
         try await ProcessRunner.run(ffmpeg, all) { line in
             // ffmpeg reports "out_time_us=<microseconds>" (also as out_time_ms, in µs).
             guard duration > 0, line.hasPrefix("out_time_us="), let micros = Double(line.dropFirst(12)) else { return }
-            progress(min(max(micros / 1_000_000 / duration, 0), 1))
+            gate.report(min(max(micros / 1_000_000 / duration, 0), 1))
         }
     }
 
@@ -67,5 +71,27 @@ enum FFmpegJob {
             }
         }
         throw lastError
+    }
+}
+
+/// Passes progress on until closed, then drops it.
+final class ProgressGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isOpen = true
+    private let progress: @Sendable (Double) -> Void
+
+    init(_ progress: @escaping @Sendable (Double) -> Void) {
+        self.progress = progress
+    }
+
+    func report(_ fraction: Double) {
+        lock.withLock {
+            guard isOpen else { return }
+            progress(fraction)
+        }
+    }
+
+    func close() {
+        lock.withLock { isOpen = false }
     }
 }

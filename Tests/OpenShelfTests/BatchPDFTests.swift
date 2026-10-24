@@ -139,6 +139,6 @@ struct BatchPDFTests {
         let tools = FileTool.available(for: urls)
         #expect(tools.contains(.organizePages))
         #expect(tools.contains(.splitPDF))
-        #expect(WheelOrdering.tools(tools) == [.combinePDF, .organizePages, .splitPDF, .compressPDF, .pdfMetadata])
+        #expect(WheelOrdering.tools(tools) == [.combinePDF, .organizePages, .splitPDF, .compressPDF, .pdfMetadata, .ocr])
     }
 }
