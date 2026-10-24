@@ -38,6 +38,7 @@ Read scanned documents, work directly from shelves, and choose wheel actions fas
   colour swatches fit their window.
 - Child processes receive a limited environment rather than inherited shell
   credentials.
+- Concurrent OCR jobs are queued to avoid stalls on smaller machines.
 - OCR cancellation leaves no partial PDF output, rotated pages retain their
   displayed dimensions, and recognition retries on CPU if acceleration fails.
 

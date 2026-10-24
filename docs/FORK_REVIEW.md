@@ -43,10 +43,13 @@ selection, multiple shelf references, and Shift-selection after moving an anchor
 - **OCR** — David NeSmith’s [d0b71b4](https://github.com/djnesmith/OpenShelf/commit/d0b71b466e266074a6ec1d0fa72664b0a7357f28)
   plus the PDF lifetime and per-page rendering corrections in **207bc44**. Images,
   PDFs and mixed batches produce text or searchable PDF copies. Local adaptations
-  propagate cancellation into the detached worker, use partial PDF writes, and
+  propagate cancellation into the OCR worker, use partial PDF writes, and
   explicitly map rotated PDF pages into the output page. A bounded retry on
   supported CPU devices handles accelerator failures observed during concurrent
-  media tests; a forced-failure test exercises that fallback.
+  media tests; a forced-failure test exercises that fallback. Blocking Vision work
+  is queued outside Swift’s cooperative executor, with explicit cancellation, so
+  concurrent jobs do not exhaust smaller runners’ worker pools. A 16-job
+  concurrency regression exercises that path.
 - **Shelf-selection wheel** — David NeSmith’s **a2c6d6f**. The global shortcut and
   menu item prefer the focused shelf, then the recent shelf when OpenShelf is
   active, and otherwise Finder. Store-URL injection (also present in David’s
@@ -146,7 +149,7 @@ Remaining feature candidates are separate from the applied fixes and features ab
 
 ## Local validation of the feature batch
 
-- Full suite: **501 tests reported in 107 suites, successful**, with the same
+- Full suite: **502 tests reported in 107 suites, successful**, with the same
   16 conditional skips. Used the direct Swift Testing runner described above.
 - Real Vision OCR produced searchable PDFs and text. Checks cover original PDF
   text retention, document lifetime, rotated pages, locked PDFs, preferred
@@ -160,3 +163,12 @@ Remaining feature candidates are separate from the applied fixes and features ab
   `build/feature-previews/ocr.png` and `build/feature-previews/wheel-shortcuts.png`.
 - Original source attribution is retained above and in the imported OCR and test
   files. Release preparation and contributor credit are recorded in CHANGELOG.md.
+
+## Release concurrency validation
+
+The first 1.5.0 CI runs stopped making progress after OCR tests started and were
+cancelled before publication. Vision's blocking work now runs on a dedicated
+serial dispatch queue rather than Swift's cooperative executor. Cancellation is
+passed explicitly to that worker. The full local suite passed with 502 tests;
+all 10 OCR tests also passed with the strict cooperative executor setting,
+including 16 simultaneous callers producing distinct, readable text outputs.

@@ -97,10 +97,33 @@ struct OCRTests {
 }
 
 extension OCRTests {
+    @Test func concurrentJobsCompleteWithoutBlockingTheSwiftExecutor() async throws {
+        let folder = try workspace()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let image = try Self.picture(of: "Concurrent OpenShelf")
+        let inputs = try (0..<16).map { index in
+            let url = folder.appendingPathComponent("Scan \(index).png")
+            try EditableImage.write(image, to: url, type: .png)
+            return url
+        }
+        let outputs = try await withThrowingTaskGroup(of: URL.self) { group in
+            for input in inputs {
+                group.addTask { try await OCR.run(input, output: .text) }
+            }
+            var results: [URL] = []
+            for try await output in group { results.append(output) }
+            return results
+        }
+        #expect(Set(outputs).count == inputs.count)
+        for output in outputs {
+            #expect(try String(contentsOf: output, encoding: .utf8).contains("OpenShelf"))
+        }
+    }
+
     @Test func retriesFailedAcceleratorRecognitionOnCPU() throws {
         enum SimulatedFailure: Error { case accelerator }
         var attempts = 0
-        let lines = try OCR.recognize(Self.picture(of: "CPU OpenShelf"), languages: ["en-US"]) { handler, request in
+        let lines = try OCR.recognize(Self.picture(of: "CPU OpenShelf"), languages: ["en-US"], perform: { handler, request in
             attempts += 1
             if attempts == 1 { throw SimulatedFailure.accelerator }
             let stages = try request.supportedComputeStageDevices
@@ -109,7 +132,7 @@ extension OCRTests {
                 return false
             })
             try handler.perform([request])
-        }
+        })
         #expect(attempts == 2)
         #expect(lines.map(\.text).joined(separator: " ").contains("OpenShelf"))
     }
