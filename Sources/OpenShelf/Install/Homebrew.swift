@@ -24,6 +24,7 @@ enum Homebrew {
         switch tool {
         case .ffmpeg: ["install", "ffmpeg"]
         case .libreOffice: ["install", "--cask", "libreoffice"]
+        case .pandoc: ["install", "pandoc"]
         }
     }
 

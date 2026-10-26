@@ -73,7 +73,7 @@ enum InstallFallback {
     static func automaticSources(for tool: ExtraTool) -> [InstallSource] {
         switch tool {
         case .ffmpeg: [.vendor, .mirror]
-        case .libreOffice: [.vendor]
+        case .libreOffice, .pandoc: [.vendor]
         }
     }
 

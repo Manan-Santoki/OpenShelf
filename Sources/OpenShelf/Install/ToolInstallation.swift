@@ -268,6 +268,58 @@ enum ToolInstallation {
         return InstalledTools.Entry(version: version, paths: [destination.path], source: diskImageURL.absoluteString)
     }
 
+    // MARK: Pandoc
+
+    /// Installs the newest Pandoc into `locations.tools`.
+    /// - Parameter release: GitHub's listing of the release to install.
+    static func installPandoc(
+        release: URL = PandocSource.latestRelease,
+        architecture: MachineArchitecture = .current,
+        into locations: InstallLocations,
+        report: @escaping Report
+    ) async throws -> InstalledTools.Entry {
+        report(InstallProgress(step: .downloading, fraction: nil, detail: "Finding the latest version…"))
+        let listing: String?
+        if release.isFileURL {
+            listing = try? String(contentsOf: release, encoding: .utf8)
+        } else {
+            listing = try await FileDownload.text(at: release)
+        }
+        guard let listing, let found = PandocSource.download(inRelease: Data(listing.utf8), for: architecture) else {
+            throw ConversionError.failed("No Pandoc download for this Mac was found. Try again later.")
+        }
+        // GitHub lists a digest for every release file; without one, nothing is installed.
+        guard let sha256 = found.sha256 else { throw ToolIntegrityError.checksumMissing(file: "Pandoc") }
+
+        let staging = try makeStagingFolder(in: locations.tools)
+        defer { try? FileManager.default.removeItem(at: staging) }
+        let zip = staging.appendingPathComponent("pandoc.zip")
+        // GitHub serves release files from its storage hosts; the checksum
+        // and signature decide what the file is.
+        let resolved = try await download(found.url, to: zip, label: "Pandoc", part: 0, of: 1, report: report)
+        guard resolved.isFileURL || resolved.scheme == "https" else {
+            throw DownloadError.untrustedLocation(resolved.host ?? resolved.absoluteString)
+        }
+
+        report(InstallProgress(step: .verifying, fraction: nil, detail: "Checking the download…"))
+        try ToolIntegrity.verify(zip, sha256: sha256, name: "Pandoc")
+        let folder = staging.appendingPathComponent("pandoc", isDirectory: true)
+        try await ProcessRunner.run(ditto, ["-x", "-k", zip.path, folder.path])
+        // The zip holds pandoc-<version>-<architecture>/bin/pandoc.
+        let binary = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil))?
+            .map { $0.appendingPathComponent("bin/pandoc") }
+            .first { FileManager.default.fileExists(atPath: $0.path) }
+        guard let binary else { throw ConversionError.failed("The download didn’t contain Pandoc.") }
+        report(InstallProgress(step: .verifying, fraction: nil, detail: "Checking the signature…"))
+        try ToolIntegrity.verifySignature(of: binary, identifier: "pandoc", teamID: PandocSource.teamID, name: "Pandoc")
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binary.path)
+
+        report(InstallProgress(step: .installing, fraction: nil, detail: "Installing…"))
+        let destination = locations.tools.appendingPathComponent("pandoc")
+        try moveIntoPlace(binary, at: destination)
+        return InstalledTools.Entry(version: found.version, paths: [destination.path], source: found.url.absoluteString)
+    }
+
     // MARK: Removing
 
     /// Removes what OpenShelf installed for `entry`: command-line tools are

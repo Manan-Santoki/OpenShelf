@@ -63,8 +63,7 @@ struct ExternalTools: Equatable, Sendable {
                 .first { FileManager.default.isExecutableFile(atPath: $0.path) }
         }
         let apps = ignored.contains("libreoffice") ? locations.ownLibreOfficeApps : locations.libreOfficeApps
-        // OpenShelf never installs Pandoc or a typesetter itself.
-        let pandoc = ignored.contains("pandoc") ? nil : find("pandoc", ignoredAs: "pandoc")
+        let pandoc = find("pandoc", ignoredAs: "pandoc")
         let pdfEngine = pandoc == nil ? nil : PandocConversion.pdfEngines.lazy.compactMap { name in
             (locations.commandDirectories + locations.texDirectories)
                 .map { $0.appendingPathComponent(name) }

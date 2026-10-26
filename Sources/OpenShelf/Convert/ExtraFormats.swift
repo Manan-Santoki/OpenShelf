@@ -5,6 +5,7 @@ import Foundation
 enum ExtraTool: String, CaseIterable, Identifiable, Sendable {
     case ffmpeg
     case libreOffice
+    case pandoc
 
     var id: String { rawValue }
 
@@ -12,15 +13,18 @@ enum ExtraTool: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .ffmpeg: "ffmpeg"
         case .libreOffice: "LibreOffice"
+        case .pandoc: "Pandoc"
         }
     }
 
     /// One short line on what installing it adds: these formats as outputs,
-    /// and for ffmpeg also as files that can be converted.
+    /// and for ffmpeg also as files that can be converted. Pandoc adds no
+    /// formats; it converts documents its own way.
     var unlocks: String {
         switch self {
         case .ffmpeg: "MP3, OGG, WebP, MKV, WebM, AVI and WMV"
         case .libreOffice: "PowerPoint, ODP, XLS and ODS"
+        case .pandoc: "Pandoc’s Markdown, Word and EPUB conversions"
         }
     }
 
@@ -29,6 +33,7 @@ enum ExtraTool: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .ffmpeg: "brew install ffmpeg"
         case .libreOffice: "brew install --cask libreoffice"
+        case .pandoc: "brew install pandoc"
         }
     }
 
@@ -37,6 +42,7 @@ enum ExtraTool: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .ffmpeg: "MP3, WebP, MKV… are now on the wheel"
         case .libreOffice: "PowerPoint, XLS… are now on the wheel"
+        case .pandoc: "Markdown and Word convert with Pandoc"
         }
     }
 
@@ -44,6 +50,7 @@ enum ExtraTool: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .ffmpeg: tools.ffmpeg
         case .libreOffice: tools.libreOffice
+        case .pandoc: tools.pandoc
         }
     }
 
@@ -60,6 +67,7 @@ enum ExtraTool: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .ffmpeg: tools.ffmpeg = placeholder
         case .libreOffice: tools.libreOffice = placeholder
+        case .pandoc: tools.pandoc = placeholder
         }
         return tools
     }

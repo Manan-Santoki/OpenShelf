@@ -114,3 +114,59 @@ enum LibreOfficeSource {
         diskImage.deletingLastPathComponent().appendingPathComponent(diskImage.lastPathComponent + ".sha256")
     }
 }
+
+/// Pandoc from its GitHub releases. GitHub lists a SHA-256 digest for every
+/// file of a release, and the program inside the zip is signed with John
+/// MacFarlane's Developer ID and notarized.
+enum PandocSource {
+    static let host = "github.com"
+    static let latestRelease = URL(string: "https://api.github.com/repos/jgm/pandoc/releases/latest")!
+    /// The Team ID of "Developer ID Application: John Macfarlane".
+    static let teamID = "5U2WKE6DES"
+    /// The Apple silicon zip's size (42 MB for 3.12), for the Install button.
+    static let approximateSize = "45 MB"
+
+    /// One release as GitHub's API describes it.
+    struct Release: Decodable {
+        struct Asset: Decodable {
+            var name: String
+            var browserDownloadURL: URL
+            /// "sha256:<64 hex digits>".
+            var digest: String?
+
+            enum CodingKeys: String, CodingKey {
+                case name
+                case browserDownloadURL = "browser_download_url"
+                case digest
+            }
+        }
+
+        var tagName: String
+        var assets: [Asset]
+
+        enum CodingKeys: String, CodingKey {
+            case tagName = "tag_name"
+            case assets
+        }
+    }
+
+    /// The zip for this Mac, e.g. "pandoc-3.12.1-arm64-macOS.zip".
+    static func zipName(version: String, architecture: MachineArchitecture) -> String {
+        "pandoc-\(version)-\(architecture == .arm64 ? "arm64" : "x86_64")-macOS.zip"
+    }
+
+    /// The zip for `architecture` in a release listing, with its version and
+    /// SHA-256 (nil when GitHub lists none).
+    static func download(inRelease json: Data, for architecture: MachineArchitecture) -> (version: String, url: URL, sha256: String?)? {
+        guard let release = try? JSONDecoder().decode(Release.self, from: json) else { return nil }
+        let version = release.tagName.hasPrefix("v") ? String(release.tagName.dropFirst()) : release.tagName
+        let name = zipName(version: version, architecture: architecture)
+        guard let asset = release.assets.first(where: { $0.name == name }) else { return nil }
+        let sha256 = asset.digest.flatMap { digest -> String? in
+            guard digest.hasPrefix("sha256:") else { return nil }
+            let hex = digest.dropFirst("sha256:".count)
+            return hex.count == 64 && hex.allSatisfy(\.isHexDigit) ? hex.lowercased() : nil
+        }
+        return (version, asset.browserDownloadURL, sha256)
+    }
+}

@@ -27,7 +27,7 @@ enum ToolStatus: Equatable {
     case failed(String)
 }
 
-/// Installs and removes ffmpeg and LibreOffice when asked from Settings, and
+/// Installs and removes ffmpeg, LibreOffice and Pandoc when asked from Settings, and
 /// keeps going if the window closes; a toast says when it's done. Nothing here
 /// touches the network until someone clicks Install.
 @MainActor
@@ -171,7 +171,9 @@ final class ToolInstaller {
             try await ToolInstallation.installFFmpegFromMirror(into: locations, report: report)
         case (.libreOffice, .vendor):
             try await ToolInstallation.installLibreOffice(into: locations, report: report)
-        case (.libreOffice, .mirror), (_, .homebrew):
+        case (.pandoc, .vendor):
+            try await ToolInstallation.installPandoc(into: locations, report: report)
+        case (.libreOffice, .mirror), (.pandoc, .mirror), (_, .homebrew):
             throw ConversionError.failed("\(tool.name) can’t be downloaded from there.")
         }
     }
@@ -281,6 +283,7 @@ extension ExtraTool {
         switch self {
         case .ffmpeg: FFmpegSource.approximateSize
         case .libreOffice: LibreOfficeSource.approximateSize
+        case .pandoc: PandocSource.approximateSize
         }
     }
 
@@ -289,6 +292,7 @@ extension ExtraTool {
         switch self {
         case .ffmpeg: FFmpegSource.host
         case .libreOffice: "libreoffice.org"
+        case .pandoc: PandocSource.host
         }
     }
 }

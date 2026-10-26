@@ -12,9 +12,14 @@ private enum Fixtures {
     static let ffprobeZip = folder.appendingPathComponent("riedl/ffprobe6.zip")
     static let libreOfficeImage = folder.appendingPathComponent("LibreOffice_26.8.1_MacOS_aarch64.dmg")
     static let libreOfficeSHA256 = "ca074e0b13571efb30a31fc531c5f95e997030637325e5d5de92d67aefdf0dfc"
+    /// Pandoc's own Apple silicon zip, e.g. pandoc-3.12.1-arm64-macOS.zip, renamed.
+    static let pandocZip = folder.appendingPathComponent("pandoc-arm64-macOS.zip")
 
     static var hasFFmpeg: Bool {
         FileManager.default.fileExists(atPath: ffmpegZip.path) && FileManager.default.fileExists(atPath: ffprobeZip.path)
+    }
+    static var hasPandoc: Bool {
+        FileManager.default.fileExists(atPath: pandocZip.path) && MachineArchitecture.current == .arm64
     }
     static var hasLibreOffice: Bool {
         FileManager.default.fileExists(atPath: libreOfficeImage.path) && MachineArchitecture.current == .arm64
@@ -464,4 +469,94 @@ private final class StepRecorder: @unchecked Sendable {
     }
 
     var steps: [InstallProgress.Step] { lock.withLock { recorded } }
+}
+
+/// Pandoc from its GitHub releases, installed from a local copy of a release:
+/// GitHub's listing, with the zip it points to beside it.
+struct PandocInstallTests {
+    /// A listing like GitHub's, naming `zip` for both processors.
+    private func release(in root: URL, zip: URL, digest: String?) throws -> URL {
+        let assets = ["arm64", "x86_64"].map { architecture -> [String: Any] in
+            var asset: [String: Any] = [
+                "name": "pandoc-3.12.1-\(architecture)-macOS.zip",
+                "browser_download_url": zip.absoluteString,
+            ]
+            if let digest { asset["digest"] = digest }
+            return asset
+        } + [["name": "pandoc-3.12.1-windows-x86_64.msi", "browser_download_url": "https://example.com/x.msi", "digest": "sha256:" + String(repeating: "0", count: 64)]]
+        let url = root.appendingPathComponent("latest.json")
+        try JSONSerialization.data(withJSONObject: ["tag_name": "3.12.1", "assets": assets]).write(to: url)
+        return url
+    }
+
+    @Test func picksThisMacsZipAndItsDigest() throws {
+        let json = Data(#"{"tag_name":"3.12.1","assets":[{"name":"pandoc-3.12.1-x86_64-macOS.zip","browser_download_url":"https://github.com/jgm/pandoc/releases/download/3.12.1/pandoc-3.12.1-x86_64-macOS.zip","digest":"sha256:81ED3E2CFECF096DF15D407152F89A684FD65221082B919963F738E977FAD3BC"},{"name":"pandoc-3.12.1-arm64-macOS.zip","browser_download_url":"https://github.com/jgm/pandoc/releases/download/3.12.1/pandoc-3.12.1-arm64-macOS.zip"}]}"#.utf8)
+        let intel = try #require(PandocSource.download(inRelease: json, for: .x86_64))
+        #expect(intel.version == "3.12.1")
+        #expect(intel.url.lastPathComponent == "pandoc-3.12.1-x86_64-macOS.zip")
+        #expect(intel.sha256 == "81ed3e2cfecf096df15d407152f89a684fd65221082b919963f738e977fad3bc")
+        #expect(try #require(PandocSource.download(inRelease: json, for: .arm64)).sha256 == nil)
+        #expect(PandocSource.download(inRelease: Data("{}".utf8), for: .arm64) == nil)
+        #expect(PandocSource.zipName(version: "3.12.1", architecture: .arm64) == "pandoc-3.12.1-arm64-macOS.zip")
+    }
+
+    /// A zip laid out like Pandoc's, holding a script nobody signed.
+    private func unsignedZip(in root: URL) async throws -> URL {
+        let bin = root.appendingPathComponent("payload/pandoc-3.12.1-arm64/bin", isDirectory: true)
+        try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
+        let script = bin.appendingPathComponent("pandoc")
+        try Data("#!/bin/sh\ntouch \(root.path)/ran\n".utf8).write(to: script)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
+        let zip = root.appendingPathComponent("pandoc.zip")
+        try await ProcessRunner.run(URL(fileURLWithPath: "/usr/bin/ditto"), ["-c", "-k", root.appendingPathComponent("payload").path, zip.path])
+        return zip
+    }
+
+    @Test func unsignedPandocIsNeverInstalled() async throws {
+        let root = try makeTemporaryFolder("pandoc-unsigned")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let zip = try await unsignedZip(in: root)
+        let listing = try release(in: root, zip: zip, digest: "sha256:" + (try ToolIntegrity.sha256(of: zip)))
+        let locations = temporaryLocations(in: root)
+        await #expect(throws: ToolIntegrityError.badSignature(file: "Pandoc")) {
+            _ = try await ToolInstallation.installPandoc(release: listing, architecture: .arm64, into: locations) { _ in }
+        }
+        #expect(try FileManager.default.contentsOfDirectory(atPath: locations.tools.path).isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent("ran").path))
+    }
+
+    @Test func aDamagedOrUnlistedDownloadIsRefused() async throws {
+        let root = try makeTemporaryFolder("pandoc-checksum")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let zip = try await unsignedZip(in: root)
+        let locations = temporaryLocations(in: root)
+        let wrong = try release(in: root, zip: zip, digest: "sha256:" + String(repeating: "a", count: 64))
+        await #expect(throws: ToolIntegrityError.checksumMismatch(file: "Pandoc")) {
+            _ = try await ToolInstallation.installPandoc(release: wrong, architecture: .arm64, into: locations) { _ in }
+        }
+        let unlisted = try release(in: root, zip: zip, digest: nil)
+        await #expect(throws: ToolIntegrityError.checksumMissing(file: "Pandoc")) {
+            _ = try await ToolInstallation.installPandoc(release: unlisted, architecture: .arm64, into: locations) { _ in }
+        }
+        #expect(hiddenItems(in: locations.tools).isEmpty)
+    }
+
+    @Test(.enabled(if: Fixtures.hasPandoc))
+    func installsTheSignedBuild() async throws {
+        let root = try makeTemporaryFolder("pandoc-real")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let listing = try release(in: root, zip: Fixtures.pandocZip, digest: "sha256:" + (try ToolIntegrity.sha256(of: Fixtures.pandocZip)))
+        let locations = temporaryLocations(in: root)
+        let entry = try await ToolInstallation.installPandoc(release: listing, architecture: .arm64, into: locations) { _ in }
+        let installed = locations.tools.appendingPathComponent("pandoc")
+        #expect(entry.version == "3.12.1")
+        #expect(entry.paths == [installed.path])
+        #expect(hiddenItems(in: locations.tools).isEmpty)
+        let result = try run(installed.path, ["--version"])
+        #expect(result.status == 0)
+        #expect(result.output.hasPrefix("pandoc"))
+        // And OpenShelf finds it there.
+        let tools = ExternalTools.detect(in: ToolLocations(commandDirectories: [locations.tools], libreOfficeApps: []), ignoring: [])
+        #expect(tools.pandoc == installed)
+    }
 }
