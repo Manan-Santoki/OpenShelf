@@ -2,6 +2,12 @@
 
 # OpenShelf
 
+<p align="center">
+  <a href="https://github.com/Manan-Santoki/OpenShelf/releases">
+    <img src="https://img.shields.io/github/downloads/Manan-Santoki/OpenShelf/total?label=downloads" alt="Downloads">
+  </a>
+</p>
+
 An open-source macOS menu-bar utility for working with files mid-drag.
 
 Start dragging any file and tap a key — a wheel appears under the pointer. Drop
