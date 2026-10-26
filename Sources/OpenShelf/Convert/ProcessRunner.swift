@@ -38,6 +38,7 @@ enum ProcessRunner {
         currentDirectory: URL? = nil,
         standardInputFile: URL? = nil,
         standardOutputFile: URL? = nil,
+        extraEnvironment: [String: String] = [:],
         onOutputLine: (@Sendable (String) -> Void)? = nil
     ) async throws {
         // Launching a missing file fails with a cryptic "file doesn't exist";
@@ -50,7 +51,7 @@ enum ProcessRunner {
         let process = box.process
         process.executableURL = executable
         process.arguments = arguments
-        process.environment = ChildEnvironment.minimal()
+        process.environment = ChildEnvironment.minimal(extra: extraEnvironment)
         if let currentDirectory {
             process.currentDirectoryURL = currentDirectory
         }

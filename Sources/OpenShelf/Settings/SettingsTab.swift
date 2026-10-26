@@ -70,6 +70,7 @@ enum SettingsTab: String, CaseIterable, Sendable {
             [Preferences.shared.output.video.quality == .custom ? "custom" : ""]
         case .extraFormats:
             ExtraTool.allCases.map { ExtraFormatsPane.layout(of: $0, installer: .shared) }
+                + ["pandoc \(ExternalTools.current.pandoc != nil) \(ExternalTools.current.pdfEngine != nil)"]
         case .general, .shelves, .updates:
             []
         }

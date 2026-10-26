@@ -135,6 +135,26 @@ a PowerPoint deck) says which one it needs. GIFs from video are made without
 ffmpeg, though it makes slightly cleaner ones when installed. Keynote files
 can't be converted, and Apple's Pages format isn't offered.
 
+#### Markdown and Word documents
+
+Markdown is rendered, not copied as text: headings, emphasis, lists, quotes,
+code blocks, tables, links, pictures beside the file, footnotes and math come
+out as the real thing in PDF, Word, HTML, EPUB and RTF, and as tidy plain text
+in TXT. Besides CommonMark and GitHub's tables and task lists, OpenShelf reads
+the Pandoc extensions people use most: definition lists, simple and multi-line
+tables, line blocks, `$math$`, smart quotes and dashes, and a YAML `title`.
+Word files get Word's own heading styles, numbered lists and footnotes.
+Pictures on the web are never downloaded; they're shown by their description.
+
+If [Pandoc](https://pandoc.org) is installed (`brew install pandoc`),
+OpenShelf uses it instead for Markdown to Word, HTML, EPUB and RTF, and for
+Word, ODT and HTML to Markdown and EPUB. Pandoc's PDFs also need a typesetter
+such as MacTeX, Tectonic or Typst; without one, PDFs keep OpenShelf's own
+layout. With LibreOffice installed, Word and ODT documents become PDFs through
+it, keeping their page layout. Should either fail, the built-in conversion
+runs instead. Pandoc downloads pictures a document links to on the web.
+Settings → Extra Formats shows whether Pandoc was found.
+
 #### Output settings
 
 Out of the box, every conversion picks its own encoding. To choose instead,

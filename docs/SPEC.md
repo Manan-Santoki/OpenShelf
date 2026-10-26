@@ -93,7 +93,8 @@ the pointer shows "Converting to JPG · 1 of 3 saved" with a cancel button.
 |---|---|---|
 | Image (incl. SVG) | PNG, JPG, WEBP†, HEIC, TIFF, AVIF, BMP, PDF, DOCX, ZIP | ImageIO, PDF context, hand-built DOCX |
 | PDF | DOCX, JPG, PNG, TXT, MD, EPUB, PPTX, XLSX, ZIP | PDFKit (pages at 300 dpi; scanned PDFs become image DOCX/EPUB/PPTX; TXT/MD/XLSX refuse scans); hand-built EPUB 3, PresentationML (one picture per slide) and SpreadsheetML (one sheet per page, cells split at tabs/wide gaps) |
-| Text / RTF / RTFD / DOCX / DOC / ODT / HTML / Markdown | PDF, DOCX, TXT, MD, EPUB, HTML, RTF, ZIP | NSAttributedString, AppKit printing, Core Text; Markdown and EPUB from detected headings, lists, bold/italic and links |
+| Text / RTF / RTFD / DOCX / DOC / ODT / HTML | PDF, DOCX, TXT, MD, EPUB, HTML, RTF, ZIP | NSAttributedString, AppKit printing, Core Text; Markdown and EPUB from detected headings, lists, bold/italic and links. DOCX/DOC/ODT/RTF → PDF through LibreOffice‡ when installed; DOCX/ODT/HTML → MD and EPUB through Pandoc§ |
+| Markdown | PDF, DOCX, TXT, EPUB, HTML, RTF, ZIP | Built-in parser (CommonMark, GitHub tables/task lists/strikethrough, Pandoc footnotes, definition lists, simple and multi-line tables, line blocks, math, smart punctuation, YAML title) rendered to AppKit rich text (PDF, RTF), hand-built WordprocessingML with Word styles, numbering, tables, footnotes and pictures (DOCX), XHTML (HTML, EPUB) and plain text (TXT). Pandoc§ for DOCX/HTML/EPUB/RTF, and PDF when it has a typesetter |
 | CSV / TSV / XLSX | XLSX, CSV, TSV, PDF, ODS‡, ZIP | Built-in RFC 4180 parser, SpreadsheetML writer/reader, Core Text table PDF (landscape, repeated header) |
 | XLS / ODS | XLSX, CSV, PDF, ODS‡, ZIP | LibreOffice‡ |
 | PPTX / PPT / ODP | PDF‡, JPG‡, PNG‡, ZIP | LibreOffice‡ → PDF → page images ("Name Slide 2.jpg") |
@@ -109,6 +110,12 @@ Silent videos never offer audio outputs (MP4/MOV checked directly, other
 containers with ffprobe).
 ‡ Needs LibreOffice (`brew install --cask libreoffice`), run headless with a
 private profile and a 120-second limit; hidden when not installed.
+
+§ Pandoc is used when found (Homebrew, MacPorts or PATH; never installed by
+OpenShelf), with a 180-second limit. Its PDFs need a typesetter, found in the
+same places and `/Library/TeX/texbin`: XeLaTeX, LuaLaTeX, Tectonic, Typst,
+pdfLaTeX, WeasyPrint or wkhtmltopdf, in that order. If Pandoc or LibreOffice
+fails, the built-in conversion runs instead.
 
 Not offered: Apple Pages (private format) and Keynote (no converter can read it).
 Wheels hold at most 12 wedges (the largest, images, has 10).

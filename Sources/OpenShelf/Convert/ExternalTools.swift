@@ -1,11 +1,15 @@
 import Foundation
 
-/// Optional tools found on this Mac: ffmpeg and ffprobe, cwebp, and LibreOffice.
+/// Optional tools found on this Mac: ffmpeg and ffprobe, cwebp, LibreOffice,
+/// and Pandoc with a program it can make PDFs with.
 struct ExternalTools: Equatable, Sendable {
     var ffmpeg: URL?
     var cwebp: URL?
     var ffprobe: URL? = nil
     var libreOffice: URL? = nil
+    var pandoc: URL? = nil
+    /// A typesetter Pandoc can make PDFs with (see `PandocConversion.pdfEngines`).
+    var pdfEngine: URL? = nil
 
     /// Never runs ffmpeg: see `WebPEncoder.isOffered`.
     var canEncodeWebP: Bool {
@@ -59,21 +63,30 @@ struct ExternalTools: Equatable, Sendable {
                 .first { FileManager.default.isExecutableFile(atPath: $0.path) }
         }
         let apps = ignored.contains("libreoffice") ? locations.ownLibreOfficeApps : locations.libreOfficeApps
+        // OpenShelf never installs Pandoc or a typesetter itself.
+        let pandoc = ignored.contains("pandoc") ? nil : find("pandoc", ignoredAs: "pandoc")
+        let pdfEngine = pandoc == nil ? nil : PandocConversion.pdfEngines.lazy.compactMap { name in
+            (locations.commandDirectories + locations.texDirectories)
+                .map { $0.appendingPathComponent(name) }
+                .first { FileManager.default.isExecutableFile(atPath: $0.path) }
+        }.first
         return ExternalTools(
             ffmpeg: find("ffmpeg", ignoredAs: "ffmpeg"),
             cwebp: find("cwebp", ignoredAs: "cwebp"),
             ffprobe: find("ffprobe", ignoredAs: "ffmpeg"),
             libreOffice: apps
                 .map { $0.appendingPathComponent("Contents/MacOS/soffice") }
-                .first { FileManager.default.isExecutableFile(atPath: $0.path) }
+                .first { FileManager.default.isExecutableFile(atPath: $0.path) },
+            pandoc: pandoc,
+            pdfEngine: pdfEngine
         )
     }
 
     /// Tools whose Homebrew, MacPorts and /Applications copies are ignored, to
     /// try OpenShelf as someone without them sees it, and to try installing
     /// them from Settings: `defaults write app.openshelf.OpenShelf
-    /// IgnoredExternalTools -array ffmpeg cwebp libreoffice` ("ffmpeg" covers
-    /// ffprobe too). `defaults delete` the key to undo.
+    /// IgnoredExternalTools -array ffmpeg cwebp libreoffice pandoc` ("ffmpeg"
+    /// covers ffprobe too). `defaults delete` the key to undo.
     static var ignoredTools: Set<String> {
         let names = UserDefaults.standard.stringArray(forKey: "IgnoredExternalTools") ?? []
         return Set(names.map { $0.lowercased() })
@@ -84,6 +97,8 @@ struct ExternalTools: Equatable, Sendable {
 struct ToolLocations: Sendable {
     var commandDirectories: [URL]
     var libreOfficeApps: [URL]
+    /// Where MacTeX and BasicTeX put LaTeX, for Pandoc's PDFs.
+    var texDirectories: [URL] = [URL(fileURLWithPath: "/Library/TeX/texbin")]
     /// Where OpenShelf installs tools itself (see `ToolInstallation`).
     var ownCommandDirectories: [URL] = []
     var ownLibreOfficeApps: [URL] = []

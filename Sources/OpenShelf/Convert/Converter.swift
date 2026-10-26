@@ -58,7 +58,7 @@ enum Converter {
         case .pdf:
             return try PDFConversion.convert(source, to: format, imageQuality: settings.image.quality)
         case .document:
-            return [try await DocumentConversion.convert(source, to: format)]
+            return [try await DocumentConversion.convert(source, to: format, tools: tools)]
         case .spreadsheet:
             return try await SpreadsheetConversion.convert(source, to: format, tools: tools)
         case .presentation:

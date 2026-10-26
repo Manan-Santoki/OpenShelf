@@ -61,39 +61,6 @@ enum DocumentStructure {
         paragraphs(in: string).map { .paragraph([TextRun(text: $0)]) }
     }
 
-    /// Blocks from Markdown: ATX headings, bullet and numbered lists, and
-    /// paragraphs, with bold, italic and links inside them.
-    static func blocks(fromMarkdown string: String) -> [TextBlock] {
-        var blocks: [TextBlock] = []
-        var paragraph: [String] = []
-
-        func flush() {
-            guard !paragraph.isEmpty else { return }
-            blocks.append(.paragraph(inlineRuns(paragraph.joined(separator: " "))))
-            paragraph.removeAll()
-        }
-
-        for line in string.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n") {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.isEmpty {
-                flush()
-            } else if let match = trimmed.firstMatch(of: /^(#{1,6})\s+(.*?)\s*#*$/) {
-                flush()
-                blocks.append(.heading(level: match.1.count, runs: inlineRuns(String(match.2))))
-            } else if let match = trimmed.firstMatch(of: /^[-*+]\s+(.*)$/) {
-                flush()
-                blocks.append(.listItem(ordered: false, runs: inlineRuns(String(match.1))))
-            } else if let match = trimmed.firstMatch(of: /^\d+[.)]\s+(.*)$/) {
-                flush()
-                blocks.append(.listItem(ordered: true, runs: inlineRuns(String(match.1))))
-            } else {
-                paragraph.append(trimmed)
-            }
-        }
-        flush()
-        return blocks
-    }
-
     /// Splits text into paragraphs at blank lines.
     static func paragraphs(in string: String) -> [String] {
         string.replacingOccurrences(of: "\r\n", with: "\n")
@@ -193,23 +160,6 @@ enum DocumentStructure {
             result.append(character)
         }
         return result
-    }
-
-    /// Inline Markdown (bold, italic, links) as runs.
-    private static func inlineRuns(_ text: String) -> [TextRun] {
-        let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-        guard let parsed = try? AttributedString(markdown: text, options: options) else {
-            return [TextRun(text: text)]
-        }
-        return parsed.runs.map { run in
-            let intent = run.inlinePresentationIntent ?? []
-            return TextRun(
-                text: String(parsed[run.range].characters),
-                bold: intent.contains(.stronglyEmphasized),
-                italic: intent.contains(.emphasized),
-                link: run.link?.absoluteString
-            )
-        }
     }
 
     // MARK: Rich-text helpers

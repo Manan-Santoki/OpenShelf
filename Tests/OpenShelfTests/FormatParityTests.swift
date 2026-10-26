@@ -83,8 +83,9 @@ struct MarkdownTests {
     }
 
     @Test func markdownSourceBecomesXHTML() {
-        let html = DocumentStructure.xhtml(DocumentStructure.blocks(fromMarkdown: "# Hi & bye\n\nSome **bold** text.\n\n- one\n- two\n"))
-        #expect(html.contains("<h1>Hi &amp; bye</h1>"))
+        var renderer = MarkdownHTML()
+        let html = renderer.body(MarkdownDocument(parsing: "# Hi & bye\n\nSome **bold** text.\n\n- one\n- two\n"))
+        #expect(html.contains("<h1 id=\"hi--bye\">Hi &amp; bye</h1>"))
         #expect(html.contains("<strong>bold</strong>"))
         #expect(html.contains("<ul>\n<li>one</li>\n<li>two</li>\n</ul>"))
     }

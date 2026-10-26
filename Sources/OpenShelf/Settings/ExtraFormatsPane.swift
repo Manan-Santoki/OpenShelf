@@ -2,7 +2,8 @@ import AppKit
 import SwiftUI
 
 /// Settings → Extra Formats: ffmpeg and LibreOffice, whether they're on this
-/// Mac and where from, and installing or removing them.
+/// Mac and where from, and installing or removing them; and Pandoc, which
+/// OpenShelf uses for documents when it finds it.
 struct ExtraFormatsPane: View {
     let installer: ToolInstaller
 
@@ -16,6 +17,9 @@ struct ExtraFormatsPane: View {
                 Text("Free software, downloaded only when you click Install: ffmpeg (LGPL/GPL) from [ffmpeg.martin-riedl.de](https://ffmpeg.martin-riedl.de), LibreOffice (MPL) from [libreoffice.org](https://www.libreoffice.org). When the ffmpeg server is down, the same signed build comes from OpenShelf’s mirror on GitHub.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+            Section("Documents") {
+                PandocRow(tools: ExternalTools.current)
             }
         }
         .settingsPane()
@@ -89,6 +93,47 @@ private struct ExtraToolRow: View {
             }
         case .failed:
             FailureControls(tool: tool, offers: installer.offers(for: tool), installer: installer)
+        }
+    }
+}
+
+/// Pandoc, found rather than installed: OpenShelf's own Markdown and Word
+/// conversions need nothing, and Pandoc's are there for people who want them.
+private struct PandocRow: View {
+    let tools: ExternalTools
+
+    var body: some View {
+        LabeledContent {
+            if let pandoc = tools.pandoc {
+                Label("Installed", systemImage: "checkmark.circle.fill")
+                    .labelStyle(GreenCheckLabelStyle())
+                    .help("Pandoc at \(pandoc.path)")
+            } else {
+                Link("Get Pandoc", destination: URL(string: "https://pandoc.org/installing.html")!)
+                    .help("Or in Terminal: brew install pandoc")
+            }
+        } label: {
+            Text("Pandoc")
+            Text(detail)
+        }
+    }
+
+    private var detail: String {
+        guard tools.pandoc != nil else {
+            return "Optional: converts Markdown and Word documents the way Pandoc does. OpenShelf finds it once it’s installed."
+        }
+        guard let engine = tools.pdfEngine else {
+            return "Converts Markdown and Word documents. PDFs keep OpenShelf’s own layout until a typesetter such as MacTeX, Tectonic or Typst is installed."
+        }
+        return "Converts Markdown and Word documents, with PDFs typeset by \(engine.lastPathComponent)."
+    }
+}
+
+private struct GreenCheckLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 4) {
+            configuration.icon.foregroundStyle(.green)
+            configuration.title
         }
     }
 }

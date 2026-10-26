@@ -162,15 +162,39 @@ enum PDFConversion {
 /// otherwise freeze the app). Only HTML import and printing rich documents to
 /// PDF need AppKit on the main thread.
 enum DocumentConversion {
-    static func convert(_ source: URL, to format: OutputFormat) async throws -> URL {
+    /// Pandoc or LibreOffice do the conversion when they're installed and do
+    /// it better (see `DocumentEngine`); if they fail, the built-in way runs.
+    static func convert(_ source: URL, to format: OutputFormat, tools: ExternalTools = ExternalTools()) async throws -> URL {
+        do {
+            switch DocumentEngine.choose(for: source, to: format, tools: tools) {
+            case .pandoc:
+                return try await PandocConversion.convert(source, to: format, tools: tools)
+            case .libreOffice:
+                if let converted = try await OfficeConversion.convert(source, to: format, tools: tools).first { return converted }
+            case .builtIn:
+                break
+            }
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            // Fall through to the built-in conversion.
+        }
+        return try await convertBuiltIn(source, to: format)
+    }
+
+    static func convertBuiltIn(_ source: URL, to format: OutputFormat) async throws -> URL {
         guard let pathExtension = format.fileExtension else {
             throw ConversionError.unsupported("document to \(format.title)")
         }
         let destination = OutputNaming.destination(for: source, pathExtension: pathExtension)
 
+        if MarkdownConversion.isMarkdown(source), format != .md {
+            try await MarkdownConversion.convert(source, to: format, destination: destination)
+            return destination
+        }
+
         if isPlainText(source) {
             let string = try readPlainText(source)
-            let isMarkdown = ["md", "markdown"].contains(source.pathExtension.lowercased())
             switch format {
             case .pdf:
                 try PlainTextPDF.write(string, to: destination)
@@ -178,8 +202,7 @@ enum DocumentConversion {
                 // Plain text is already valid Markdown.
                 try string.write(to: destination, atomically: true, encoding: .utf8)
             case .epub:
-                let blocks = isMarkdown ? DocumentStructure.blocks(fromMarkdown: string) : DocumentStructure.blocks(fromPlainText: string)
-                try writeEpub(blocks, source: source, to: destination)
+                try writeEpub(DocumentStructure.blocks(fromPlainText: string), source: source, to: destination)
             default:
                 try write(NSAttributedString(string: string, attributes: [.font: bodyFont]), as: format, source: source, to: destination)
             }
@@ -253,10 +276,13 @@ enum DocumentConversion {
         NSFont(name: "HelveticaNeue", size: 12) ?? .userFont(ofSize: 12) ?? .systemFont(ofSize: 12)
     }
 
+    /// The width text is laid out in on a US Letter page with 0.75 in margins.
+    static let printableWidth: CGFloat = 612 - 54 * 2
+
     /// Lays rich text out on US Letter pages and prints it to a PDF file. AppKit
     /// printing keeps tables and images that Core Text would drop.
     @MainActor
-    private static func printPDF(_ text: NSAttributedString, to url: URL) throws {
+    static func printPDF(_ text: NSAttributedString, to url: URL) throws {
         let printInfo = NSPrintInfo()
         printInfo.paperSize = NSSize(width: 612, height: 792)
         printInfo.topMargin = 54
@@ -270,7 +296,9 @@ enum DocumentConversion {
         printInfo.dictionary()[NSPrintInfo.AttributeKey.jobSavingURL] = url
 
         let width = printInfo.paperSize.width - printInfo.leftMargin - printInfo.rightMargin
-        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: width, height: 10))
+        // TextKit 1: TextKit 2 lays out neither tables nor boxed text blocks.
+        let textView = NSTextView(usingTextLayoutManager: false)
+        textView.frame = NSRect(x: 0, y: 0, width: width, height: 10)
         textView.isVerticallyResizable = true
         textView.textContainer?.widthTracksTextView = true
         textView.textStorage?.setAttributedString(text)
