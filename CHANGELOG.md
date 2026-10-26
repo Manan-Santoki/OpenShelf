@@ -6,6 +6,32 @@ tags `v<version>` and publishes a GitHub release with that section as notes.
 
 Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
 
+## [1.6.0] - 2026-10-25
+
+Markdown that converts properly, and Pandoc when you have it.
+
+### New
+
+- **Pandoc, when it's installed.** With [Pandoc](https://pandoc.org)
+  (`brew install pandoc`), Markdown becomes Word, HTML, EPUB and RTF through it,
+  and Word, ODT and HTML documents become Markdown and EPUB. PDFs go through
+  Pandoc too when a typesetter such as MacTeX, Tectonic or Typst is installed.
+  Settings → Extra Formats shows whether it was found. If Pandoc fails, the
+  built-in conversion runs instead.
+
+### Fixed and improved
+
+- **Markdown converts properly.** Markdown to PDF, Word, HTML, RTF and plain
+  text used to come out as the Markdown source itself, asterisks and all
+  ([#5](https://github.com/Manan-Santoki/OpenShelf/issues/5)). Headings,
+  emphasis, lists, quotes, code blocks, tables, links, pictures, footnotes and
+  math are now the real thing in every format, and Word files use Word's own
+  heading styles, numbered lists and footnotes. Pandoc's definition lists,
+  simple and multi-line tables, line blocks, math and smart quotes are read
+  too. Thanks to [@wada3n](https://github.com/wada3n) for the report and the
+  comparison files.
+- **Word documents to PDF keep their layout** when LibreOffice is installed.
+
 ## [1.5.0] - 2026-10-24
 
 Read scanned documents, work directly from shelves, and choose wheel actions faster.
