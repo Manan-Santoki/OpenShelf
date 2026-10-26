@@ -29,7 +29,7 @@ struct OpenShelfApp: App {
             }
             Divider()
             openWheelButton
-            Button("How to Use OpenShelf") { WelcomeView.present() }
+            Button("Take the Tour…") { TourWindowController.present() }
             Button("Settings…") { SettingsWindowController.shared.show() }
                 .keyboardShortcut(",")
             Button("Check for Updates…") { Updater.shared.checkForUpdates() }

@@ -2,7 +2,7 @@ import Carbon.HIToolbox
 import ServiceManagement
 import SwiftUI
 
-/// Settings → General: opening at login, and the welcome guide.
+/// Settings → General: opening at login, and the guided tour.
 struct GeneralSettingsPane: View {
     @State private var opensAtLogin = SMAppService.mainApp.status == .enabled
 
@@ -15,11 +15,14 @@ struct GeneralSettingsPane: View {
                     }
             }
             Section {
-                LabeledContent("How to use OpenShelf") {
-                    Button("Show Guide") { WelcomeView.present() }
+                LabeledContent("Learn OpenShelf") {
+                    HStack {
+                        Button("Start Over") { TourWindowController.present(startingOver: true) }
+                        Button("Take the Tour") { TourWindowController.present() }
+                    }
                 }
             } footer: {
-                Text("The drag gestures and the keyboard shortcut, as shown the first time OpenShelf opened.")
+                Text("A hands-on tour with practice files: converting, the Tools wheel, PDFs, video, shelves and the keyboard shortcut. Pick up where you left off, or start over.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

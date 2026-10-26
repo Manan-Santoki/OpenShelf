@@ -45,7 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if Preferences.shared.restoresShelves {
             shelves.restoreSavedShelves()
         }
-        WelcomeView.presentIfNeeded()
+        TourWindowController.presentIfNeeded()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -65,7 +65,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         let location = NSEvent.mouseLocation
-        if !wheel.presentForKeyboard(urls: urls, at: location) {
+        if wheel.presentForKeyboard(urls: urls, at: location) {
+            TourProgress.shared.record(.keyboardWheelOpened(urls))
+        } else {
             ToastController.shared.show(Toast(systemImage: "nosign", title: "Nothing to do with these files"), near: location)
         }
     }
@@ -77,7 +79,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             try FinderSelection.fetchFromFinder()
         }
         if case .files(let urls) = outcome {
-            if !wheel.presentForKeyboard(urls: urls, at: location) {
+            if wheel.presentForKeyboard(urls: urls, at: location) {
+                TourProgress.shared.record(.keyboardWheelOpened(urls))
+            } else {
                 ToastController.shared.show(Toast(systemImage: "nosign", title: "Nothing to do with these files"), near: location)
             }
             return
@@ -120,6 +124,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         wheel.present(items, at: location)
+        TourProgress.shared.record(.wheelOpened(kind, urls))
         if kind == .convert, !hasShownMoreFormatsHint,
            let hint = MissingToolAdvice.moreFormatsHint(for: urls, tools: tools) {
             // Once per launch: OpenShelf stays open for days, so this is an
@@ -145,6 +150,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Runs a wedge. With ⌥ held, a format with output settings opens them
     /// for this conversion first (see `ConvertOptionsView`).
     private func perform(_ command: WheelCommand, on urls: [URL], modifiers: NSEvent.ModifierFlags) {
+        TourProgress.shared.record(.ran(command, urls, option: modifiers.contains(.option)))
         switch command {
         case .action(let action):
             perform(action, on: urls)
