@@ -6,6 +6,25 @@ tags `v<version>` and publishes a GitHub release with that section as notes.
 
 Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
 
+## [1.7.0] - 2026-10-25
+
+A hands-on tour, and Pandoc in one click.
+
+### New
+
+- **A hands-on tour.** The first time OpenShelf opens, a guided tour teaches
+  it by doing: practice files are made for you (a photo, Markdown notes, a PDF,
+  a video and a letter), and each step shows the keys to press and waits until
+  you've done it for real, from converting a photo and typesetting Markdown to
+  trimming a video, using shelves and opening a wheel without dragging. Skip any
+  step, or the whole tour; take it again or start over from the menu bar or
+  Settings → General. It replaces the welcome window, and opens once after
+  this update too, so you can try it (or choose Not Now).
+- **Install Pandoc from Settings.** Settings → Extra Formats installs Pandoc
+  in one click, like ffmpeg and LibreOffice: the official build from GitHub,
+  checked against GitHub's checksum and Pandoc's code signature, installed
+  for you alone with no administrator password. Remove it there too.
+
 ## [1.6.0] - 2026-10-25
 
 Markdown that converts properly, and Pandoc when you have it.

@@ -111,8 +111,10 @@ containers with ffprobe).
 ‡ Needs LibreOffice (`brew install --cask libreoffice`), run headless with a
 private profile and a 120-second limit; hidden when not installed.
 
-§ Pandoc is used when found (Homebrew, MacPorts or PATH; never installed by
-OpenShelf), with a 180-second limit. Its PDFs need a typesetter, found in the
+§ Pandoc is used when found (Homebrew, MacPorts, PATH, or OpenShelf's own copy
+from Settings → Extra Formats: the newest GitHub release's zip for this Mac,
+checked against the SHA-256 digest GitHub lists and the Developer ID of team
+5U2WKE6DES), with a 180-second limit. Its PDFs need a typesetter, found in the
 same places and `/Library/TeX/texbin`: XeLaTeX, LuaLaTeX, Tectonic, Typst,
 pdfLaTeX, WeasyPrint or wkhtmltopdf, in that order. If Pandoc or LibreOffice
 fails, the built-in conversion runs instead.
@@ -274,14 +276,15 @@ never copies or modifies them by itself).
 
 ## 4. Menu-bar item
 
-New Shelf · Close All Shelves · Settings… · Quit.
+New Shelf · Show Shelves · Close All Shelves · Open Wheel for Selection ·
+Take the Tour… · Settings… · Check for Updates… · Quit.
 
 ## 5. Settings
 
 Toolbar tabs, like System apps; the window keeps its width, takes each tab's
 height (scrolling when the screen is shorter) and opens on the tab used last.
 
-- General: open at login; show the welcome guide.
+- General: open at login; take the tour, or start it over (§6).
 - Wheels: trigger keys per wheel (any combination of ⌃ ⌥ ⇧ ⌘, at least one),
   and the shortcut for Finder's selection.
 - Shelves: remove files from a shelf after dragging them out (default off);
@@ -291,14 +294,39 @@ height (scrolling when the screen is shorter) and opens on the tab used last.
   bitrate; image quality and metadata; GIF width and frame rate (§2.3.1), all
   Automatic by default, with Reset to Automatic. Stored as one JSON value;
   anything unreadable falls back to Automatic, setting by setting.
-- Extra Formats: install or remove ffmpeg and LibreOffice. ffmpeg comes from
+- Extra Formats: install or remove ffmpeg, LibreOffice and Pandoc. ffmpeg comes from
   its build server, then OpenShelf's GitHub mirror of the same signed zips;
+  Pandoc from its GitHub releases;
   when every download source is down, Install with Homebrew is offered if
   Homebrew is installed. A failed checksum or signature never falls through
   to another source.
 - Updates: automatic checks and installs.
 
-## 6. Roadmap
+## 6. Guided tour
+
+Opens by itself once, on first launch, and on the first launch after updating
+for people who saw the earlier welcome guide (titled "New: Learn OpenShelf
+Hands-On" for them); after that from the menu bar and Settings → General. A window with the steps listed on the left and the current one on
+the right: Welcome, then eight practice steps (Convert a photo, Markdown to
+PDF, Edit with Tools, Work with PDFs, Trim a video, Keep files on a shelf, No
+drag needed, Choose the settings), then You're set.
+
+- **Practice files** are drawn and encoded at runtime (the app carries no
+  samples) into `~/Library/Application Support/OpenShelf/Practice`: a JPEG
+  landscape, Markdown notes with a table, a three-page PDF, a four-second
+  H.264 clip and a plain-text letter. Results are saved beside them, as
+  anywhere else, and listed under the step ("Made so far"). The last page
+  moves the folder to the Trash on request.
+- **Each step** names the file, shows the wheel's keys as set in Settings
+  (as keycaps), and the wedge to drop on. The practice file is a real file
+  drag source, so the wheels open exactly as they do from Finder.
+- **Progress** comes from the app itself while the tour is open: a wheel
+  opening for the step's wheel marks it under way ("The Convert wheel is
+  open. Now drop on PNG."); running the right kind of wedge on the right kind
+  of file completes it. Any file of the right kind counts. Done steps are
+  remembered across launches; Skip for Now moves on without them.
+
+## 7. Roadmap
 
 1. ~~Convert wheel~~ (done, §2.3) — wedges chosen by input type (e.g. PDF → DOCX/JPG/PNG/TXT;
    image → PNG/WEBP/HEIC/TIFF/AVIF/BMP/PDF/DOCX). Output is saved beside the

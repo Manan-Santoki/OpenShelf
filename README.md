@@ -27,7 +27,8 @@ the file on a wedge and it's done, saved right next to the original.
 - **Updates itself:** new versions install from the app (Sparkle), signed so
   only genuine OpenShelf releases are accepted
 - **Extra formats, one click away:** ffmpeg adds MP3, OGG, WebP, MKV, WebM,
-  AVI and WMV; LibreOffice adds PowerPoint, XLS and ODS. Install either from
+  AVI and WMV; LibreOffice adds PowerPoint, XLS and ODS; Pandoc converts
+  Markdown and Word documents its own way. Install any of them from
   Settings → Extra Formats (no Homebrew or administrator needed), or use the
   copies you already have from Homebrew
 
@@ -39,7 +40,7 @@ See [docs/SPEC.md](docs/SPEC.md) for the full behaviour and roadmap.
    [latest release](https://github.com/Manan-Santoki/OpenShelf/releases/latest).
 2. Open it and drag **OpenShelf** onto the **Applications** folder.
 3. Open OpenShelf from Applications. It lives in the menu bar (the wheel icon),
-   and a short welcome guide appears the first time.
+   and a hands-on tour opens the first time (see below).
 
 **"Apple could not verify OpenShelf…"** The app isn't notarized by Apple yet,
 so macOS asks once on first launch:
@@ -54,6 +55,16 @@ Requires macOS 14 Sonoma or later, on Apple silicon or Intel. A `.zip` of the
 app is also attached to each release.
 
 ## How to use
+
+**Take the tour.** The first time OpenShelf opens, a guided tour walks you
+through everything with practice files it makes for you: a photo, Markdown
+notes, a PDF, a video and a letter. Each step shows the keys to press and
+waits until you've done it for real: convert a photo, turn Markdown into a
+PDF, crop with the Tools wheel, split a PDF, trim a video, put files on a
+shelf, open a wheel without dragging, and choose a conversion's settings.
+Skip any step or the whole tour; pick it up again from the menu bar (**Take
+the Tour…**) or Settings → General, where **Start Over** begins afresh. Your
+own files are never touched, and the practice folder can be removed at the end.
 
 Everything starts with a drag. Press on a file in Finder, on the Desktop, or in
 any app that lets you drag files, and **keep holding** while you tap a key.
@@ -146,14 +157,17 @@ tables, line blocks, `$math$`, smart quotes and dashes, and a YAML `title`.
 Word files get Word's own heading styles, numbered lists and footnotes.
 Pictures on the web are never downloaded; they're shown by their description.
 
-If [Pandoc](https://pandoc.org) is installed (`brew install pandoc`),
-OpenShelf uses it instead for Markdown to Word, HTML, EPUB and RTF, and for
+If [Pandoc](https://pandoc.org) is installed, OpenShelf uses it instead for
+Markdown to Word, HTML, EPUB and RTF, and for
 Word, ODT and HTML to Markdown and EPUB. Pandoc's PDFs also need a typesetter
 such as MacTeX, Tectonic or Typst; without one, PDFs keep OpenShelf's own
 layout. With LibreOffice installed, Word and ODT documents become PDFs through
 it, keeping their page layout. Should either fail, the built-in conversion
 runs instead. Pandoc downloads pictures a document links to on the web.
-Settings → Extra Formats shows whether Pandoc was found.
+Install Pandoc from **Settings → Extra Formats** like ffmpeg and LibreOffice:
+OpenShelf downloads its official build from GitHub, checks the checksum GitHub
+lists and John MacFarlane's code signature, and installs it for you alone.
+Homebrew's copy (`brew install pandoc`) is used too.
 
 #### Output settings
 
@@ -259,15 +273,15 @@ from the menu bar, or turn automatic checks and installs on or off in Settings.
 Click the OpenShelf wheel in the menu bar → **Settings…** (⌘,). It opens on the
 tab you used last:
 
-- **General:** open OpenShelf at login, and show the welcome guide again (also
-  in the menu as **How to Use OpenShelf**)
+- **General:** open OpenShelf at login, and take the tour again or start it
+  over (also in the menu as **Take the Tour…**)
 - **Wheels:** the keys that open each wheel while dragging, and the shortcut
   for Finder or shelf selections
 - **Shelves:** remove files from a shelf after dragging them out, restore
   shelves at launch, hide docked shelves at the screen edge
 - **Output:** how conversions encode video, audio, images and GIFs (see
   [Output settings](#output-settings))
-- **Extra Formats:** install or remove ffmpeg and LibreOffice
+- **Extra Formats:** install or remove ffmpeg, LibreOffice and Pandoc
 - **Updates:** automatic checks and installs, and Check Now
 
 ffmpeg and ffprobe that OpenShelf installs live in
