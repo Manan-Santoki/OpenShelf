@@ -3,9 +3,13 @@
 # OpenShelf
 
 <p align="center">
-  <a href="https://github.com/Manan-Santoki/OpenShelf/releases">
-    <img src="https://img.shields.io/github/downloads/Manan-Santoki/OpenShelf/total?label=downloads" alt="Downloads">
-  </a>
+  <a href="https://github.com/Manan-Santoki/OpenShelf/releases/latest"><img src="https://img.shields.io/github/v/release/Manan-Santoki/OpenShelf?label=release" alt="Latest release"></a>
+  <a href="https://github.com/Manan-Santoki/OpenShelf/releases"><img src="https://img.shields.io/github/downloads/Manan-Santoki/OpenShelf/total?label=downloads" alt="Downloads"></a>
+  <img src="https://img.shields.io/badge/macOS-14%2B-black?logo=apple" alt="macOS 14+">
+  <img src="https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white" alt="Swift 6">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/Manan-Santoki/OpenShelf" alt="MIT License"></a>
+  <a href="https://github.com/Manan-Santoki/OpenShelf/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Manan-Santoki/OpenShelf/ci.yml?branch=main&label=build" alt="Build status"></a>
+  <a href="https://github.com/Manan-Santoki/OpenShelf/stargazers"><img src="https://img.shields.io/github/stars/Manan-Santoki/OpenShelf" alt="GitHub stars"></a>
 </p>
 
 An open-source macOS menu-bar utility for working with files mid-drag.
