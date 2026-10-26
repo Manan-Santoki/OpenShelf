@@ -1,9 +1,17 @@
 name: CI
 
+# Docs, the website and the license don't affect the app, so changes to only
+# those skip the build.
 on:
   push:
     branches: [main]
+    paths-ignore: &docs
+      - '**.md'
+      - 'docs/**'
+      - 'website/**'
+      - 'LICENSE'
   pull_request:
+    paths-ignore: *docs
 
 jobs:
   build-and-test:
