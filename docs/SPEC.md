@@ -99,11 +99,14 @@ the pointer shows "Converting to JPG · 1 of 3 saved" with a cancel button.
 |---|---|---|
 | Image (incl. SVG) | PNG, JPG, WEBP†, HEIC, TIFF, AVIF, BMP, PDF, DOCX, ZIP | ImageIO, PDF context, hand-built DOCX |
 | PDF | DOCX, JPG, PNG, TXT, MD, EPUB, PPTX, XLSX, ZIP | PDFKit (pages at 300 dpi; scanned PDFs become image DOCX/EPUB/PPTX; TXT/MD/XLSX refuse scans); hand-built EPUB 3, PresentationML (one picture per slide) and SpreadsheetML (one sheet per page, cells split at tabs/wide gaps) |
-| Text / RTF / RTFD / DOCX / DOC / ODT / HTML | PDF, DOCX, TXT, MD, EPUB, HTML, RTF, ZIP | NSAttributedString, AppKit printing, Core Text; Markdown and EPUB from detected headings, lists, bold/italic and links. DOCX/DOC/ODT/RTF → PDF through LibreOffice‡ when installed; DOCX/ODT/HTML → MD and EPUB through Pandoc§ |
+| Text / RTF / RTFD / DOCX / DOC / ODT / HTML | PDF, DOCX, TXT, MD, EPUB, HTML, RTF, PAGES¶, ZIP | NSAttributedString, AppKit printing, Core Text; Markdown and EPUB from detected headings, lists, bold/italic and links. DOCX/DOC/ODT/RTF → PDF through LibreOffice‡ when installed; DOCX/ODT/HTML → MD and EPUB through Pandoc§ |
 | Markdown | PDF, DOCX, TXT, EPUB, HTML, RTF, ZIP | Built-in parser (CommonMark, GitHub tables/task lists/strikethrough, Pandoc footnotes, definition lists, simple and multi-line tables, line blocks, math, smart punctuation, YAML title) rendered to AppKit rich text (PDF, RTF), hand-built WordprocessingML with Word styles, numbering, tables, footnotes and pictures (DOCX), XHTML (HTML, EPUB) and plain text (TXT). Pandoc§ for DOCX/HTML/EPUB/RTF, and PDF when it has a typesetter |
-| CSV / TSV / XLSX | XLSX, CSV, TSV, PDF, ODS‡, ZIP | Built-in RFC 4180 parser, SpreadsheetML writer/reader, Core Text table PDF (landscape, repeated header) |
-| XLS / ODS | XLSX, CSV, PDF, ODS‡, ZIP | LibreOffice‡ |
-| PPTX / PPT / ODP | PDF‡, JPG‡, PNG‡, ZIP | LibreOffice‡ → PDF → page images ("Name Slide 2.jpg") |
+| CSV / TSV / XLSX | XLSX, CSV, TSV, PDF, ODS‡, NUMBERS¶, ZIP | Built-in RFC 4180 parser, SpreadsheetML writer/reader, Core Text table PDF (landscape, repeated header) |
+| XLS / ODS | XLSX, CSV, PDF, ODS‡, NUMBERS¶ (XLS), ZIP | LibreOffice‡ |
+| PPTX / PPT / ODP | PDF‡, JPG‡, PNG‡, KEY¶ (PPTX, PPT), ZIP | LibreOffice‡ → PDF → page images ("Name Slide 2.jpg") |
+| Pages | PDF, DOCX‡, RTF‡, TXT‡, JPG, PNG, ZIP | LibreOffice‡ (libetonyek), → PDF → page images; without it, the Quick Look preview inside the package (see below) |
+| Numbers | PDF, XLSX‡, CSV‡, ODS‡, JPG, PNG, ZIP | as Pages |
+| Keynote | PDF, PPTX‡, JPG, PNG, ZIP | as Pages; images are "Name Slide 2.jpg" |
 | Audio | MP3†, M4A, WAV, AIFF, FLAC, OGG†, OPUS†, WMA†, ZIP | AVFoundation, afconvert; ffmpeg† for MP3/OGG/Opus/WMA and for sources macOS can't decode (OGG, Opus, WMA, MKA, APE, AC3) |
 | Video | MP4, MOV, M4A, GIF†, MP3†, MKV†, WEBM†, AVI†, WMV†, ZIP | AVFoundation; ffmpeg† (H.264/AAC, VP9/Opus, MPEG-4/MP3, WMV2/WMA2; MKV copies streams when it can) and for sources macOS can't open (MKV, WebM, AVI, WMV, FLV, MPEG, …) |
 | SRT / VTT | TXT, SRT, VTT, ZIP | built in |
@@ -125,7 +128,29 @@ same places and `/Library/TeX/texbin`: XeLaTeX, LuaLaTeX, Tectonic, Typst,
 pdfLaTeX, WeasyPrint or wkhtmltopdf, in that order. If Pandoc or LibreOffice
 fails, the built-in conversion runs instead.
 
-Not offered: Apple Pages (private format) and Keynote (no converter can read it).
+Pages, Numbers and Keynote files (`IWorkConversion`) are zip files, or folder
+packages in older and synced copies; `FileKind` classifies both by extension
+as document, spreadsheet and presentation. With LibreOffice they convert
+through it, falling back to the preview if it fails. Without it, the preview
+saved inside for Quick Look is used: `QuickLook/Preview.pdf` (iWork '09: every
+page) gives PDF, JPG and PNG; `preview.jpg` (current versions) or
+`QuickLook/Thumbnail.jpg` gives JPG and PNG of the first page. Zip entries are
+found by reading the central directory (`ZipDirectory`), so the wheel never
+unpacks anything; the preview is extracted with `unzip -p` when converting.
+With no preview and no LibreOffice the wheel is ZIP-only, so the "Keynote
+needs LibreOffice" toast shows instead, and a conversion that still runs says
+to install it in Settings → Extra Formats.
+
+¶ PAGES, NUMBERS and KEY (`IWorkExport`) are offered only when Pages, Numbers
+or Keynote is in /Applications or ~/Applications (checked by bundle identifier,
+`com.apple.iWork.Pages` etc.), for files that app opens: DOCX, DOC, RTF, RTFD
+and TXT for Pages; XLSX, XLS, CSV and TSV for Numbers (on spreadsheet wheels);
+PPTX and PPT for Keynote (on slide wheels, even without LibreOffice). The app
+does the work over Apple Events: `osascript` opens the file, `save … in` writes
+the new document next to the original, then it's closed and the app quit if
+it wasn't already running (300-second limit). Paths are passed as script
+arguments, never spliced into the script. Denied Automation access (-1743)
+says to allow it in Privacy & Security → Automation.
 Wheels hold at most 12 wedges (the largest, images, has 10).
 
 #### 2.3.1 Output settings
