@@ -333,9 +333,9 @@ code { font: 13.5px var(--mono); background: var(--panel-2); border: 1px solid v
 .install-get .sub a:hover { color: var(--ink); }
 details.firstrun { margin-top: 30px; border: 1px solid var(--line); border-radius: var(--r-md); background: #0f0f12; }
 details.firstrun summary { padding: 14px 16px; }
-details.firstrun .body { padding: 0 16px 18px 46px; color: var(--muted); font-size: 15px; display: grid; gap: 10px; }
+details.firstrun .body { padding: 0 16px 18px 46px; color: var(--muted); font-size: 15px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 details.firstrun .body b { color: var(--ink); font-weight: 600; }
-details.firstrun ul { margin: 0; padding-left: 18px; display: grid; gap: 8px; }
+details.firstrun ul { margin: 0; padding-left: 18px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 details.firstrun li { line-height: 1.55; }
 details.firstrun code { display: block; margin-top: 6px; overflow-x: auto; white-space: nowrap; font: 13px var(--mono); color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
 
@@ -398,6 +398,8 @@ footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
   .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .span-4, .span-6 { grid-column: span 2; }
   .span-2, .span-3 { grid-column: span 1; }
+  .tile.fill-row { grid-column: span 2; }
+  .tile.fill-row .mock { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .formats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .faq { grid-template-columns: minmax(0, 1fr); gap: 32px; }
 }
@@ -423,6 +425,8 @@ footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
   .wkey { padding: 0 10px 0 6px; gap: 6px; font-size: 13px; }
   .bento { grid-template-columns: minmax(0, 1fr); }
   .span-4, .span-6, .span-2, .span-3 { grid-column: span 1; }
+  .tile.fill-row { grid-column: span 1; }
+  .tile.fill-row .mock { grid-template-columns: minmax(0, 1fr); }
   .tile { padding: 22px; }
   .editors { height: auto; padding: 18px 12px 0; gap: 8px; align-items: end; }
   .editors img:nth-child(2) { transform: none; }
@@ -760,7 +764,7 @@ footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
             <div class="mock-row">Largest size<span>1080p</span></div>
           </div>
         </article>
-        <article class="card tile span-2 reveal">
+        <article class="card tile span-2 fill-row reveal">
           <span class="tag">Extra formats</span>
           <h3>More formats in one click</h3>
           <p>Settings → Extra Formats installs ffmpeg, LibreOffice and Pandoc for you: official builds, signature-checked, no Homebrew or admin password.</p>
