@@ -32,8 +32,8 @@ enum ToolLauncher {
             }
 
         case .combinePDF:
-            runner.run(title: "Combining into PDF", jobs: [urls], near: location, sourceShelfID: sourceShelfID) { sources, _ in
-                [try await PDFTools.combine(sources)]
+            runner.run(title: "Combining into PDF", jobs: [urls], near: location, sourceShelfID: sourceShelfID) { sources, progress in
+                [try await PDFTools.combine(sources, progress: progress)]
             }
 
         case .mute:
