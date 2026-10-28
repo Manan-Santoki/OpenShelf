@@ -309,6 +309,34 @@ Options (the Desktop unless you changed it).
 - Nothing is watched until you add a folder. Switch a folder off, or click ⊖
   to stop watching it.
 
+### Shortcuts and Spotlight
+
+OpenShelf's engines are also actions in the Shortcuts app, so they can run
+without a drag: in a shortcut, from a Finder Quick Action, or in a folder
+automation that converts whatever lands in a folder. On macOS 26 and later
+the main ones appear in Spotlight too. Like the wheels, they run entirely on
+this Mac and save results next to the originals, never overwriting them.
+
+| Action | What it does |
+|---|---|
+| **Convert Files** | Converts files to any format the Convert wheel offers; files already in that format pass through, and ZIP, TAR and TAR.GZ put everything in one archive |
+| **Compress Images and PDFs** | Smaller copies, Light, Balanced or Strong; a file that can't get smaller passes through |
+| **Extract Text (OCR)** | Saves the text of images and scanned PDFs as a text file or a searchable PDF |
+| **Remove Background** | Cuts out the subject of each photo as a transparent PNG |
+| **Combine into PDF** | Combines PDFs and images, in order, into one PDF |
+| **Remove Audio from Videos** | Saves a silent copy of each video |
+| **Read QR Codes** | Returns the text of the codes in images |
+| **Add to Shelf** | Puts files on the shelf you used last, or a new one |
+
+Each action returns the files it wrote, so actions can be chained. Conversions
+use your Settings → Output choices. Files that don't come from a folder
+OpenShelf can write to are converted in a temporary folder and handed on;
+Add to Shelf keeps such files in
+`~/Library/Application Support/OpenShelf/From Shortcuts`.
+
+The actions need a build made with Xcode installed (the release builds are);
+see [Build & run](#build--run).
+
 ### Updates
 
 OpenShelf checks GitHub for new versions once a day (it asks the first time).
@@ -370,6 +398,11 @@ make release  # universal build, zipped for a GitHub release
 make dmg      # drag-to-Applications installer (after make release; needs create-dmg)
 ```
 
+`make app` and `make release` also add the App Intents metadata that makes the
+Shortcuts actions appear, using `appintentsmetadataprocessor` from Xcode. With
+only the Command Line Tools it prints a warning and builds the app without
+them; everything else works. `SKIP_APPINTENTS=1 make app` skips the step.
+
 You can also open `Package.swift` in Xcode.
 
 ## Project layout
@@ -387,6 +420,7 @@ Sources/OpenShelf/
   Tools/Media/    video and audio tools (trim, speed, crop, rotate, split, merge, compress, mute)
   Shelf/          shelf model, floating panel, docking, layout
   Shelf/Views/    SwiftUI shelf UI and the AppKit drag source
+  Intents/        Shortcuts and Spotlight actions (App Intents)
   Support/        file actions, Quick Look
   Settings/       settings window
   WatchedFolders/ folders watched for new files, and what to do with them

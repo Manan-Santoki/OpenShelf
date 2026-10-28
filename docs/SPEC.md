@@ -394,7 +394,41 @@ drag needed, Choose the settings), then You're set.
   of file completes it. Any file of the right kind counts. Done steps are
   remembered across launches; Skip for Now moves on without them.
 
-## 7. Roadmap
+## 7. Shortcuts and Spotlight
+
+App Intents (`Sources/OpenShelf/Intents`) expose the engines with no UI, run
+in the app's process (`openAppWhenRun` is false) and never go online.
+
+- **Actions:** Convert Files (files + format; every `OutputFormat`, as the
+  `IntentFormat` choice), Compress Images and PDFs (Light/Balanced/Strong:
+  the PDF tool's levels, image quality 85/70/45), Extract Text (text file or
+  searchable PDF), Remove Background, Combine into PDF, Remove Audio from
+  Videos, Read QR Codes (returns strings) and Add to Shelf (most recent shelf,
+  or a new one). File actions return the files written.
+- **Inputs:** each file must be a kind the matching Tools-wheel entry takes.
+  Convert accepts only formats `ConversionCatalog` offers for the file; a file
+  already in the target format is passed on unchanged, ZIP/TAR/TAR.GZ make one
+  archive of all the files. Compress passes on a file that wouldn't get
+  smaller. A failing file doesn't stop the rest, but the action then fails
+  naming it ("“a.png”: reason (and 2 more files failed)").
+- **Where results go:** next to each file, as on the wheels. Files with no
+  location on disk, or in a folder that can't be written to, are copied to a
+  temporary folder first; Add to Shelf copies such files to
+  `~/Library/Application Support/OpenShelf/From Shortcuts` instead, so the
+  shelf's references outlast the shortcut.
+- **App Shortcuts** (Spotlight on macOS 26+, Siri, the Shortcuts gallery):
+  Convert Files, Compress, Extract Text, Remove Background, Combine into PDF,
+  Add to Shelf.
+- **Build:** `make` runs `scripts/appintents-metadata.sh`, which compiles the
+  sources once more for their constant values (`-emit-const-values-path`) and
+  runs Xcode's `appintentsmetadataprocessor` to write
+  `Contents/Resources/Metadata.appintents`. The processor only handles apps
+  whose linker dependency info lists AppIntents.framework, so the app is
+  linked with `-framework AppIntents -Xlinker -dependency_info` and that file
+  is passed along. Without that tool it warns and the
+  app builds without the actions.
+
+## 8. Roadmap
 
 1. ~~Convert wheel~~ (done, §2.3) — wedges chosen by input type (e.g. PDF → DOCX/JPG/PNG/TXT;
    image → PNG/WEBP/HEIC/TIFF/AVIF/BMP/PDF/DOCX). Output is saved beside the
