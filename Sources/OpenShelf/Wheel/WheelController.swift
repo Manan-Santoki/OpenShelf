@@ -210,7 +210,7 @@ final class WheelController {
         pageTurnDwell.pageDidTurn(isOnPageTurn: isPointerOnSlot, at: ContinuousClock.now)
         dwellTask?.cancel()
         dwellTask = nil
-        model.dwellingSlot = nil
+        if model.dwellingSlot != nil { model.dwellingSlot = nil }
         model.showPage(page)
         updateDropTargets()
         NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
@@ -229,7 +229,10 @@ final class WheelController {
             cancelDwell(resettingState: false)
             return
         }
-        model.dwellingSlot = slot
+        // `@Observable` notifies observers on every assignment, even to an
+        // equal value, so this would otherwise re-render every petal on each
+        // of the dozens of hover readings a second while resting on the wedge.
+        if model.dwellingSlot != slot { model.dwellingSlot = slot }
         guard !wasPending else { return }
         // Pointer readings stop while it rests, so check back on a timer.
         dwellTask = Task { [weak self] in
@@ -245,7 +248,10 @@ final class WheelController {
         if resettingState { pageTurnDwell = PageTurnDwell() }
         dwellTask?.cancel()
         dwellTask = nil
-        model.dwellingSlot = nil
+        // Called on every hover reading where the pointer isn't on More or
+        // Back, i.e. most mouse moves over the wheel, so skip the write (and
+        // the observation notification it carries) once it's already nil.
+        if model.dwellingSlot != nil { model.dwellingSlot = nil }
     }
 
     /// Tells the drop view where the wedges are and which ones take files.
@@ -486,7 +492,12 @@ final class WheelController {
     /// Highlights the wedge at `slot`; an empty wedge or nil clears the highlight.
     private func setHighlight(_ slot: Int?) {
         let slot = slot.flatMap { model.slots[safe: $0]?.isEmpty == false ? $0 : nil }
-        if slot != model.highlightedSlot, slot != nil {
+        // Two different wedges can both resolve to the same highlight (e.g.
+        // two empty placeholders both map to nil), and `@Observable` notifies
+        // observers even on an equal assignment, so guard here rather than
+        // just on the raw wedge index the callers already compare against.
+        guard slot != model.highlightedSlot else { return }
+        if slot != nil {
             NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
         }
         model.highlightedSlot = slot
@@ -627,6 +638,11 @@ final class WheelDropView: NSView {
     var onPointerMoved: ((Int?) -> Void)?
     /// Called with the clicked wedge, or nil for a click outside the wedges.
     var onClick: ((Int?) -> Void)?
+    /// The dragged files, read once when the drag enters and reused for every
+    /// hover update, so a file drag moving over the wheel doesn't hit the
+    /// pasteboard on every mouse move (AppKit calls `draggingUpdated` on each
+    /// one, and the dragged files don't change while it's hovering).
+    private var hoveredFileURLs: [URL] = []
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -638,18 +654,20 @@ final class WheelDropView: NSView {
     }
 
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
-        draggingUpdated(sender)
+        hoveredFileURLs = isAbsorbingDrop ? [] : fileURLs(in: sender)
+        return draggingUpdated(sender)
     }
 
     override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
         guard !isAbsorbingDrop else { return .copy }
         let wedge = wedge(for: sender)
-        onHover?(wedge, fileURLs(in: sender))
+        onHover?(wedge, hoveredFileURLs)
         return wedge == nil ? [] : .copy
     }
 
     override func draggingExited(_ sender: (any NSDraggingInfo)?) {
         guard !isAbsorbingDrop else { return }
+        hoveredFileURLs = []
         onHover?(nil, [])
     }
 

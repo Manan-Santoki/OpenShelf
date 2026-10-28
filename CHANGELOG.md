@@ -6,7 +6,7 @@ tags `v<version>` and publishes a GitHub release with that section as notes.
 
 Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
 
-## Unreleased
+## [Unreleased]
 
 ### New
 
@@ -15,6 +15,29 @@ Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
   shortcut) and the result is added to that same shelf, so it's right there
   with the original. Files dragged in from Finder or another app behave as
   before. Turn it off in Settings → Shelves.
+
+### Fixed and improved
+
+- **Dragging with the wheel open is smooth again.** Two things on the wheel's
+  hover path were doing far more work than a mouse move needs:
+  - Once a wheel appeared mid-drag, moving the pointer over it re-read the
+    system drag pasteboard on every single mouse move instead of once when
+    the drag arrived. The dragged files are now read once and reused for the
+    rest of the hover, matching how shelves already read drops.
+  - Tracking the highlight and the More/Back dwell ring wrote to the wheel's
+    `@Observable` state on every hover reading even when the value hadn't
+    changed, which re-renders every petal regardless. Those writes now happen
+    only when the value actually changes.
+- **Converting to or from PDF shows real progress, and freezes the app
+  less.** The progress toast sat at 0% for the whole of a PDF's conversion,
+  then jumped to 100%: turning a PDF into images, Word, Markdown, EPUB,
+  PowerPoint or Excel (and slides into images) now moves page by page, and
+  Combine into PDF moves file by file. A step that can't measure its own
+  progress (LibreOffice, Pandoc, printing a document) shows a moving busy bar
+  instead of one stuck at a fraction. Making a PDF from Markdown, RTF, Word or
+  OpenDocument now reads the file and loads its pictures in the background,
+  leaving only the printing itself on the main thread, so the wheel, the shelf
+  and the toast stay responsive for longer.
 
 ## [1.7.0] - 2026-10-25
 
