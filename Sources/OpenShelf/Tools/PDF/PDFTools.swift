@@ -114,15 +114,18 @@ enum PDFTools {
     // MARK: Combine
 
     /// Combines PDFs and images, in order, into "Combined.pdf" next to the first file.
-    static func combine(_ urls: [URL]) async throws -> URL {
-        try await Task.detached(priority: .userInitiated) { try combineNow(urls) }.value
+    /// - Parameter progress: Reported 0...1 as each file is added.
+    static func combine(_ urls: [URL], progress: @escaping @Sendable (Double) -> Void = { _ in }) async throws -> URL {
+        try await Task.detached(priority: .userInitiated) { try combineNow(urls, progress: progress) }.value
     }
 
-    static func combineNow(_ urls: [URL]) throws -> URL {
+    static func combineNow(_ urls: [URL], progress: @escaping @Sendable (Double) -> Void = { _ in }) throws -> URL {
         guard let first = urls.first else { throw PDFToolError.nothingToSave }
         let output = PDFDocument()
-        for url in urls {
+        for (position, url) in urls.enumerated() {
             try Task.checkCancellation()
+            // Writing the combined file at the end takes the last share.
+            defer { progress(Double(position + 1) / Double(urls.count + 1)) }
             if FileKind(url: url) == .pdf {
                 let document = try open(url)
                 for index in 0..<document.pageCount {

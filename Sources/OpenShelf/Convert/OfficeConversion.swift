@@ -6,7 +6,12 @@ enum OfficeConversion {
     /// How long LibreOffice gets before the conversion is abandoned.
     static let timeout: Duration = .seconds(120)
 
-    static func convert(_ source: URL, to format: OutputFormat, tools: ExternalTools) async throws -> [URL] {
+    static func convert(
+        _ source: URL,
+        to format: OutputFormat,
+        tools: ExternalTools,
+        progress: @escaping @Sendable (Double) -> Void = { _ in }
+    ) async throws -> [URL] {
         guard let soffice = tools.libreOffice else {
             throw MissingToolError(name: "LibreOffice")
         }
@@ -20,7 +25,7 @@ enum OfficeConversion {
             let pdf = try await run(soffice, source: source, filter: "pdf", extension: "pdf", workspace: workspace, output: output)
             let named = workspace.appendingPathComponent(source.deletingPathExtension().lastPathComponent + ".pdf")
             try FileManager.default.moveItem(at: pdf, to: named)
-            return try PDFConversion.convert(named, to: format, savingNextTo: source, pageLabel: "Slide")
+            return try PDFConversion.convert(named, to: format, savingNextTo: source, pageLabel: "Slide", progress: progress)
         }
 
         guard let pathExtension = format.fileExtension, let filter = filter(for: format) else {
