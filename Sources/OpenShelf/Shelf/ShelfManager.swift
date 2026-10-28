@@ -10,6 +10,8 @@ final class ShelfManager {
     private var controllers: [ShelfWindowController] = []
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private let storeURL: URL
+    /// The shelf each watched folder's new files go on, while it's open.
+    @ObservationIgnored private var watchedFolderShelves: [WatchedFolder.ID: Shelf.ID] = [:]
 
     init(storeURL: URL = ShelfStore.defaultURL) {
         self.storeURL = storeURL
@@ -65,6 +67,23 @@ final class ShelfManager {
         }
         recent.shelf.add(urls)
         recent.present()
+    }
+
+    /// Puts files that just arrived in a watched folder on that folder's
+    /// shelf, sliding it out if it's hidden at an edge, or on a new shelf
+    /// when the folder doesn't have one open (yet, or any more).
+    @discardableResult
+    func addArrivals(_ urls: [URL], fromWatchedFolder folderID: WatchedFolder.ID) -> Shelf {
+        if let shelfID = watchedFolderShelves[folderID],
+           let controller = controllers.first(where: { $0.shelf.id == shelfID }) {
+            controller.shelf.add(urls)
+            controller.present()
+            scheduleSave()
+            return controller.shelf
+        }
+        let shelf = newShelf(with: urls)
+        watchedFolderShelves[folderID] = shelf.id
+        return shelf
     }
 
     /// Adds the files a conversion or tool wrote back to the shelf the

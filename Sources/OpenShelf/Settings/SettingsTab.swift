@@ -57,7 +57,8 @@ enum SettingsTab: String, CaseIterable, Sendable {
     }
 
     /// The state that changes this pane's height (a conflict warning, a
-    /// custom bitrate's row, a failed install's message and buttons), read
+    /// custom bitrate's row, a failed install's message and buttons, the
+    /// watched folders), read
     /// through Observation so the window can follow it. Empty for panes that
     /// never change height.
     @MainActor
@@ -71,7 +72,12 @@ enum SettingsTab: String, CaseIterable, Sendable {
         case .extraFormats:
             ExtraTool.allCases.map { ExtraFormatsPane.layout(of: $0, installer: .shared) }
                 + ["typesetter \(ToolInstaller.shared.tools.pdfEngine != nil)"]
-        case .general, .shelves, .updates:
+        case .shelves:
+            // A row per watched folder; a missing folder's row says so.
+            WatchedFolders.shared.folders.map { folder in
+                "\(folder.id) \(WatchedFolders.shared.unavailable.contains(folder.id))"
+            }
+        case .general, .updates:
             []
         }
     }
