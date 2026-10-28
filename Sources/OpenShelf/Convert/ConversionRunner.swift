@@ -16,6 +16,11 @@ final class ConversionRunner {
     /// shelf when Settings → Shelves allows it.
     var onSaved: (([URL], Shelf.ID?) -> Void)?
 
+    /// Called with each job's files as soon as they're written, before the
+    /// rest of the batch finishes. Wired once at launch so watched folders
+    /// can tell OpenShelf's own output from files that arrived.
+    var onJobSaved: (@MainActor @Sendable ([URL]) -> Void)?
+
     /// - Parameters:
     ///   - settings: How to encode; nil for Settings → Output's, read now so
     ///     a change mid-batch doesn't mix two kinds of output.
@@ -70,6 +75,7 @@ final class ConversionRunner {
     ) async {
         let toasts = ToastController.shared
         let total = jobs.count
+        let onJobSaved = onJobSaved
         let job = Task {
             var saved: [URL] = []
             var failures: [String] = []
@@ -77,9 +83,11 @@ final class ConversionRunner {
                 if Task.isCancelled { break }
                 let step = StepProgress(index: index, total: total) { toasts.updateProgress($0, subtitle: $1) }
                 do {
-                    saved += try await operation(sources) { fraction in
+                    let outputs = try await operation(sources) { fraction in
                         Task { @MainActor in step.report(fraction) }
                     }
+                    saved += outputs
+                    onJobSaved?(outputs)
                 } catch is CancellationError {
                     step.cancel()
                     break

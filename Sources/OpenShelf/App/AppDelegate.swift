@@ -18,8 +18,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ConversionRunner.shared.onSaved = { [weak self] urls, sourceShelfID in
             self?.shelves.addConversionResults(urls, sourceShelfID: sourceShelfID)
         }
+        ConversionRunner.shared.onJobSaved = { urls in
+            WatchedFolders.shared.noteOutputs(urls)
+        }
         EditorWindowController.onSaved = { [weak self] urls, sourceShelfID in
+            WatchedFolders.shared.noteOutputs(urls)
             self?.shelves.addConversionResults(urls, sourceShelfID: sourceShelfID)
+        }
+        WatchedFolders.shared.onArrival = { [weak self] urls, folder in
+            guard let self else { return }
+            let shelf = self.shelves.addArrivals(urls, fromWatchedFolder: folder.id)
+            folder.action.run(on: urls, sourceShelfID: shelf.id)
         }
         wheel.itemsProvider = { [weak self] kind, urls in
             self?.items(for: kind, urls: urls) ?? []
@@ -52,6 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if Preferences.shared.restoresShelves {
             shelves.restoreSavedShelves()
         }
+        WatchedFolders.shared.start()
         TourWindowController.presentIfNeeded()
     }
 

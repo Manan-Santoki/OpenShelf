@@ -122,8 +122,104 @@ struct ShelvesSettingsPane: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            WatchedFoldersSection(watched: .shared)
         }
         .settingsPane()
+    }
+}
+
+/// Settings → Shelves → Watched Folders: folders whose new files are put on
+/// a shelf, each with an optional conversion or tool to run on them.
+private struct WatchedFoldersSection: View {
+    let watched: WatchedFolders
+
+    var body: some View {
+        Section {
+            ForEach(watched.folders) { folder in
+                WatchedFolderRow(folder: folder, watched: watched)
+            }
+            HStack {
+                Button("Add Folder…", action: chooseFolders)
+                Button("Watch Screenshots") { watched.addScreenshots() }
+                    .disabled(watched.isWatchingScreenshots)
+                    .help("Watches the folder screenshots are saved to (\(ScreenshotLocation.current().path))")
+            }
+        } header: {
+            Text("Watched Folders")
+        } footer: {
+            Text("New files that appear in these folders are put on a shelf of their own. Files already there, hidden files and unfinished downloads are left alone; subfolders aren't watched. A conversion or tool only runs on files it applies to.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func chooseFolders() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Watch"
+        panel.message = "Choose folders whose new files OpenShelf puts on a shelf."
+        guard panel.runModal() == .OK else { return }
+        for url in panel.urls { watched.add(url) }
+    }
+}
+
+/// One watched folder: on/off, where it is, what to do with new files, and
+/// a button to stop watching it.
+private struct WatchedFolderRow: View {
+    let folder: WatchedFolder
+    let watched: WatchedFolders
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Toggle(isOn: Binding(
+                    get: { folder.isEnabled },
+                    set: { watched.setEnabled($0, for: folder.id) }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(folder.name)
+                        if watched.unavailable.contains(folder.id) {
+                            Text("Folder not found")
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        } else {
+                            Text(folder.isScreenshots ? ScreenshotLocation.current().path : folder.path)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                    }
+                }
+                Button {
+                    watched.remove(folder.id)
+                } label: {
+                    Image(systemName: "minus.circle")
+                }
+                .buttonStyle(.borderless)
+                .help("Stop Watching")
+                .accessibilityLabel("Stop watching \(folder.name)")
+            }
+            Picker("New files", selection: Binding(
+                get: { folder.action },
+                set: { watched.setAction($0, for: folder.id) }
+            )) {
+                Text(WatchedFolderAction.addOnly.title).tag(WatchedFolderAction.addOnly)
+                Section("Convert") {
+                    ForEach(WatchedFolderAction.conversions, id: \.self) { action in
+                        Text(action.title).tag(action)
+                    }
+                }
+                Section("Tools") {
+                    ForEach(WatchedFolderAction.tools, id: \.self) { action in
+                        Text(action.title).tag(action)
+                    }
+                }
+            }
+            .disabled(!folder.isEnabled)
+        }
     }
 }
 

@@ -10,6 +10,17 @@ Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
 
 ### New
 
+- **Watched folders and a screenshot shelf.** Pick folders such as Downloads
+  or a project inbox in Settings → Shelves → Watched Folders, or click
+  **Watch Screenshots** to follow wherever your screenshots are saved. New
+  files that land there pop onto a shelf of their own as soon as they've
+  finished arriving, so a fresh screenshot or download is ready to drag
+  straight into a message. Files that were already there, hidden files and
+  unfinished downloads are left alone. Each folder can also convert new files
+  or open them in a tool (for example, every screenshot to JPG, or every PDF
+  into Compress PDF); results go back on the shelf when that setting is on.
+  Nothing is watched until you add a folder, and each one can be switched off
+  or removed at any time.
 - **Conversion and tool results return to their shelf.** Convert or edit a
   file that's on a shelf (with the Convert or Tools wheel, or the keyboard
   shortcut) and the result is added to that same shelf, so it's right there
