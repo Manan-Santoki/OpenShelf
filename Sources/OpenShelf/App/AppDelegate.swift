@@ -11,8 +11,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Keeps the app out of the Dock when launched without the bundle's LSUIElement (e.g. `swift run`).
         NSApp.setActivationPolicy(.accessory)
 
-        wheel.onDrop = { [weak self] item, urls, modifiers in
-            self?.perform(item.command, on: urls, modifiers: modifiers)
+        wheel.onDrop = { [weak self] item, urls, modifiers, sourceShelfID in
+            self?.perform(item.command, on: urls, modifiers: modifiers, sourceShelfID: sourceShelfID)
+        }
+        ConversionRunner.shared.onSaved = { [weak self] urls, sourceShelfID in
+            self?.shelves.addConversionResults(urls, sourceShelfID: sourceShelfID)
+        }
+        EditorWindowController.onSaved = { [weak self] urls, sourceShelfID in
+            self?.shelves.addConversionResults(urls, sourceShelfID: sourceShelfID)
         }
         wheel.itemsProvider = { [weak self] kind, urls in
             self?.items(for: kind, urls: urls) ?? []
@@ -55,8 +61,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Opens a keyboard-driven wheel for the selected shelf items or, when no
     /// shelf has focus with a selection, the files selected in Finder.
     func openWheelForSelection() {
+        let keySelection = shelves.keyShelfSelection
         let source = WheelSelectionSource.choose(
-            keyShelfSelection: shelves.keyShelfSelection,
+            keyShelfSelection: keySelection,
             recentShelfSelection: shelves.recentShelfSelection,
             isOpenShelfFrontmost: NSApp.isActive
         )
@@ -64,8 +71,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             openWheelForFinderSelection()
             return
         }
+        // Whichever selection `choose` picked names the shelf it came from.
+        let sourceShelf = (keySelection == urls) ? shelves.keyShelf : shelves.recentShelf
         let location = NSEvent.mouseLocation
-        if wheel.presentForKeyboard(urls: urls, at: location) {
+        if wheel.presentForKeyboard(urls: urls, at: location, sourceShelfID: sourceShelf?.id) {
             TourProgress.shared.record(.keyboardWheelOpened(urls))
         } else {
             ToastController.shared.show(Toast(systemImage: "nosign", title: "Nothing to do with these files"), near: location)
@@ -149,16 +158,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Runs a wedge. With ⌥ held, a format with output settings opens them
     /// for this conversion first (see `ConvertOptionsView`).
-    private func perform(_ command: WheelCommand, on urls: [URL], modifiers: NSEvent.ModifierFlags) {
+    /// - Parameter sourceShelfID: The shelf `urls` were dragged or selected
+    ///   from, if any; a conversion or tool's results are added back to it.
+    private func perform(_ command: WheelCommand, on urls: [URL], modifiers: NSEvent.ModifierFlags, sourceShelfID: Shelf.ID?) {
         TourProgress.shared.record(.ran(command, urls, option: modifiers.contains(.option)))
         switch command {
         case .action(let action):
             perform(action, on: urls)
         case .convert(let format):
-            if modifiers.contains(.option), ConvertOptionsView.present(urls, to: format) { return }
-            ConversionRunner.shared.convert(urls, to: format)
+            if modifiers.contains(.option), ConvertOptionsView.present(urls, to: format, sourceShelfID: sourceShelfID) { return }
+            ConversionRunner.shared.convert(urls, to: format, sourceShelfID: sourceShelfID)
         case .tool(let tool):
-            ToolLauncher.open(tool, with: urls)
+            ToolLauncher.open(tool, with: urls, sourceShelfID: sourceShelfID)
         }
     }
 

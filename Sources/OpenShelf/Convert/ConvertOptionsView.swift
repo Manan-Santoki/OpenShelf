@@ -11,20 +11,22 @@ struct ConvertOptionsView: View {
     let location: NSPoint
     @State private var model: ConvertOptionsModel
 
-    init(urls: [URL], format: OutputFormat, options: OutputOptions, location: NSPoint, actions: EditorActions) {
+    init(urls: [URL], format: OutputFormat, options: OutputOptions, location: NSPoint, sourceShelfID: Shelf.ID?, actions: EditorActions) {
         self.actions = actions
         self.location = location
-        _model = State(initialValue: ConvertOptionsModel(urls: urls, format: format, options: options))
+        _model = State(initialValue: ConvertOptionsModel(urls: urls, format: format, options: options, sourceShelfID: sourceShelfID))
     }
 
     /// Opens the window for converting `urls` to `format`, when the format
     /// has anything to choose for these files. Returns whether it opened.
+    /// - Parameter sourceShelfID: The shelf `urls` were dragged or selected
+    ///   from, if any; carried through to the conversion it starts.
     @MainActor @discardableResult
-    static func present(_ urls: [URL], to format: OutputFormat, near location: NSPoint = NSEvent.mouseLocation) -> Bool {
+    static func present(_ urls: [URL], to format: OutputFormat, near location: NSPoint = NSEvent.mouseLocation, sourceShelfID: Shelf.ID? = nil) -> Bool {
         let options = OutputOptions(format: format, urls: urls)
         guard !urls.isEmpty, !options.isEmpty else { return false }
         EditorWindowController.present(size: windowSize(for: options), near: location) { actions in
-            ConvertOptionsView(urls: urls, format: format, options: options, location: location, actions: actions)
+            ConvertOptionsView(urls: urls, format: format, options: options, location: location, sourceShelfID: sourceShelfID, actions: actions)
         }
         return true
     }
@@ -105,16 +107,18 @@ final class ConvertOptionsModel {
     let urls: [URL]
     let format: OutputFormat
     let options: OutputOptions
+    let sourceShelfID: Shelf.ID?
     var settings: OutputSettings
     var usesAsDefault = false
     /// The videos, read once for the size estimate.
     private(set) var sources: [VideoSourceInfo]?
     private(set) var cannotEstimate = false
 
-    init(urls: [URL], format: OutputFormat, options: OutputOptions, settings: OutputSettings = Preferences.shared.output) {
+    init(urls: [URL], format: OutputFormat, options: OutputOptions, sourceShelfID: Shelf.ID? = nil, settings: OutputSettings = Preferences.shared.output) {
         self.urls = urls
         self.format = format
         self.options = options
+        self.sourceShelfID = sourceShelfID
         self.settings = settings
     }
 
@@ -166,6 +170,6 @@ final class ConvertOptionsModel {
             preferences.output = preferences.output.applying(options, from: settings)
         }
         actions.close()
-        ConversionRunner.shared.convert(urls, to: format, settings: settings, near: location)
+        ConversionRunner.shared.convert(urls, to: format, settings: settings, near: location, sourceShelfID: sourceShelfID)
     }
 }

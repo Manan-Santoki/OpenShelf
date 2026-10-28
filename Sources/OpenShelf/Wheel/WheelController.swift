@@ -54,8 +54,9 @@ final class WheelController {
     /// Called when files are dropped on a wedge (or a wedge runs from the
     /// keyboard), with the modifier keys held for it: ⌥ asks for a
     /// conversion's options. Keys still down from the shortcut that opened a
-    /// keyboard wheel don't count.
-    var onDrop: ((WheelItem, [URL], NSEvent.ModifierFlags) -> Void)?
+    /// keyboard wheel don't count. The last value is the shelf these files
+    /// were dragged or selected from, if any.
+    var onDrop: ((WheelItem, [URL], NSEvent.ModifierFlags, Shelf.ID?) -> Void)?
     /// Supplies each wheel's wedges for the files of a keyboard session.
     var itemsProvider: ((WheelKind, [URL]) -> [WheelItem])?
 
@@ -88,6 +89,8 @@ final class WheelController {
         let available: [WheelKind]
         var kind: WheelKind
         var taps: ModifierTapTracker
+        /// The shelf `urls` came from, if any.
+        var sourceShelfID: Shelf.ID?
     }
 
     var isInKeyboardMode: Bool { keyboardSession != nil }
@@ -191,7 +194,7 @@ final class WheelController {
             return false
         }
         absorbNextDrop()
-        onDrop?(item, urls, NSEvent.modifierFlags)
+        onDrop?(item, urls, NSEvent.modifierFlags, Shelf.activeDragSource?.id)
         return true
     }
 
@@ -264,7 +267,7 @@ final class WheelController {
     /// a trigger tap switches wheels, Esc or a click elsewhere closes. Returns
     /// false when no wheel has anything for these files.
     @discardableResult
-    func presentForKeyboard(urls: [URL], at location: NSPoint) -> Bool {
+    func presentForKeyboard(urls: [URL], at location: NSPoint, sourceShelfID: Shelf.ID? = nil) -> Bool {
         guard let itemsProvider, !urls.isEmpty else { return false }
         var itemsByKind: [WheelKind: [WheelItem]] = [:]
         for kind in WheelCycle.order {
@@ -281,7 +284,8 @@ final class WheelController {
             itemsByKind: itemsByKind,
             available: available,
             kind: first,
-            taps: ModifierTapTracker(alreadyHeld: NSEvent.modifierFlags)
+            taps: ModifierTapTracker(alreadyHeld: NSEvent.modifierFlags),
+            sourceShelfID: sourceShelfID
         )
         showKeyboardWheel(first, at: location)
         takeKeyboard(hint: KeyboardWheelHint.opening(canSwitch: available.count > 1, hasOptions: hasOptions(first)))
@@ -311,7 +315,9 @@ final class WheelController {
             itemsByKind: itemsByKind,
             available: available,
             kind: kind,
-            taps: ModifierTapTracker(alreadyHeld: NSEvent.modifierFlags)
+            taps: ModifierTapTracker(alreadyHeld: NSEvent.modifierFlags),
+            // The drag that dropped on More/Back is still in progress here.
+            sourceShelfID: Shelf.activeDragSource?.id
         )
         updateSummary(for: urls)
         model.wheelName = kind.shortTitle
@@ -445,7 +451,7 @@ final class WheelController {
         }
         let modifiers = session.taps.chosen(modifiers ?? NSEvent.modifierFlags)
         dismiss(after: .zero)
-        onDrop?(item, session.urls, modifiers)
+        onDrop?(item, session.urls, modifiers, session.sourceShelfID)
     }
 
     /// Hides the wheel but keeps its panel, invisible, centred under the pointer
@@ -541,7 +547,7 @@ final class WheelController {
             switch slot {
             case .item(let item):
                 dismiss(after: .zero)
-                onDrop?(item, urls, NSEvent.modifierFlags)
+                onDrop?(item, urls, NSEvent.modifierFlags, Shelf.activeDragSource?.id)
             case .more, .back:
                 // Nothing runs; the wheel stays open on the other page.
                 turnPage(from: wedge)

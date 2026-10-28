@@ -11,6 +11,7 @@ final class Preferences {
         static let removeAfterDragOut = "removeAfterDragOut"
         static let restoresShelves = "restoresShelves"
         static let hidesDockedShelves = "hidesDockedShelves"
+        static let addsConversionResultsToShelf = "addsConversionResultsToShelf"
         static let openWheelShortcut = "openWheelShortcut"
         static let output = "outputSettings"
 
@@ -43,6 +44,12 @@ final class Preferences {
         didSet { defaults.set(hidesDockedShelves, forKey: Key.hidesDockedShelves) }
     }
 
+    /// Add a conversion's or tool's output back to the shelf it was started
+    /// from.
+    var addsConversionResultsToShelf: Bool {
+        didSet { defaults.set(addsConversionResultsToShelf, forKey: Key.addsConversionResultsToShelf) }
+    }
+
     /// The global shortcut that opens a wheel for Finder's selection; nil is off.
     var openWheelShortcut: KeyCombo? {
         didSet { defaults.set(Self.encode(openWheelShortcut), forKey: Key.openWheelShortcut) }
@@ -65,6 +72,7 @@ final class Preferences {
         removeAfterDragOut = defaults.bool(forKey: Key.removeAfterDragOut)
         restoresShelves = defaults.object(forKey: Key.restoresShelves) as? Bool ?? true
         hidesDockedShelves = defaults.object(forKey: Key.hidesDockedShelves) as? Bool ?? true
+        addsConversionResultsToShelf = defaults.object(forKey: Key.addsConversionResultsToShelf) as? Bool ?? true
         openWheelShortcut = Self.decode(defaults.string(forKey: Key.openWheelShortcut))
         output = OutputSettings.decode(defaults.string(forKey: Key.output))
     }

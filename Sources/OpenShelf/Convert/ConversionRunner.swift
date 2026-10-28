@@ -11,9 +11,16 @@ final class ConversionRunner {
 
     private var current: Task<Void, Never>?
 
-    /// - Parameter settings: How to encode; nil for Settings → Output's,
-    ///   read now so a change mid-batch doesn't mix two kinds of output.
-    func convert(_ urls: [URL], to format: OutputFormat, settings: OutputSettings? = nil, near location: NSPoint = NSEvent.mouseLocation) {
+    /// Called with the files a batch wrote, and the shelf the operation was
+    /// started from, if any. Wired once at launch to add them back to that
+    /// shelf when Settings → Shelves allows it.
+    var onSaved: (([URL], Shelf.ID?) -> Void)?
+
+    /// - Parameters:
+    ///   - settings: How to encode; nil for Settings → Output's, read now so
+    ///     a change mid-batch doesn't mix two kinds of output.
+    ///   - sourceShelfID: The shelf `urls` were dragged or selected from, if any.
+    func convert(_ urls: [URL], to format: OutputFormat, settings: OutputSettings? = nil, near location: NSPoint = NSEvent.mouseLocation, sourceShelfID: Shelf.ID? = nil) {
         let tools = ExternalTools.current
         let settings = settings ?? Preferences.shared.output
         let isArchive = [.zip, .tar, .tgz].contains(format)
@@ -24,7 +31,7 @@ final class ConversionRunner {
         }
         // Several files go into one archive; everything else converts per file.
         let jobs: [[URL]] = isArchive ? [urls] : urls.map { [$0] }
-        run(title: title, jobs: jobs, savedSubtitle: format == .extract ? nil : "as \(format.title)", near: location) { sources, progress in
+        run(title: title, jobs: jobs, savedSubtitle: format == .extract ? nil : "as \(format.title)", near: location, sourceShelfID: sourceShelfID) { sources, progress in
             switch format {
             case .zip: return [try await ArchiveConversion.zip(sources)]
             case .tar: return [try await ArchiveConversion.tar(sources, gzip: false)]
@@ -41,6 +48,7 @@ final class ConversionRunner {
         jobs: [[URL]],
         savedSubtitle: String? = nil,
         near location: NSPoint = NSEvent.mouseLocation,
+        sourceShelfID: Shelf.ID? = nil,
         operation: @escaping Operation
     ) {
         guard !jobs.isEmpty else { return }
@@ -48,7 +56,7 @@ final class ConversionRunner {
         current = Task { [weak self] in
             // Batches queue behind each other so their toasts don't collide.
             await previous?.value
-            await self?.execute(title: title, jobs: jobs, savedSubtitle: savedSubtitle, near: location, operation: operation)
+            await self?.execute(title: title, jobs: jobs, savedSubtitle: savedSubtitle, near: location, sourceShelfID: sourceShelfID, operation: operation)
         }
     }
 
@@ -57,6 +65,7 @@ final class ConversionRunner {
         jobs: [[URL]],
         savedSubtitle: String?,
         near location: NSPoint,
+        sourceShelfID: Shelf.ID?,
         operation: @escaping Operation
     ) async {
         let toasts = ToastController.shared
@@ -86,6 +95,7 @@ final class ConversionRunner {
             job.cancel()
         }
         let (saved, failures) = await job.value
+        if !saved.isEmpty { onSaved?(saved, sourceShelfID) }
 
         if job.isCancelled {
             toasts.show(Toast(systemImage: "xmark", title: "Cancelled", subtitle: saved.isEmpty ? nil : "\(saved.count) saved"))

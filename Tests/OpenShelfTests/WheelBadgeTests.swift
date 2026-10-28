@@ -45,7 +45,7 @@ struct WheelBadgeTests {
         let all = items(8)
         controller.itemsProvider = { kind, _ in kind == .convert ? all : [] }
         var ran: [WheelItem] = []
-        controller.onDrop = { item, _, _ in ran.append(item) }
+        controller.onDrop = { item, _, _, _ in ran.append(item) }
         #expect(controller.presentForKeyboard(urls: [URL(fileURLWithPath: "/tmp/a.png")], at: NSPoint(x: 400, y: 400)))
         defer { controller.endKeyboardMode(hidingWheel: true) }
 
@@ -76,7 +76,7 @@ struct WheelBadgeIntegrationTests {
         controller.itemsProvider = { kind, _ in kind == .convert ? [.convert(.png)] : [] }
         var received: [URL] = []
         var modifiers: NSEvent.ModifierFlags = []
-        controller.onDrop = { _, urls, flags in received = urls; modifiers = flags }
+        controller.onDrop = { _, urls, flags, _ in received = urls; modifiers = flags }
         #expect(controller.presentForKeyboard(urls: selected, at: NSPoint(x: 400, y: 400)))
         defer { controller.endKeyboardMode(hidingWheel: true) }
         #expect(controller.handleKey(key("1", flags: [.command, .option])))
@@ -89,7 +89,7 @@ struct WheelBadgeIntegrationTests {
         let controller = WheelController()
         controller.itemsProvider = { kind, _ in kind == .convert ? [.convert(.png)] : [] }
         var runs = 0
-        controller.onDrop = { _, _, _ in runs += 1 }
+        controller.onDrop = { _, _, _, _ in runs += 1 }
         #expect(controller.presentForKeyboard(urls: [URL(fileURLWithPath: "/tmp/a.jpg")], at: NSPoint(x: 400, y: 400)))
         defer { controller.endKeyboardMode(hidingWheel: true) }
         #expect(!controller.handleKey(key("1", flags: [])))
