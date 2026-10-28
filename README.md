@@ -290,6 +290,25 @@ any time, and drag them out to any app or folder when you need them.
 - Closing a shelf never touches your files. **New Shelf** and **Close All
   Shelves** are in the menu-bar menu.
 
+#### Watched folders
+
+OpenShelf can put new files on a shelf by itself. In Settings → Shelves →
+**Watched Folders**, click **Add Folder…** (Downloads, a project inbox, …) or
+**Watch Screenshots**, which follows the folder chosen in the Screenshot app's
+Options (the Desktop unless you changed it).
+
+- Each watched folder gets its own shelf. A file appears on it once it has
+  finished arriving: downloads still in progress, files Finder is still
+  copying, hidden files and files that were already there are left alone, and
+  so are files renamed inside the folder. Subfolders aren't watched.
+- Optionally pick what happens to new files: convert them (e.g. every
+  screenshot to JPG) or open them in a tool (Compress, Annotate, Redact, OCR,
+  Compress PDF, Trim, …). It only runs on files it applies to, and the result
+  goes back on the shelf when **Add conversion and tool results back to the
+  shelf** is on. Files OpenShelf writes itself never count as new.
+- Nothing is watched until you add a folder. Switch a folder off, or click ⊖
+  to stop watching it.
+
 ### Updates
 
 OpenShelf checks GitHub for new versions once a day (it asks the first time).
@@ -308,7 +327,8 @@ tab you used last:
 - **Wheels:** the keys that open each wheel while dragging, and the shortcut
   for Finder or shelf selections
 - **Shelves:** remove files from a shelf after dragging them out, restore
-  shelves at launch, hide docked shelves at the screen edge
+  shelves at launch, hide docked shelves at the screen edge, add conversion
+  results back to the shelf, and [watched folders](#watched-folders)
 - **Output:** how conversions encode video, audio, images and GIFs (see
   [Output settings](#output-settings))
 - **Extra Formats:** install or remove ffmpeg, LibreOffice and Pandoc
@@ -369,6 +389,7 @@ Sources/OpenShelf/
   Shelf/Views/    SwiftUI shelf UI and the AppKit drag source
   Support/        file actions, Quick Look
   Settings/       settings window
+  WatchedFolders/ folders watched for new files, and what to do with them
 ```
 
 ## How drag detection works

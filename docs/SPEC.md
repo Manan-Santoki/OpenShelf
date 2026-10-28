@@ -305,6 +305,36 @@ never copies or modifies them by itself).
   removed. Closing never touches the files.
 - Multiple shelves may exist at once.
 
+### 3.1 Watched folders
+
+Off until a folder is added in Settings → Shelves → Watched Folders (Add
+Folder… with an open panel, or Watch Screenshots: the `location` default of
+`com.apple.screencapture`, with `~` expanded, else `~/Desktop`; re-read each
+time watching starts). Saved to
+`~/Library/Application Support/OpenShelf/watched-folders.json` with a path and
+a bookmark per folder, a per-folder on/off switch and an optional action.
+
+- **Watching:** a dispatch source per switched-on folder (top level only)
+  says when its entries change; the folder is then listed off the main thread.
+  Files present at the first listing are never reported. A file renamed inside
+  the folder (same file number) or saved over in place under the same name
+  isn't new. Hidden names (`.DS_Store`, Screenshot's `.Screenshot …` partials),
+  `~$` lock files and `.download`, `.crdownload`, `.part`, `.partial`,
+  `.opdownload`, `.tmp`, `.temp`, `.screenshot` files are ignored, so the
+  finished file they're renamed to counts as new. Only regular files count.
+- **Debounce:** a new file is reported once its size has stayed the same for
+  1 s (5 s for an empty file) and Finder no longer marks it as copying
+  (creation date 1984-01-24); the folder is listed every 0.5 s meanwhile.
+- **Routing:** new files go on the folder's own shelf (revealed if hidden at
+  an edge), or a new shelf near the pointer when it has none open.
+- **Action:** none, a conversion (JPG, PNG, HEIC, WebP, AVIF, PDF, MP4, GIF,
+  M4A, MP3) or a single-file tool, run through the same paths as the wheels
+  on the files it applies to, with the shelf as the source shelf (so results
+  follow the results-back-on-the-shelf setting). Files OpenShelf wrote itself
+  are recorded as each one is saved and never count as arrivals.
+- A folder that's deleted, moved away or ejected stops being watched and
+  shows "Folder not found"; switching it off and on tries again.
+
 ## 4. Menu-bar item
 
 New Shelf · Show Shelves · Close All Shelves · Open Wheel for Selection ·
@@ -326,7 +356,8 @@ height (scrolling when the screen is shorter) and opens on the tab used last.
   and the shortcut for Finder's selection.
 - Shelves: remove files from a shelf after dragging them out (default off);
   restore shelves when OpenShelf opens (default on); hide docked shelves to the
-  screen edge (default on).
+  screen edge (default on); add conversion and tool results back to the shelf
+  (default on); watched folders (§3.1, none by default).
 - Output: video codec, quality (or a custom bitrate) and largest size; audio
   bitrate; image quality and metadata; GIF width and frame rate (§2.3.1), all
   Automatic by default, with Reset to Automatic. Stored as one JSON value;
