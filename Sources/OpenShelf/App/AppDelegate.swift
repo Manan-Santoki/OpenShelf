@@ -30,6 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let shelf = self.shelves.addArrivals(urls, fromWatchedFolder: folder.id)
             folder.action.run(on: urls, sourceShelfID: shelf.id)
         }
+        IntentShelves.manager = shelves
         wheel.itemsProvider = { [weak self] kind, urls in
             self?.items(for: kind, urls: urls) ?? []
         }
