@@ -5,19 +5,35 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>OpenShelf · Convert, edit and share files mid-drag on your Mac</title>
 <meta name="description" content="OpenShelf is a free, open-source Mac app. Start dragging any file, tap a key, and drop it on a wheel to convert it (images, PDFs, documents, spreadsheets, audio, video), edit it or put it on a floating shelf. Everything runs on your Mac.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="OpenShelf">
 <meta property="og:title" content="OpenShelf: drag, tap, done.">
 <meta property="og:description" content="A free, open-source Mac app that turns every file drag into a launcher: convert, edit and share files without opening another app.">
-<meta property="og:image" content="https://openshelf.space/assets/icon.png">
+<meta property="og:image" content="https://openshelf.space/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="OpenShelf: drag a file, tap a key and drop it on a wheel to convert, edit or shelve it">
 <meta property="og:url" content="https://openshelf.space/">
-<meta name="twitter:card" content="summary">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="OpenShelf: drag, tap, done.">
+<meta name="twitter:description" content="A free, open-source Mac app that turns every file drag into a launcher: convert, edit and share files without opening another app.">
+<meta name="twitter:image" content="https://openshelf.space/assets/og-image.png">
 <meta name="theme-color" content="#0a0a0b">
 <link rel="canonical" href="https://openshelf.space/">
-<link rel="icon" href="assets/favicon.png">
+<link rel="icon" type="image/png" sizes="64x64" href="assets/favicon.png">
 <link rel="apple-touch-icon" href="assets/icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <script>document.documentElement.classList.add("js");</script>
+<script type="application/ld+json">
+{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "OpenShelf",
+ "operatingSystem": "macOS 14 or later", "applicationCategory": "UtilitiesApplication",
+ "description": "A free, open-source Mac app: drag any file, tap a key and drop it on a wheel to convert it, edit it or put it on a floating shelf.",
+ "url": "https://openshelf.space/", "downloadUrl": "https://github.com/Manan-Santoki/OpenShelf/releases/latest",
+ "license": "https://opensource.org/licenses/MIT", "image": "https://openshelf.space/assets/icon.png",
+ "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}
+</script>
 <style>
 :root {
   --bg: #0a0a0b;
@@ -102,8 +118,17 @@ h1 span { color: var(--muted); }
 .lede { font-size: 19px; line-height: 1.55; color: var(--muted); max-width: 30em; }
 .lede b { color: var(--ink); font-weight: 600; }
 .cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; }
-.meta { margin-top: 18px; font-size: 14px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 0; }
-.meta span + span::before { content: "·"; margin: 0 9px; color: var(--muted); }
+/* Each item carries its separator in front of it; the list is pulled left by one
+   separator's width and clipped, so a separator that starts a new line is hidden. */
+.meta { margin-top: 18px; font-size: 14px; color: var(--muted); overflow: hidden; }
+.meta ul { list-style: none; padding: 0; margin: 0 0 0 -22px; display: flex; flex-wrap: wrap; row-gap: 4px; }
+.meta li { white-space: nowrap; }
+.meta li::before { content: "·"; display: inline-block; width: 22px; text-align: center; }
+.news { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 18px; padding: 5px 12px 5px 6px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,.03); color: var(--muted); font-size: 13.5px; text-decoration: none; transition: border-color .15s, color .15s; }
+.news:hover { border-color: #3c3c46; color: var(--ink); }
+.news b { font: 500 11.5px var(--mono); letter-spacing: .04em; color: #fff; background: var(--accent-fill); padding: 2px 8px; border-radius: 999px; }
+.news[hidden] { display: none; }
+.news:not([hidden]) + .eyebrow { display: none; }
 
 /* Demo */
 .demo { position: relative; }
@@ -263,6 +288,19 @@ code { font: 13.5px var(--mono); background: var(--panel-2); border: 1px solid v
 .fmt i { font-style: normal; color: var(--accent-ink); }
 .fnote { margin-top: 16px; font-size: 14px; color: var(--muted); }
 .fnote i { font-style: normal; color: var(--accent-ink); }
+.mock { padding: 16px; display: grid; gap: 8px; margin-top: auto; }
+.tile .media.mock, .tile .media.ocr-lines, .tile .media.watch-media { margin-top: auto; }
+.mock-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 12px; border-radius: 10px; background: rgba(255,255,255,.03); border: 1px solid var(--hair); font-size: 13.5px; color: var(--ink); }
+.mock-row span { color: var(--muted); font: 500 12.5px var(--mono); white-space: nowrap; }
+.mock-row span.ok { color: var(--accent-ink); }
+.ocr-lines { padding: 18px 18px 16px; display: grid; gap: 7px; margin-top: auto; }
+.ocr-lines i { display: block; height: 7px; border-radius: 4px; background: rgba(255,255,255,.12); }
+.ocr-lines i.hl { background: rgba(61,123,253,.45); box-shadow: 0 0 0 3px rgba(61,123,253,.12); }
+.ocr-lines .out { margin-top: 8px; font: 500 12.5px var(--mono); color: var(--muted); }
+.ocr-lines .out code { font-size: 12px; }
+.watch-media { padding: 16px; display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; margin-top: auto; }
+.watch-media .arrow { color: var(--faint); font-size: 18px; }
+.watch-media img { width: min(100%, 220px); }
 
 /* Trust */
 .trust { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 56px; }
@@ -288,6 +326,7 @@ code { font: 13.5px var(--mono); background: var(--panel-2); border: 1px solid v
 .install-get img { width: 88px; height: 88px; }
 .install-get h3 { margin-top: 14px; font-size: 24px; }
 .install-get p { color: var(--muted); font-size: 14px; margin-top: 6px; }
+.install-get .reqs { list-style: none; padding: 0; margin: 10px 0 0; color: var(--muted); font-size: 14px; line-height: 1.55; display: grid; gap: 2px; }
 .install-get .btn { margin-top: 22px; }
 .install-get .sub { margin-top: 14px; font-size: 14px; }
 .install-get .sub a { color: var(--muted); text-underline-offset: 3px; }
@@ -378,8 +417,6 @@ footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
   .hero .wrap { padding-top: 40px; padding-bottom: 16px; }
   .lede { font-size: 17px; }
   .cta .btn { flex: 1 1 100%; }
-  .meta { gap: 4px 16px; }
-  .meta span + span::before { content: none; }
   .nav .btn.small { display: none; }
   .stage { height: 500px; border-radius: 22px; }
   .stage-keys .lbl, .try { display: none; }
@@ -461,6 +498,7 @@ footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
   <div class="hero" id="top">
     <div class="wrap">
       <div class="intro">
+        <a class="news" id="news" href="https://github.com/Manan-Santoki/OpenShelf/releases/latest" hidden><b>New</b><span id="news-text">See what's new</span><span aria-hidden="true">→</span></a>
         <div class="eyebrow">Free &amp; open source · for Mac</div>
         <h1>Drag. Tap. <span>Done.</span></h1>
         <p class="lede">While you drag any file, tap a key and a wheel opens under the pointer: drop on a wedge to <b>convert it, edit it or park it on a shelf</b>.</p>
@@ -474,7 +512,7 @@ footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
             View on GitHub
           </a>
         </div>
-        <p class="meta"><span>macOS 14+</span><span>Tested on macOS 27</span><span>Apple silicon &amp; Intel</span><span>Free &amp; open source</span></p>
+        <div class="meta"><ul aria-label="Requirements"><li>macOS 14 or later</li><li>Ready for macOS 27</li><li>Apple silicon &amp; Intel</li><li>No account, no uploads</li></ul></div>
       </div>
 
       <div class="demo">
@@ -591,15 +629,16 @@ footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
           <div class="shot"><img src="assets/wheel-tools.webp" alt="The Tools wheel for a photo, with Crop highlighted among Compress, Metadata, Edit, Annotate, Add BG, Redact and Read QR" width="608" height="608" loading="lazy"></div>
           <div class="copy">
             <h3><kbd class="kc">⇧⌥</kbd>Tools</h3>
-            <p>Quick edits without opening a full app. Most tools open a small focused editor and save a copy beside the original. Busy wheels show six at a time; rest on <span class="nw">⋯ for more.</span></p>
+            <p>Quick edits without opening a full app. Most tools open a small focused editor, work on several files at once and save a copy beside the original. Busy wheels show six at a time; rest on <span class="nw">⋯ for more.</span></p>
             <ul class="examples">
               <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l6-6M10 14v5M10 14H5M20 4l-6 6M14 10V5M14 10h5"/></svg><span>Compress a photo</span></li>
               <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2v16h16M2 6h16v16"/></svg><span>Crop or resize images</span></li>
               <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M12 7.5a2.5 2.5 0 1 0 .01 0M7.5 17c.8-2.4 2.5-3.5 4.5-3.5s3.7 1.1 4.5 3.5"/></svg><span>Remove a background</span></li>
               <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18v12H3zM8 6v12M16 6v12"/></svg><span>Trim a video</span></li>
+              <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M8 9h8M8 12h8M8 15h5"/></svg><span>Read the text in a scan</span><small>OCR</small></li>
               <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8h11v13H8zM5 16V3h11"/></svg><span>Combine images into one PDF</span></li>
             </ul>
-            <p class="note">For PDFs: combine, reorder pages, split. For video and audio: trim, split, merge, change speed.</p>
+            <p class="note">For PDFs: combine, reorder pages, split, compress, OCR. For video and audio: trim, split, merge, change speed.</p>
           </div>
         </div>
 
@@ -615,7 +654,7 @@ footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
               <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg><span>Copy the full path</span></li>
               <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v14H3zM7 10l3 2-3 2M12 15h5"/></svg><span>Open Terminal in its folder</span></li>
             </ul>
-            <p class="note">With a shelf open, <b>Add to Shelf</b> drops files on the one you used last.</p>
+            <p class="note">With a shelf open, <b>Add to Shelf</b> drops files on the one you used last. Hold <kbd class="kc">⌘</kbd> in a keyboard-opened wheel to number the wedges, then press a number to run one.</p>
           </div>
         </div>
       </div>
@@ -648,7 +687,7 @@ footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
           <div class="media plate shelf-media">
             <img src="assets/shelf-expanded.webp" alt="An expanded shelf holding five files in a grid, with one selected" width="660" height="588" loading="lazy">
           </div>
-          <p>Dock it to a screen edge; it's still there after a restart.</p>
+          <p>Dock it to a screen edge, preview with Quick Look, keep several. Convert a file on a shelf and the result lands right beside it.</p>
         </article>
         <article class="card tile span-2 reveal">
           <span class="tag">Keyboard</span>
@@ -678,9 +717,17 @@ footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
         <article class="card tile span-3 reveal">
           <span class="tag">Shelves</span>
           <h3>Watched folders</h3>
-          <p>Point OpenShelf at Downloads, your screenshot folder or any inbox. New files pop onto a shelf of their own once they've finished arriving, ready to drag into a message.</p>
+          <p>Point OpenShelf at Downloads or any inbox, or click <b>Watch Screenshots</b>. New files pop onto a shelf of their own once they've finished arriving, ready to drag into a message.</p>
           <div class="chips"><span class="chip">Downloads</span><span class="chip">Screenshots</span><span class="chip">Project inbox</span></div>
           <p>Each folder can also convert new files or open them in a tool, like every screenshot to JPG. Nothing is watched until you add a folder.</p>
+          <div class="media plate watch-media" aria-hidden="true">
+            <div class="mock" style="margin:0; padding:0; min-width: 190px;">
+              <div class="mock-row">Screenshots<span class="ok">→ JPG</span></div>
+              <div class="mock-row">Downloads<span>shelf only</span></div>
+            </div>
+            <span class="arrow">→</span>
+            <img src="assets/shelf-collapsed.webp" alt="" width="372" height="412" loading="lazy" style="width: 120px">
+          </div>
         </article>
         <article class="card tile span-3 reveal">
           <span class="tag">iWork</span>
@@ -688,6 +735,40 @@ footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
           <p>Turn <code>.pages</code>, <code>.numbers</code> and <code>.key</code> files into PDFs, pictures, or Word, Excel and PowerPoint files. And the other way: Word files, spreadsheets and slides get a wedge to save them in Apple's formats.</p>
           <div class="chips"><span class="chip">PAGES → DOCX · PDF</span><span class="chip">NUMBERS → XLSX · CSV</span><span class="chip">KEY → PPTX · PDF</span></div>
           <p>Saving to Pages, Numbers or Keynote uses the app itself. Word, Excel and PowerPoint need LibreOffice; without it, PDFs and pictures come from the preview inside the file.</p>
+          <div class="media plate mock" aria-hidden="true">
+            <div class="mock-row">Report.pages<span class="ok">→ PDF · DOCX</span></div>
+            <div class="mock-row">Budget.numbers<span class="ok">→ XLSX · CSV</span></div>
+            <div class="mock-row">Slides.pptx<span class="ok">→ KEY</span></div>
+          </div>
+        </article>
+        <article class="card tile span-2 reveal">
+          <span class="tag">Tools</span>
+          <h3>Text from any scan</h3>
+          <p>Drop screenshots, scanned pages or PDFs on <b>OCR</b>. Get a text file or a searchable PDF, recognised on your Mac.</p>
+          <div class="media plate ocr-lines" aria-hidden="true">
+            <i style="width: 82%"></i><i class="hl" style="width: 94%"></i><i class="hl" style="width: 68%"></i><i style="width: 88%"></i><i style="width: 52%"></i>
+            <p class="out"><code>Scan OCR.pdf</code></p>
+          </div>
+        </article>
+        <article class="card tile span-2 reveal">
+          <span class="tag">Settings</span>
+          <h3>Output your way</h3>
+          <p>Automatic by default. Or pick the video codec, quality and size, the audio bitrate, image quality and GIF width.</p>
+          <div class="media plate mock" aria-hidden="true">
+            <div class="mock-row">Video codec<span>HEVC</span></div>
+            <div class="mock-row">Quality<span>Balanced</span></div>
+            <div class="mock-row">Largest size<span>1080p</span></div>
+          </div>
+        </article>
+        <article class="card tile span-2 reveal">
+          <span class="tag">Extra formats</span>
+          <h3>More formats in one click</h3>
+          <p>Settings → Extra Formats installs ffmpeg, LibreOffice and Pandoc for you: official builds, signature-checked, no Homebrew or admin password.</p>
+          <div class="media plate mock" aria-hidden="true">
+            <div class="mock-row">ffmpeg<span class="ok">Installed</span></div>
+            <div class="mock-row">LibreOffice<span>Install</span></div>
+            <div class="mock-row">Pandoc<span>Install</span></div>
+          </div>
         </article>
         <article class="card tile span-6 reveal">
           <span class="tag">Formats</span>
@@ -696,14 +777,18 @@ footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
           <div class="formats">
             <div class="fmt"><b>Images</b><span>PNG · JPG · HEIC · AVIF · WEBP<i>*</i> · TIFF · BMP, or into a PDF or Word file</span></div>
             <div class="fmt"><b>PDF</b><span>to Word, PowerPoint, Excel, EPUB, Markdown, JPG, PNG, TXT</span></div>
-            <div class="fmt"><b>Office documents</b><span>Word, RTF, ODT, HTML, TXT to PDF, Word and more</span></div>
-            <div class="fmt"><b>EPUB &amp; Markdown</b><span>from PDFs and documents; Markdown in, too</span></div>
-            <div class="fmt"><b>Spreadsheets</b><span>CSV ⇄ TSV ⇄ XLSX, tables to PDF; slides<i>*</i> to PDF, JPG, PNG</span></div>
+            <div class="fmt"><b>Documents</b><span>Word, RTF, ODT, HTML, TXT to PDF, Word, EPUB, HTML, Markdown</span></div>
+            <div class="fmt"><b>Markdown</b><span>rendered properly to PDF, Word, HTML, EPUB, RTF; Pandoc<i>*</i> if you have it</span></div>
+            <div class="fmt"><b>Spreadsheets</b><span>CSV ⇄ TSV ⇄ XLSX, XLS<i>*</i> and ODS<i>*</i>, tables to PDF</span></div>
+            <div class="fmt"><b>Slides</b><span>PowerPoint and ODP<i>*</i> to PDF, or one JPG or PNG per slide</span></div>
+            <div class="fmt"><b>Pages · Numbers · Keynote</b><span>to PDF, JPG, PNG, DOCX<i>*</i>, XLSX<i>*</i>, PPTX<i>*</i>, and back</span></div>
             <div class="fmt"><b>Audio</b><span>M4A · WAV · AIFF · FLAC · MP3<i>*</i> · OGG<i>*</i> · Opus<i>*</i> · WMA<i>*</i></span></div>
-            <div class="fmt"><b>Video</b><span>MP4 · MOV · GIF<i>*</i> · MKV<i>*</i> · WebM<i>*</i> · AVI<i>*</i> · WMV<i>*</i></span></div>
-            <div class="fmt"><b>Archives</b><span>ZIP · TAR · TAR.GZ, and unzip ZIP, 7Z, RAR</span></div>
+            <div class="fmt"><b>Video</b><span>MP4 · MOV · GIF · M4A · MKV<i>*</i> · WebM<i>*</i> · AVI<i>*</i> · WMV<i>*</i></span></div>
+            <div class="fmt"><b>Subtitles</b><span>SRT ⇄ VTT, or plain TXT</span></div>
+            <div class="fmt"><b>Archives</b><span>unzip ZIP, TAR, GZ, 7Z, RAR into a folder</span></div>
+            <div class="fmt"><b>Folders &amp; anything</b><span>ZIP · TAR · TAR.GZ, several files in one archive</span></div>
           </div>
-          <p class="fnote"><i>*</i> Optional and free: some audio and video formats need ffmpeg (<code>brew install ffmpeg</code>, plus <code>brew install webp</code> for WEBP), and slides need LibreOffice (<code>brew install --cask libreoffice</code>). Those wedges appear once the tool is installed.</p>
+          <p class="fnote"><i>*</i> Optional and free: ffmpeg adds the starred audio and video formats and WEBP, LibreOffice adds slides, XLS, ODS and whole-document Pages, Numbers and Keynote conversion, and Pandoc is used for Markdown when it's there. Install any of them in one click from <b>Settings → Extra Formats</b>, or use your Homebrew copies. Those wedges appear once the tool is installed.</p>
         </article>
       </div>
     </div>
@@ -720,7 +805,7 @@ footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
         <div class="card reveal">
           <div class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
           <h3>Private and offline</h3>
-          <p>Every conversion and tool runs on your Mac. Files never leave it. The only network access is checking GitHub for updates, which you can turn off.</p>
+          <p>Every conversion and tool runs on your Mac. Files never leave it. The only network access is checking GitHub for updates, which you can turn off, and downloading an extra tool when you click Install.</p>
         </div>
         <div class="card reveal">
           <div class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg></div>
@@ -770,7 +855,10 @@ footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
         <div class="install-get">
           <img src="assets/icon.png" alt="" width="88" height="88" loading="lazy">
           <h3>OpenShelf for Mac</h3>
-          <p>macOS 14 Sonoma or later · Tested on macOS 27 · Apple silicon &amp; Intel (Intel up to macOS 26)</p>
+          <ul class="reqs">
+            <li>macOS 14 Sonoma or later, ready for macOS 27</li>
+            <li>Apple silicon, or Intel up to macOS 26</li>
+          </ul>
           <a class="btn primary download-link" href="https://github.com/Manan-Santoki/OpenShelf/releases/latest"><span class="download-label" data-prefix="Download for Mac">Download for Mac</span></a>
           <p class="sub"><a href="https://github.com/Manan-Santoki/OpenShelf/releases">All releases</a> · <a href="https://github.com/Manan-Santoki/OpenShelf/blob/main/CHANGELOG.md">What's new</a></p>
         </div>
@@ -793,7 +881,7 @@ footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
         </details>
         <details>
           <summary>Does it upload my files?<svg class="plus" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary>
-          <div class="ans"><p>No. Every conversion and tool runs on your Mac, offline. There's no telemetry; the only network access is checking GitHub for updates, which you can turn off in Settings.</p></div>
+          <div class="ans"><p>No. Every conversion and tool runs on your Mac, offline. There's no telemetry; the only network access is checking GitHub for updates, which you can turn off in Settings, and downloading ffmpeg, LibreOffice or Pandoc if you click Install in Settings → Extra Formats.</p></div>
         </details>
         <details>
           <summary>Which macOS versions does it support?<svg class="plus" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary>
@@ -802,10 +890,11 @@ footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
         <details>
           <summary>Which formats need extra tools?<svg class="plus" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary>
           <div class="ans">
-            <p>Most formats work out of the box. Two free, optional tools add more:</p>
-            <p><b>ffmpeg</b> (<code>brew install ffmpeg</code>) adds MP3, OGG, Opus, WMA, MKV, WebM, AVI, WMV and GIF; <code>brew install webp</code> adds WEBP.</p>
-            <p><b>LibreOffice</b> (<code>brew install --cask libreoffice</code>) adds slides (PowerPoint and ODP), XLS/ODS spreadsheets, and whole-document conversion of Pages, Numbers and Keynote files.</p>
-            <p>Their wedges stay hidden until the tool is installed.</p>
+            <p>Most formats work out of the box. Three free, optional tools add more:</p>
+            <p><b>ffmpeg</b> adds MP3, OGG, Opus, WMA, MKV, WebM, AVI, WMV and WEBP, and makes slightly cleaner GIFs.</p>
+            <p><b>LibreOffice</b> adds slides (PowerPoint and ODP), XLS and ODS spreadsheets, Word to PDF with the original layout, and whole-document conversion of Pages, Numbers and Keynote files.</p>
+            <p><b>Pandoc</b> converts Markdown and Word documents its own way, when you prefer it.</p>
+            <p>Install any of them in one click from <b>Settings → Extra Formats</b>: OpenShelf downloads the official build and checks its signature, no Homebrew or administrator password needed. Copies you already have from Homebrew work too. Their wedges stay hidden until the tool is installed.</p>
           </div>
         </details>
         <details>
@@ -814,7 +903,15 @@ footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
         </details>
         <details>
           <summary>Can I change the keys?<svg class="plus" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary>
-          <div class="ans"><p>Yes. Click the OpenShelf wheel in the menu bar, choose <b>Settings…</b>, and pick the key for each wheel. The <kbd class="kc">⌃⌥Space</kbd> shortcut can be changed or turned off in Settings → Keyboard.</p></div>
+          <div class="ans"><p>Yes. Click the OpenShelf wheel in the menu bar, choose <b>Settings…</b>, and pick the key for each wheel. The <kbd class="kc">⌃⌥Space</kbd> shortcut can be changed or turned off there too.</p></div>
+        </details>
+        <details>
+          <summary>I can't see the menu bar icon. How do I get to Settings?<svg class="plus" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary>
+          <div class="ans"><p>On a crowded menu bar the icon can hide behind the notch or in macOS 27's menu bar overflow. Open OpenShelf again from Finder or Spotlight and Settings opens. Pressing <kbd class="kc">⌃⌥Space</kbd> twice with no files selected does the same.</p></div>
+        </details>
+        <details>
+          <summary>Where do converted files go?<svg class="plus" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary>
+          <div class="ans"><p>Next to the original, with a new name, so nothing is ever overwritten: <code>Photo.jpg</code> becomes <code>Photo.png</code>, then <code>Photo 2.png</code>. Files converted from a shelf are also added back to that shelf.</p></div>
         </details>
       </div>
     </div>
@@ -881,27 +978,48 @@ function wedgePath(start, end, g) {
   ].join(" ");
 }
 
-// ---- Download: point every button at the newest DMG.
-try {
-  fetch("https://api.github.com/repos/Manan-Santoki/OpenShelf/releases/latest")
+// ---- Download: point every button at the newest DMG, label it with its
+// version and show a "what's new" link. The version comes from GitHub, so
+// nothing here needs editing for a release; without it, the buttons keep
+// linking to the latest release page.
+(() => {
+  const API = "https://api.github.com/repos/Manan-Santoki/OpenShelf/releases/latest";
+  const KEY = "openshelf-latest-release";
+  const apply = release => {
+    if (!release || !release.tag) return;
+    const version = release.tag.replace(/^v/, "");
+    if (release.dmg) document.querySelectorAll(".download-link").forEach(a => { a.href = release.dmg; });
+    document.querySelectorAll(".download-label").forEach(s => {
+      s.textContent = s.dataset.prefix || "Download";
+      const v = document.createElement("span");
+      v.className = "ver";
+      v.textContent = "v" + version;
+      s.append(" ", v);
+    });
+    const news = document.getElementById("news");
+    if (news && release.url) {
+      news.href = release.url;
+      document.getElementById("news-text").textContent = "Version " + version + " is out: see what's new";
+      news.hidden = false;
+    }
+  };
+  // Reuse a recent answer so repeat visits don't spend GitHub's per-visitor rate limit.
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(KEY) || "null");
+    if (cached && Date.now() - cached.at < 30 * 60 * 1000) { apply(cached); return; }
+  } catch (_) {}
+  if (!window.fetch) return;
+  fetch(API, { headers: { Accept: "application/vnd.github+json" } })
     .then(r => r.ok ? r.json() : null)
-    .then(release => {
-      if (!release) return;
-      const dmg = (release.assets || []).find(a => a.name.endsWith(".dmg"));
-      if (!dmg) return;
-      const version = String(release.tag_name || "").replace(/^v/, "");
-      document.querySelectorAll(".download-link").forEach(a => { a.href = dmg.browser_download_url; });
-      document.querySelectorAll(".download-label").forEach(s => {
-        s.textContent = s.dataset.prefix || "Download";
-        if (!version) return;
-        const v = document.createElement("span");
-        v.className = "ver";
-        v.textContent = "v" + version;
-        s.append(" ", v);
-      });
+    .then(data => {
+      if (!data || data.draft || data.prerelease) return;
+      const dmg = (data.assets || []).find(a => /\.dmg$/i.test(a.name));
+      const release = { tag: String(data.tag_name || ""), url: data.html_url || "", dmg: dmg ? dmg.browser_download_url : "", at: Date.now() };
+      try { sessionStorage.setItem(KEY, JSON.stringify(release)); } catch (_) {}
+      apply(release);
     })
     .catch(() => {});
-} catch (_) {}
+})();
 
 // ---- One-time reveal as sections enter the viewport.
 (() => {
@@ -961,6 +1079,7 @@ const ICONS = {
   terminal: "M3 5h18v14H3zM7 10l3 2-3 2M12 15h5",
   more: "M6 12h.01M12 12h.01M18 12h.01",
   back: "M9 14L4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11",
+  ocr: "M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M8 9h8M8 12h8M8 15h5",
 };
 
 const conv = (fmt, name) => ({ label: fmt, title: "Convert to " + fmt, toast: ["Saved " + name, "Next to Photo.jpg"] });
@@ -978,6 +1097,7 @@ const WHEELS = {
     tool("Remove BG", "removebg", "Remove Background", "Saves a transparent PNG"), tool("Edit", "edit", "Edit"),
     tool("Metadata", "metadata", "Metadata", "View or remove EXIF and location"), tool("Redact", "redact", "Redact"),
     tool("Add BG", "addbg", "Add Background"), tool("Read QR", "qr", "Read QR", "Photo.jpg has no code to copy"),
+    tool("OCR", "ocr", "OCR", "Saves its text or a searchable PDF"),
   ]},
   actions: { name: "Actions", keys: "⌃", items: [
     { label: "Shelf", icon: "shelf", title: "Shelf", toast: ["Put on a shelf", "Photo.jpg waits in a floating shelf"] },
