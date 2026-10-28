@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 
 /// Apple's Pages, Numbers and Keynote documents. Each is a package: a zip
 /// file, or a folder in older and iCloud-synced copies.
@@ -34,12 +34,24 @@ enum IWorkFormat: String, CaseIterable, Hashable, Sendable {
         }
     }
 
-    var bundleIdentifier: String {
+    /// Newest first: current versions ("Pages Creator Studio" and so on)
+    /// use `com.apple.Pages`, older ones `com.apple.iWork.Pages`.
+    var bundleIdentifiers: [String] {
         switch self {
-        case .pages: "com.apple.iWork.Pages"
-        case .numbers: "com.apple.iWork.Numbers"
-        case .keynote: "com.apple.iWork.Keynote"
+        case .pages: ["com.apple.Pages", "com.apple.iWork.Pages"]
+        case .numbers: ["com.apple.Numbers", "com.apple.iWork.Numbers"]
+        case .keynote: ["com.apple.Keynote", "com.apple.iWork.Keynote"]
         }
+    }
+
+    /// The names the app is installed under, newest first.
+    var appFileNames: [String] {
+        ["\(appName) Creator Studio.app", "\(appName).app"]
+    }
+
+    /// The copy macOS would open, current or older; nil when none is installed.
+    var installedAppURL: URL? {
+        bundleIdentifiers.lazy.compactMap { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) }.first
     }
 
     /// The Convert wheel's wedge for saving in this format.
@@ -297,6 +309,16 @@ enum IWorkConversion {
     }
 }
 
+/// Automation access to Pages, Numbers or Keynote is turned off, so the save
+/// was refused. The Convert wheel says where to turn it back on.
+struct AutomationNotAllowed: LocalizedError, Equatable {
+    let appName: String
+
+    var errorDescription: String? {
+        "Allow OpenShelf to control \(appName) in System Settings → Privacy & Security → Automation, then try again."
+    }
+}
+
 /// Saves documents as Pages, Numbers or Keynote files by asking the app
 /// itself, over Apple Events. Only offered when the app is installed; the
 /// first time, macOS asks whether OpenShelf may control it.
@@ -321,7 +343,7 @@ enum IWorkExport {
             }
         } catch let failure as ProcessFailure {
             try? FileManager.default.removeItem(at: destination)
-            throw ConversionError.failed(message(forScriptError: failure.message, source: source, app: iWork))
+            throw self.failure(forScriptError: failure.message, source: source, app: iWork)
         } catch {
             try? FileManager.default.removeItem(at: destination)
             throw error
@@ -335,18 +357,24 @@ enum IWorkExport {
     /// osascript's command line: the script, then the paths it's run with,
     /// so no path is ever spliced into the script's text.
     static func arguments(source: URL, destination: URL, app: IWorkFormat) -> [String] {
-        ["-e", script(for: app), source.path, destination.path]
+        ["-e", script(bundleIdentifier: installedBundleIdentifier(of: app)), source.path, destination.path]
+    }
+
+    /// The identifier of the copy macOS would open, current or older.
+    static func installedBundleIdentifier(of app: IWorkFormat) -> String {
+        app.bundleIdentifiers.first { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) != nil }
+            ?? app.bundleIdentifiers[0]
     }
 
     /// Opens the file in the app, saves it as one of the app's documents and
     /// closes it, quitting the app again if it wasn't already open.
-    static func script(for app: IWorkFormat) -> String {
+    static func script(bundleIdentifier: String) -> String {
         """
         on run argv
             set sourceFile to POSIX file (item 1 of argv)
             set targetFile to POSIX file (item 2 of argv)
-            set wasRunning to application id "\(app.bundleIdentifier)" is running
-            tell application id "\(app.bundleIdentifier)"
+            set wasRunning to application id "\(bundleIdentifier)" is running
+            tell application id "\(bundleIdentifier)"
                 with timeout of 300 seconds
                     set theDocument to open sourceFile
                     try
@@ -364,15 +392,15 @@ enum IWorkExport {
         """
     }
 
-    /// A plain explanation of osascript's error output.
-    static func message(forScriptError text: String, source: URL, app: IWorkFormat) -> String {
+    /// What osascript's error output means, as an error to throw.
+    static func failure(forScriptError text: String, source: URL, app: IWorkFormat) -> any Error {
         if text.contains("(\(notPermittedCode))") {
-            return "Allow OpenShelf to control \(app.appName) in System Settings → Privacy & Security → Automation, then try again."
+            return AutomationNotAllowed(appName: app.appName)
         }
         // -10814: no app with that bundle identifier; -600: it quit or never launched.
         if text.contains("(-10814)") || text.contains("(-600)") {
-            return "\(app.appName) isn’t installed any more."
+            return ConversionError.failed("\(app.appName) isn’t installed any more.")
         }
-        return "\(app.appName) couldn’t save “\(source.lastPathComponent)”: \(FailureMessage.sanitized(text))"
+        return ConversionError.failed("\(app.appName) couldn’t save “\(source.lastPathComponent)”: \(FailureMessage.sanitized(text))")
     }
 }

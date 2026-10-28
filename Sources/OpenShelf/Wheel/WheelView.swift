@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct WheelView: View {
@@ -237,10 +238,14 @@ private struct PetalLabel: View {
                     Image(systemName: systemImage)
                         .font(.system(size: isCrowded ? 15 : 17, weight: .semibold))
                         .symbolRenderingMode(.hierarchical)
+                } else if let appIconPath = item.appIconPath {
+                    Image(nsImage: AppIcons.icon(forFile: appIconPath))
+                        .resizable()
+                        .frame(width: isCrowded ? 18 : 22, height: isCrowded ? 18 : 22)
                 }
                 Text(item.title.uppercased())
                     // Format names stand alone, so they get a larger label.
-                    .font(.system(size: item.systemImage == nil ? 13 : 9.5, weight: .bold))
+                    .font(.system(size: item.systemImage != nil ? 9.5 : item.appIconPath != nil ? 11 : 13, weight: .bold))
                     .tracking(0.4)
                     .lineLimit(1)
                     .minimumScaleFactor(0.65)
@@ -372,5 +377,18 @@ struct RoundedAnnularSector: Shape {
         )
         path.closeSubpath()
         return path
+    }
+}
+
+/// App icons for wedges, read once per app.
+@MainActor
+enum AppIcons {
+    private static var cache: [String: NSImage] = [:]
+
+    static func icon(forFile path: String) -> NSImage {
+        if let icon = cache[path] { return icon }
+        let icon = NSWorkspace.shared.icon(forFile: path)
+        cache[path] = icon
+        return icon
     }
 }

@@ -82,7 +82,9 @@ struct ExternalTools: Equatable, Sendable {
             pdfEngine: pdfEngine,
             iWorkApps: ignored.contains("iwork") ? [] : Set(IWorkFormat.allCases.filter { app in
                 locations.applicationDirectories.contains { directory in
-                    Bundle(url: directory.appendingPathComponent(app.appName + ".app"))?.bundleIdentifier == app.bundleIdentifier
+                    app.appFileNames.contains { name in
+                        Bundle(url: directory.appendingPathComponent(name))?.bundleIdentifier.map(app.bundleIdentifiers.contains) == true
+                    }
                 }
             })
         )
