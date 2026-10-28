@@ -6,10 +6,20 @@ tags `v<version>` and publishes a GitHub release with that section as notes.
 
 Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
 
-## Unreleased
+## [Unreleased]
 
-### Fixed
+### Fixed and improved
 
+- **Dragging with the wheel open is smooth again.** Two things on the wheel's
+  hover path were doing far more work than a mouse move needs:
+  - Once a wheel appeared mid-drag, moving the pointer over it re-read the
+    system drag pasteboard on every single mouse move instead of once when
+    the drag arrived. The dragged files are now read once and reused for the
+    rest of the hover, matching how shelves already read drops.
+  - Tracking the highlight and the More/Back dwell ring wrote to the wheel's
+    `@Observable` state on every hover reading even when the value hadn't
+    changed, which re-renders every petal regardless. Those writes now happen
+    only when the value actually changes.
 - **Converting to or from PDF shows real progress, and freezes the app
   less.** The progress toast sat at 0% for the whole of a PDF's conversion,
   then jumped to 100%: turning a PDF into images, Word, Markdown, EPUB,
