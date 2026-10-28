@@ -19,6 +19,7 @@ enum IntentFormat: String, AppEnum, CaseIterable {
     case mkv, webm, avi, wmv
     case srt, vtt
     case zip, tar, tgz, extract
+    case pages, numbers, key
 
     static var typeDisplayRepresentation: TypeDisplayRepresentation { "Format" }
 
@@ -32,6 +33,7 @@ enum IntentFormat: String, AppEnum, CaseIterable {
             .mkv: "MKV", .webm: "WEBM", .avi: "AVI", .wmv: "WMV",
             .srt: "SRT", .vtt: "VTT",
             .zip: "ZIP", .tar: "TAR", .tgz: "TAR.GZ", .extract: "UNZIP",
+            .pages: "PAGES", .numbers: "NUMBERS", .key: "KEY",
         ]
     }
 
