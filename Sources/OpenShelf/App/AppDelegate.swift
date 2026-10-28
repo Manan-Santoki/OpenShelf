@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let wheel = WheelController()
     private let dragMonitor = DragMonitor(preferences: .shared)
     private var hasShownMoreFormatsHint = false
+    private var emptyShortcutPresses = RepeatedEmptyPress()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Keeps the app out of the Dock when launched without the bundle's LSUIElement (e.g. `swift run`).
@@ -58,6 +59,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         shelves.saveNow()
     }
 
+    /// Opening OpenShelf again (from Finder, Spotlight or Launchpad) shows
+    /// Settings, so it can be reached when the menu bar icon is out of sight:
+    /// behind the notch or in the menu bar's overflow.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        SettingsWindowController.shared.show()
+        return false
+    }
+
     /// Opens a keyboard-driven wheel for the selected shelf items or, when no
     /// shelf has focus with a selection, the files selected in Finder.
     func openWheelForSelection() {
@@ -71,6 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             openWheelForFinderSelection()
             return
         }
+        emptyShortcutPresses.reset()
         // Whichever selection `choose` picked names the shelf it came from.
         let sourceShelf = (keySelection == urls) ? shelves.keyShelf : shelves.recentShelf
         let location = NSEvent.mouseLocation
@@ -87,6 +97,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let outcome = FinderSelection.resolve(frontmostBundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier) {
             try FinderSelection.fetchFromFinder()
         }
+        if outcome != .noSelection && outcome != .finderNotFrontmost {
+            emptyShortcutPresses.reset()
+        } else if emptyShortcutPresses.record(at: .now) {
+            SettingsWindowController.shared.show()
+            return
+        }
         if case .files(let urls) = outcome {
             if wheel.presentForKeyboard(urls: urls, at: location) {
                 TourProgress.shared.record(.keyboardWheelOpened(urls))
@@ -95,7 +111,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             return
         }
-        if let toast = FinderSelection.toast(for: outcome) {
+        if let toast = FinderSelection.toast(for: outcome, shortcut: Preferences.shared.openWheelShortcut) {
             ToastController.shared.show(toast, near: location, for: .seconds(outcome == .notPermitted ? 5 : 2))
         }
         if outcome == .notPermitted, let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation") {

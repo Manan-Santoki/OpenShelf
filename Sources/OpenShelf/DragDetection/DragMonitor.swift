@@ -91,6 +91,14 @@ final class DragMonitor {
         }) {
             eventMonitors.append(monitor)
         }
+        // A press whose mouse-down never reached us (a trackpad drag, say)
+        // is picked up on its first movement rather than by the slow fallback.
+        // Once following, each event only finds the follow already running.
+        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDragged, handler: { [weak self] _ in
+            MainActor.assumeIsolated { self?.followPressIfHeld() }
+        }) {
+            eventMonitors.append(monitor)
+        }
         if let monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp], handler: { [weak self] event in
             let isWheelKey = MainActor.assumeIsolated { self?.takeWheelKey(event) ?? false }
             return isWheelKey ? nil : event
@@ -98,10 +106,7 @@ final class DragMonitor {
             eventMonitors.append(monitor)
         }
         let timer = Timer(timeInterval: Self.fallbackInterval, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self, NSEvent.pressedMouseButtons & 1 == 1 else { return }
-                self.followPress()
-            }
+            MainActor.assumeIsolated { self?.fallbackCheck() }
         }
         timer.tolerance = Self.fallbackInterval / 2
         RunLoop.main.add(timer, forMode: .common)
@@ -115,6 +120,25 @@ final class DragMonitor {
         fallbackTimer = nil
         followTask?.cancel()
         endFollowing()
+    }
+
+    /// Starts following if the primary button is down and nothing is yet.
+    private func followPressIfHeld() {
+        guard followTask == nil, NSEvent.pressedMouseButtons & 1 == 1 else { return }
+        followPress()
+    }
+
+    /// Catches a press nothing else noticed and, between presses, keeps the
+    /// "before" change count current, so a source app that writes to the drag
+    /// pasteboard just after the button comes up (instead of during the drag)
+    /// doesn't leave the next ordinary click looking like a file drag.
+    private func fallbackCheck() {
+        guard followTask == nil else { return }
+        if NSEvent.pressedMouseButtons & 1 == 1 {
+            followPress()
+        } else {
+            changeCountBeforeDrag = dragPasteboard.changeCount
+        }
     }
 
     /// Polls closely until the primary button is released.

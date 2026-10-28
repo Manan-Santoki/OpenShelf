@@ -18,6 +18,21 @@ Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
 
 ### Fixed and improved
 
+- **Ready for macOS 27.** OpenShelf has been checked against macOS 27's
+  changes:
+  - When the menu bar icon is out of reach, behind the notch or tucked into
+    the new menu bar overflow, open OpenShelf again from Finder or Spotlight
+    and Settings opens. Pressing the wheel shortcut twice with no files
+    selected does the same; the "Select files in Finder first" toast now says
+    so.
+  - Drags are picked up more reliably: a drag whose mouse-down OpenShelf
+    didn't see (which can happen with trackpad drags) is noticed as soon as
+    it moves instead of up to a second later, and an app that updates its
+    drag data just after a drop is less likely to make a later ordinary
+    click look like a file drag.
+  - macOS 27 runs on Apple silicon only, so Intel Macs are supported up to
+    macOS 26.
+
 - **Dragging with the wheel open is smooth again.** Two things on the wheel's
   hover path were doing far more work than a mouse move needs:
   - Once a wheel appeared mid-drag, moving the pointer over it re-read the

@@ -69,8 +69,9 @@ so macOS asks once on first launch:
 - **macOS 14 Sonoma:** right-click OpenShelf in Applications → **Open** → **Open**.
 - Or, in Terminal: `xattr -dr com.apple.quarantine /Applications/OpenShelf.app`
 
-Requires macOS 14 Sonoma or later, on Apple silicon or Intel. A `.zip` of the
-app is also attached to each release.
+Requires macOS 14 Sonoma or later. Tested on macOS 27. Runs on Apple silicon
+and on Intel Macs up to macOS 26 (macOS 27 is Apple silicon only). A `.zip` of
+the app is also attached to each release.
 
 ## How to use
 
@@ -301,6 +302,11 @@ tab you used last:
   [Output settings](#output-settings))
 - **Extra Formats:** install or remove ffmpeg, LibreOffice and Pandoc
 - **Updates:** automatic checks and installs, and Check Now
+
+If the wheel icon is out of sight (behind the notch, or tucked into the menu
+bar's overflow on macOS 27), open OpenShelf again from Finder or Spotlight and
+Settings opens. Pressing the wheel shortcut (⌃⌥Space) twice with no files
+selected does the same.
 
 ffmpeg and ffprobe that OpenShelf installs live in
 `~/Library/Application Support/OpenShelf/Tools`; LibreOffice goes to

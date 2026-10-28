@@ -69,12 +69,18 @@ enum FinderSelection {
     }
 
     /// The toast to show when there's no wheel to open, or nil for `.files`.
-    static func toast(for outcome: FinderSelectionOutcome) -> Toast? {
+    /// - Parameter shortcut: The shortcut that was pressed; when there's no
+    ///   selection, the toast says pressing it again opens Settings.
+    static func toast(for outcome: FinderSelectionOutcome, shortcut: KeyCombo? = nil) -> Toast? {
         switch outcome {
         case .files:
             nil
         case .noSelection, .finderNotFrontmost:
-            Toast(systemImage: "cursorarrow.click", title: "Select files in Finder first")
+            Toast(
+                systemImage: "cursorarrow.click",
+                title: "Select files in Finder first",
+                subtitle: shortcut.map { "Press \($0.displayString) again for Settings" }
+            )
         case .notPermitted:
             Toast(systemImage: "lock", title: "Allow OpenShelf to control Finder", subtitle: "Privacy & Security → Automation")
         case .failed(let message):
@@ -96,5 +102,32 @@ enum WheelSelectionSource: Equatable {
         if let keyShelfSelection, !keyShelfSelection.isEmpty { return .shelf(keyShelfSelection) }
         if isOpenShelfFrontmost, !recentShelfSelection.isEmpty { return .shelf(recentShelfSelection) }
         return .finder
+    }
+}
+
+/// Pressing the wheel shortcut again while "Select files in Finder first" is
+/// still showing opens Settings: a way in when the menu bar icon is out of
+/// sight, behind the notch or in the menu bar's overflow.
+struct RepeatedEmptyPress {
+    /// About as long as the toast stays up.
+    static let window: Duration = .seconds(2)
+
+    private var lastPress: ContinuousClock.Instant?
+
+    /// Records a press that found nothing to open a wheel for. Returns true
+    /// when it follows another such press within `window`; the press after
+    /// that starts over.
+    mutating func record(at now: ContinuousClock.Instant) -> Bool {
+        if let lastPress, now - lastPress <= Self.window {
+            self.lastPress = nil
+            return true
+        }
+        lastPress = now
+        return false
+    }
+
+    /// Forgets the last press, e.g. once a wheel opened.
+    mutating func reset() {
+        lastPress = nil
     }
 }

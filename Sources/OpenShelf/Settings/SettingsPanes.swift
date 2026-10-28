@@ -13,6 +13,10 @@ struct GeneralSettingsPane: View {
                     .onChange(of: opensAtLogin) { _, enabled in
                         setOpensAtLogin(enabled)
                     }
+            } footer: {
+                Text("Menu bar icon out of sight, behind the notch or in the menu bar's overflow? Open OpenShelf again from Finder or Spotlight to come back here, or press the wheel shortcut twice with no files selected.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Section {
                 LabeledContent("Learn OpenShelf") {

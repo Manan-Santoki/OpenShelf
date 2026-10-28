@@ -19,6 +19,12 @@ this spec; it does not contain or derive from any other app's code or assets.
   opens the matching wheel at the pointer. A *tap* is enough: the wheel stays
   open until the drag ends (drop anywhere, or Esc).
 - Each wheel has its own configurable modifier combination (see §5).
+- Following starts on any primary-button press (or, if that press was never
+  seen, on its first drag movement; a once-a-second check catches the rest).
+  The "before" change count is the one from after the previous press, kept
+  current once a second while the button is up, so a pasteboard written a
+  little after the button goes down still counts and one written just after
+  it comes up doesn't.
 
 ## 2. The wheel
 
@@ -279,6 +285,12 @@ never copies or modifies them by itself).
 New Shelf · Show Shelves · Close All Shelves · Open Wheel for Selection ·
 Take the Tour… · Settings… · Check for Updates… · Quit.
 
+When the icon can't be reached (behind the notch, or in the macOS 27 menu
+bar's overflow), opening the app again from Finder or Spotlight shows
+Settings, and so does pressing the wheel shortcut again while "Select files in
+Finder first" is showing (within 2 s; that toast says so). Settings → General
+mentions both.
+
 ## 5. Settings
 
 Toolbar tabs, like System apps; the window keeps its width, takes each tab's
@@ -351,3 +363,6 @@ drag needed, Choose the settings), then You're set.
 7. ~~Shelf persistence across relaunches (with bookmarks).~~ (done, §3)
 8. ~~Batch progress for long-running conversions.~~ (done: the progress card, §2.3)
 9. Notarized builds once a Developer ID is available; then a Homebrew cask.
+10. Follow AppKit's move to gesture recognizers (TN3212): wheel and shelf
+    mouse tracking still uses mouse events and tracking areas, which macOS 27
+    supports; port it to `NSGestureRecognizer` when that becomes the better path.
