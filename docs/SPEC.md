@@ -432,6 +432,11 @@ in the app's process (`openAppWhenRun` is false) and never go online.
   linked with `-framework AppIntents -Xlinker -dependency_info` and that file
   is passed along. Without that tool it warns and the
   app builds without the actions.
+- **Signing:** macOS 27 only connects App Intents to apps with a team ID
+  (linkd logs "Unable to get teamId" and Shortcuts says it couldn't
+  communicate with the app). Ad-hoc signed builds have none, so the Release
+  workflow builds with `SKIP_APPINTENTS=1` until releases are signed with a
+  Developer ID.
 
 ## 8. Roadmap
 

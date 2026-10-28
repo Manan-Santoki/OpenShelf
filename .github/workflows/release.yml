@@ -63,6 +63,11 @@ jobs:
 
       - name: Build the universal app
         if: steps.version.outputs.exists == 'false'
+        env:
+          # The Shortcuts actions stay out of releases until they're signed with
+          # a Developer ID: macOS refuses to run App Intents from an ad-hoc
+          # signed app ("Unable to get teamId"), so they'd show up and fail.
+          SKIP_APPINTENTS: "1"
         run: make release
 
       - name: Build the installer
