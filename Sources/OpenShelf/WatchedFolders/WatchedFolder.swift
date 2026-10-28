@@ -155,8 +155,11 @@ enum WatchedFolderStore {
 /// Desktop when none was chosen (or the chosen one is gone).
 enum ScreenshotLocation {
     static func current(fileManager: FileManager = .default) -> URL {
-        resolve(
-            stored: UserDefaults(suiteName: "com.apple.screencapture")?.string(forKey: "location"),
+        // macOS 27 keeps a folder per capture type and reads "location-screenshot"
+        // first; earlier versions only have "location".
+        let defaults = UserDefaults(suiteName: "com.apple.screencapture")
+        return resolve(
+            stored: defaults?.string(forKey: "location-screenshot") ?? defaults?.string(forKey: "location"),
             home: fileManager.homeDirectoryForCurrentUser
         ) { url in
             var isDirectory: ObjCBool = false

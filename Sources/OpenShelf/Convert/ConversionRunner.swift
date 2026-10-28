@@ -79,6 +79,7 @@ final class ConversionRunner {
         let job = Task {
             var saved: [URL] = []
             var failures: [String] = []
+            var notAllowed: AutomationNotAllowed?
             for (index, sources) in jobs.enumerated() {
                 if Task.isCancelled { break }
                 let step = StepProgress(index: index, total: total) { toasts.updateProgress($0, subtitle: $1) }
@@ -91,22 +92,37 @@ final class ConversionRunner {
                 } catch is CancellationError {
                     step.cancel()
                     break
+                } catch let refusal as AutomationNotAllowed {
+                    // The rest would be refused the same way.
+                    step.cancel()
+                    notAllowed = refusal
+                    break
                 } catch {
                     failures.append("\(sources[0].lastPathComponent): \(error.localizedDescription)")
                 }
                 step.finish(subtitle: "\(index + 1) of \(total) saved")
             }
-            return (saved, failures)
+            return (saved, failures, notAllowed)
         }
 
         toasts.showProgress(Toast(systemImage: "arrow.triangle.2.circlepath", title: title, subtitle: "0 of \(total) saved", progress: .determinate(0)), near: location) {
             job.cancel()
         }
-        let (saved, failures) = await job.value
+        let (saved, failures, notAllowed) = await job.value
         if !saved.isEmpty { onSaved?(saved, sourceShelfID) }
 
         if job.isCancelled {
             toasts.show(Toast(systemImage: "xmark", title: "Cancelled", subtitle: saved.isEmpty ? nil : "\(saved.count) saved"))
+        } else if let notAllowed {
+            // Like Finder's: the full sentence doesn't fit a toast, so name the
+            // setting and open it.
+            toasts.show(
+                Toast(systemImage: "lock", title: "Allow OpenShelf to control \(notAllowed.appName)", subtitle: "Privacy & Security → Automation"),
+                for: .seconds(5)
+            )
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation") {
+                NSWorkspace.shared.open(url)
+            }
         } else if let failure = failures.first {
             let title = failures.count == 1 ? "Something went wrong" : "\(failures.count) files failed"
             toasts.show(Toast(systemImage: "exclamationmark.triangle", title: title, subtitle: failure), for: .seconds(4))

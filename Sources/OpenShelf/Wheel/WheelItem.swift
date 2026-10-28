@@ -61,6 +61,9 @@ struct WheelItem: Identifiable, Hashable {
     let title: String
     /// Text-only wedges (output formats) show a larger label instead of an icon.
     let systemImage: String?
+    /// The app that saves this format (Pages, Numbers, Keynote), whose icon
+    /// the wedge shows above its label.
+    var appIconPath: String? = nil
 
     var id: WheelCommand { command }
 
@@ -69,7 +72,7 @@ struct WheelItem: Identifiable, Hashable {
     }
 
     static func convert(_ format: OutputFormat) -> WheelItem {
-        WheelItem(command: .convert(format), title: format.title, systemImage: nil)
+        WheelItem(command: .convert(format), title: format.title, systemImage: nil, appIconPath: format.iWorkFormat?.installedAppURL?.path)
     }
 
     static func tool(_ tool: FileTool) -> WheelItem {

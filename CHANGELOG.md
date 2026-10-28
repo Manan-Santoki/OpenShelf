@@ -37,10 +37,10 @@ Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
   and the folder ("package") versions of these documents work.
 - **Save as Pages, Numbers or Keynote.** When the app is installed, Word, RTF
   and text files get a PAGES wedge, spreadsheets (XLSX, XLS, CSV, TSV) a
-  NUMBERS wedge and PowerPoint decks a KEY wedge. The app itself does the
-  saving, so the first time macOS asks whether OpenShelf may control it; if
-  that's turned off, the message says where to turn it back on (System
-  Settings → Privacy & Security → Automation).
+  NUMBERS wedge and PowerPoint decks a KEY wedge, each with the app's icon.
+  The app itself does the saving, so the first time macOS asks whether
+  OpenShelf may control it; if that's turned off, OpenShelf opens the setting
+  (System Settings → Privacy & Security → Automation).
 - **OpenShelf in Shortcuts and Spotlight.** Convert Files, Compress, Extract
   Text (OCR), Remove Background, Combine into PDF, Remove Audio, Read QR Codes
   and Add to Shelf are now actions in the Shortcuts app, so you can chain

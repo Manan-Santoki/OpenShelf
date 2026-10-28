@@ -266,13 +266,23 @@ struct IWorkTests {
             try PackageZip.write(data, to: "\(name).app/Contents/Info.plist", in: applications)
         }
         try install("Pages", identifier: "com.apple.iWork.Pages")
+        // Current versions have a new name and identifier.
+        try install("Numbers Creator Studio", identifier: "com.apple.Numbers")
         // Something else that happens to be called Keynote doesn't count.
         try install("Keynote", identifier: "com.example.keynote")
 
         let locations = ToolLocations(commandDirectories: [], libreOfficeApps: [], applicationDirectories: [applications])
-        #expect(ExternalTools.detect(in: locations, ignoring: []).iWorkApps == [.pages])
+        #expect(ExternalTools.detect(in: locations, ignoring: []).iWorkApps == [.pages, .numbers])
         #expect(ExternalTools.detect(in: locations, ignoring: ["iwork"]).iWorkApps.isEmpty)
         #expect(ExternalTools.detect(in: ToolLocations(commandDirectories: [], libreOfficeApps: []), ignoring: []).iWorkApps.isEmpty)
+    }
+
+    @Test func onlyIWorkWedgesShowAnAppIcon() {
+        #expect(WheelItem.convert(.png).appIconPath == nil)
+        #expect(WheelItem.convert(.pdf).appIconPath == nil)
+        for app in IWorkFormat.allCases {
+            #expect(WheelItem.convert(app.outputFormat).appIconPath == app.installedAppURL?.path)
+        }
     }
 
     @Test func exportScriptTakesPathsAsArguments() {
@@ -281,22 +291,22 @@ struct IWorkTests {
         let arguments = IWorkExport.arguments(source: source, destination: destination, app: .pages)
         #expect(arguments.first == "-e")
         #expect(Array(arguments.suffix(2)) == [source.path, destination.path])
-        let script = IWorkExport.script(for: .pages)
-        #expect(script.contains("application id \"com.apple.iWork.Pages\""))
+        let script = IWorkExport.script(bundleIdentifier: "com.apple.Pages")
+        #expect(script.contains("application id \"com.apple.Pages\""))
         #expect(!script.contains("Report"))
-        #expect(IWorkExport.script(for: .keynote).contains("com.apple.iWork.Keynote"))
     }
 
     @Test func explainsAutomationRefusals() {
         let source = URL(fileURLWithPath: "/tmp/Report.docx")
-        let denied = IWorkExport.message(
+        let denied = IWorkExport.failure(
             forScriptError: "0:312: execution error: Not authorized to send Apple events to Pages. (-1743)",
             source: source, app: .pages
         )
-        #expect(denied.contains("Privacy & Security → Automation"))
-        #expect(IWorkExport.message(forScriptError: "execution error: Can’t get application id \"com.apple.iWork.Pages\". (-10814)", source: source, app: .pages)
-            == "Pages isn’t installed any more.")
-        #expect(IWorkExport.message(forScriptError: "execution error: Pages got an error: The document can’t be opened. (-1)", source: source, app: .pages)
-            .hasPrefix("Pages couldn’t save “Report.docx”"))
+        #expect(denied as? AutomationNotAllowed == AutomationNotAllowed(appName: "Pages"))
+        #expect(denied.localizedDescription.contains("Privacy & Security → Automation"))
+        #expect(IWorkExport.failure(forScriptError: "execution error: Can’t get application id \"com.apple.Pages\". (-10814)", source: source, app: .pages)
+            .localizedDescription == "Pages isn’t installed any more.")
+        #expect(IWorkExport.failure(forScriptError: "execution error: Pages got an error: The document can’t be opened. (-1)", source: source, app: .pages)
+            .localizedDescription.hasPrefix("Pages couldn’t save “Report.docx”"))
     }
 }

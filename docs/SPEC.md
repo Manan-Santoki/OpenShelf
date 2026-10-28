@@ -142,15 +142,19 @@ needs LibreOffice" toast shows instead, and a conversion that still runs says
 to install it in Settings → Extra Formats.
 
 ¶ PAGES, NUMBERS and KEY (`IWorkExport`) are offered only when Pages, Numbers
-or Keynote is in /Applications or ~/Applications (checked by bundle identifier,
-`com.apple.iWork.Pages` etc.), for files that app opens: DOCX, DOC, RTF, RTFD
+or Keynote is in /Applications or ~/Applications (checked by bundle identifier:
+`com.apple.Pages` etc. for current "… Creator Studio" versions,
+`com.apple.iWork.Pages` etc. for older ones), for files that app opens: DOCX, DOC, RTF, RTFD
 and TXT for Pages; XLSX, XLS, CSV and TSV for Numbers (on spreadsheet wheels);
 PPTX and PPT for Keynote (on slide wheels, even without LibreOffice). The app
 does the work over Apple Events: `osascript` opens the file, `save … in` writes
 the new document next to the original, then it's closed and the app quit if
 it wasn't already running (300-second limit). Paths are passed as script
-arguments, never spliced into the script. Denied Automation access (-1743)
-says to allow it in Privacy & Security → Automation.
+arguments, never spliced into the script. Each of these wedges shows the
+installed app's icon above its label. Denied Automation access (-1743) ends
+the batch with "Allow OpenShelf to control …" and opens Privacy & Security →
+Automation, like the keyboard shortcut does for Finder. (macOS lets the app
+open the file without that access, so it's left open with the document.)
 Wheels hold at most 12 wedges (the largest, images, has 10).
 
 #### 2.3.1 Output settings
@@ -308,8 +312,9 @@ never copies or modifies them by itself).
 ### 3.1 Watched folders
 
 Off until a folder is added in Settings → Shelves → Watched Folders (Add
-Folder… with an open panel, or Watch Screenshots: the `location` default of
-`com.apple.screencapture`, with `~` expanded, else `~/Desktop`; re-read each
+Folder… with an open panel, or Watch Screenshots: the `location-screenshot`
+default of `com.apple.screencapture` (macOS 27), else its `location`, with `~`
+expanded, else `~/Desktop`; re-read each
 time watching starts). Saved to
 `~/Library/Application Support/OpenShelf/watched-folders.json` with a path and
 a bookmark per folder, a per-folder on/off switch and an optional action.
