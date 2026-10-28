@@ -170,30 +170,41 @@ struct FinderSelectionTests {
 struct RepeatedEmptyPressTests {
     let start = ContinuousClock.now
 
+    // `record` is mutating, so each result is read before `#expect`, which
+    // can't call a mutating member inside its expansion.
+
     @Test func secondPressSoonAfterCounts() {
         var presses = RepeatedEmptyPress()
-        #expect(!presses.record(at: start))
-        #expect(presses.record(at: start + .milliseconds(800)))
+        let first = presses.record(at: start)
+        let second = presses.record(at: start + .milliseconds(800))
+        #expect(!first)
+        #expect(second)
     }
 
     @Test func slowSecondPressStartsOver() {
         var presses = RepeatedEmptyPress()
-        #expect(!presses.record(at: start))
-        #expect(!presses.record(at: start + .seconds(3)))
-        #expect(presses.record(at: start + .seconds(4)))
+        let first = presses.record(at: start)
+        let slow = presses.record(at: start + .seconds(3))
+        let soonAfterSlow = presses.record(at: start + .seconds(4))
+        #expect(!first)
+        #expect(!slow)
+        #expect(soonAfterSlow)
     }
 
     @Test func pressAfterASecondPressStartsOver() {
         var presses = RepeatedEmptyPress()
         _ = presses.record(at: start)
-        #expect(presses.record(at: start + .milliseconds(500)))
-        #expect(!presses.record(at: start + .seconds(1)))
+        let second = presses.record(at: start + .milliseconds(500))
+        let third = presses.record(at: start + .seconds(1))
+        #expect(second)
+        #expect(!third)
     }
 
     @Test func openingAWheelInBetweenStartsOver() {
         var presses = RepeatedEmptyPress()
         _ = presses.record(at: start)
         presses.reset()
-        #expect(!presses.record(at: start + .milliseconds(500)))
+        let afterReset = presses.record(at: start + .milliseconds(500))
+        #expect(!afterReset)
     }
 }
