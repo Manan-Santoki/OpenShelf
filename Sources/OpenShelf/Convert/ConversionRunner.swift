@@ -133,7 +133,8 @@ final class StepProgress {
     private let total: Int
     /// Sets the toast's progress, and its subtitle when given.
     private let update: @MainActor (ToastProgress, String?) -> Void
-    private var pending: Task<Void, Never>?
+    /// The late switch to the busy bar; readable so tests can wait for it.
+    private(set) var pending: Task<Void, Never>?
 
     init(index: Int, total: Int, update: @escaping @MainActor (ToastProgress, String?) -> Void) {
         self.index = index

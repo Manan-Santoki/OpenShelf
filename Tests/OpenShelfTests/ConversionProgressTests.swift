@@ -184,7 +184,9 @@ struct StepProgressTests {
         let step = StepProgress(index: 0, total: 1, update: toast.record)
         #expect(toast.progress == nil)
 
-        try await Task.sleep(for: pastTheDelay)
+        // Waits for the switch itself rather than a fixed time: with the whole
+        // suite running, other tests can hold the main actor past the delay.
+        await step.pending?.value
         #expect(toast.progress == .indeterminate)
         // A late report still brings the real fraction back.
         step.report(0.4)
