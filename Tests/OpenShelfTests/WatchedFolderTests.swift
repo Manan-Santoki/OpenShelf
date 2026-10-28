@@ -35,50 +35,67 @@ struct ArrivalTrackerTests {
 
     @Test func neverReportsFilesThatWereAlreadyThere() {
         var tracker = ArrivalTracker(existing: [file("old.pdf", 1)])
-        #expect(tracker.observe([file("old.pdf", 1)], now: at(0)).isEmpty)
-        #expect(tracker.observe([file("old.pdf", 1)], now: at(10)).isEmpty)
+        let first = tracker.observe([file("old.pdf", 1)], now: at(0))
+        #expect(first.isEmpty)
+        let second = tracker.observe([file("old.pdf", 1)], now: at(10))
+        #expect(second.isEmpty)
         #expect(!tracker.hasPending)
     }
 
     @Test func reportsANewFileOnceItsSizeHasSettled() {
         var tracker = ArrivalTracker(existing: [])
-        #expect(tracker.observe([file("new.png", 2)], now: at(0)).isEmpty)
+        let first = tracker.observe([file("new.png", 2)], now: at(0))
+        #expect(first.isEmpty)
         #expect(tracker.hasPending)
-        #expect(tracker.observe([file("new.png", 2)], now: at(0.5)).isEmpty)
-        #expect(tracker.observe([file("new.png", 2)], now: at(1)) == ["new.png"])
+        let second = tracker.observe([file("new.png", 2)], now: at(0.5))
+        #expect(second.isEmpty)
+        let third = tracker.observe([file("new.png", 2)], now: at(1))
+        #expect(third == ["new.png"])
         #expect(!tracker.hasPending)
         // Only once.
-        #expect(tracker.observe([file("new.png", 2)], now: at(5)).isEmpty)
+        let fourth = tracker.observe([file("new.png", 2)], now: at(5))
+        #expect(fourth.isEmpty)
     }
 
     @Test func waitsWhileAFileIsStillGrowing() {
         var tracker = ArrivalTracker(existing: [])
         _ = tracker.observe([file("big.mov", 3, size: 10)], now: at(0))
-        #expect(tracker.observe([file("big.mov", 3, size: 500)], now: at(1)).isEmpty)
-        #expect(tracker.observe([file("big.mov", 3, size: 900)], now: at(2)).isEmpty)
-        #expect(tracker.observe([file("big.mov", 3, size: 900)], now: at(2.5)).isEmpty)
-        #expect(tracker.observe([file("big.mov", 3, size: 900)], now: at(3)) == ["big.mov"])
+        let first = tracker.observe([file("big.mov", 3, size: 500)], now: at(1))
+        #expect(first.isEmpty)
+        let second = tracker.observe([file("big.mov", 3, size: 900)], now: at(2))
+        #expect(second.isEmpty)
+        let third = tracker.observe([file("big.mov", 3, size: 900)], now: at(2.5))
+        #expect(third.isEmpty)
+        let fourth = tracker.observe([file("big.mov", 3, size: 900)], now: at(3))
+        #expect(fourth == ["big.mov"])
     }
 
     @Test func waitsLongerForAnEmptyFile() {
         var tracker = ArrivalTracker(existing: [])
         _ = tracker.observe([file("empty.txt", 4, size: 0)], now: at(0))
-        #expect(tracker.observe([file("empty.txt", 4, size: 0)], now: at(2)).isEmpty)
-        #expect(tracker.observe([file("empty.txt", 4, size: 0)], now: at(ArrivalTracker.emptySettleInterval)) == ["empty.txt"])
+        let first = tracker.observe([file("empty.txt", 4, size: 0)], now: at(2))
+        #expect(first.isEmpty)
+        let second = tracker.observe([file("empty.txt", 4, size: 0)], now: at(ArrivalTracker.emptySettleInterval))
+        #expect(second == ["empty.txt"])
     }
 
     @Test func waitsWhileFinderIsStillCopying() {
         var tracker = ArrivalTracker(existing: [])
         _ = tracker.observe([file("copy.zip", 5, busy: true)], now: at(0))
-        #expect(tracker.observe([file("copy.zip", 5, busy: true)], now: at(5)).isEmpty)
-        #expect(tracker.observe([file("copy.zip", 5)], now: at(6)).isEmpty)
-        #expect(tracker.observe([file("copy.zip", 5)], now: at(7)) == ["copy.zip"])
+        let first = tracker.observe([file("copy.zip", 5, busy: true)], now: at(5))
+        #expect(first.isEmpty)
+        let second = tracker.observe([file("copy.zip", 5)], now: at(6))
+        #expect(second.isEmpty)
+        let third = tracker.observe([file("copy.zip", 5)], now: at(7))
+        #expect(third == ["copy.zip"])
     }
 
     @Test func aRenameInsideTheFolderIsNotNew() {
         var tracker = ArrivalTracker(existing: [file("draft.txt", 6)])
-        #expect(tracker.observe([file("final.txt", 6)], now: at(0)).isEmpty)
-        #expect(tracker.observe([file("final.txt", 6)], now: at(5)).isEmpty)
+        let first = tracker.observe([file("final.txt", 6)], now: at(0))
+        #expect(first.isEmpty)
+        let second = tracker.observe([file("final.txt", 6)], now: at(5))
+        #expect(second.isEmpty)
         #expect(!tracker.hasPending)
     }
 
@@ -86,8 +103,10 @@ struct ArrivalTrackerTests {
     /// same name, which gives it a new file number.
     @Test func aFileSavedOverInPlaceIsNotNew() {
         var tracker = ArrivalTracker(existing: [file("notes.md", 7)])
-        #expect(tracker.observe([file("notes.md", 70)], now: at(0)).isEmpty)
-        #expect(tracker.observe([file("notes.md", 70)], now: at(5)).isEmpty)
+        let first = tracker.observe([file("notes.md", 70)], now: at(0))
+        #expect(first.isEmpty)
+        let second = tracker.observe([file("notes.md", 70)], now: at(5))
+        #expect(second.isEmpty)
     }
 
     /// Screenshot writes ".Screenshot …png" and then renames it; browsers
@@ -98,7 +117,8 @@ struct ArrivalTrackerTests {
         _ = tracker.observe([file(".Screenshot 1.png", 8), file("movie.mp4.crdownload", 9, size: 50)], now: at(0))
         #expect(!tracker.hasPending)
         _ = tracker.observe([file("Screenshot 1.png", 8), file("movie.mp4", 9, size: 50)], now: at(1))
-        #expect(tracker.observe([file("Screenshot 1.png", 8), file("movie.mp4", 9, size: 50)], now: at(2)) == ["movie.mp4", "Screenshot 1.png"])
+        let first = tracker.observe([file("Screenshot 1.png", 8), file("movie.mp4", 9, size: 50)], now: at(2))
+        #expect(first == ["movie.mp4", "Screenshot 1.png"])
     }
 
     @Test func ignoresFoldersAndHiddenFiles() {
@@ -106,13 +126,15 @@ struct ArrivalTrackerTests {
         let folder = Entry(name: "Unzipped", fileNumber: 10, size: 0, isRegularFile: false)
         _ = tracker.observe([folder, file(".DS_Store", 11)], now: at(0))
         #expect(!tracker.hasPending)
-        #expect(tracker.observe([folder, file(".DS_Store", 11)], now: at(9)).isEmpty)
+        let first = tracker.observe([folder, file(".DS_Store", 11)], now: at(9))
+        #expect(first.isEmpty)
     }
 
     @Test func forgetsAFileThatDisappearsBeforeSettling() {
         var tracker = ArrivalTracker(existing: [])
         _ = tracker.observe([file("scratch.dat", 12)], now: at(0))
-        #expect(tracker.observe([], now: at(0.5)).isEmpty)
+        let first = tracker.observe([], now: at(0.5))
+        #expect(first.isEmpty)
         #expect(!tracker.hasPending)
     }
 
@@ -122,7 +144,8 @@ struct ArrivalTrackerTests {
         var tracker = ArrivalTracker(existing: [file("report.pdf", 13)])
         _ = tracker.observe([], now: at(0))
         _ = tracker.observe([file("report.pdf", 14)], now: at(1))
-        #expect(tracker.observe([file("report.pdf", 14)], now: at(2)) == ["report.pdf"])
+        let first = tracker.observe([file("report.pdf", 14)], now: at(2))
+        #expect(first == ["report.pdf"])
     }
 
     /// Without file numbers, renames can't be told apart, but the file
@@ -132,8 +155,10 @@ struct ArrivalTrackerTests {
         var tracker = ArrivalTracker(existing: [old])
         let new = Entry(name: "new.txt", fileNumber: nil, size: 5, isRegularFile: true)
         _ = tracker.observe([old, new], now: at(0))
-        #expect(tracker.observe([old, new], now: at(1)) == ["new.txt"])
-        #expect(tracker.observe([old, new], now: at(2)).isEmpty)
+        let first = tracker.observe([old, new], now: at(1))
+        #expect(first == ["new.txt"])
+        let second = tracker.observe([old, new], now: at(2))
+        #expect(second.isEmpty)
     }
 }
 
