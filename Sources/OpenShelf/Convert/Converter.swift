@@ -48,8 +48,16 @@ enum Converter {
             return [try await ArchiveConversion.tar([source], gzip: true)]
         case .extract:
             return [try await ArchiveConversion.extract(source)]
+        case .pages, .numbers, .key:
+            guard let iWork = format.iWorkFormat else { break }
+            return [try await IWorkExport.export(source, as: iWork)]
         default:
             break
+        }
+
+        // Pages, Numbers and Keynote files, before their kind's own converters.
+        if let iWork = IWorkFormat(url: source) {
+            return try await IWorkConversion.convert(source, from: iWork, to: format, tools: tools, settings: settings, progress: progress)
         }
 
         switch FileKind(url: source) {

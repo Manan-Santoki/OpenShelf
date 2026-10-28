@@ -45,7 +45,8 @@ the file on a wedge and it's done, saved right next to the original.
 - **Updates itself:** new versions install from the app (Sparkle), signed so
   only genuine OpenShelf releases are accepted
 - **Extra formats, one click away:** ffmpeg adds MP3, OGG, WebP, MKV, WebM,
-  AVI and WMV; LibreOffice adds PowerPoint, XLS and ODS; Pandoc converts
+  AVI and WMV; LibreOffice adds PowerPoint, Keynote, Pages, Numbers, XLS and
+  ODS; Pandoc converts
   Markdown and Word documents its own way. Install any of them from
   Settings → Extra Formats (no Homebrew or administrator needed), or use the
   copies you already have from Homebrew
@@ -134,10 +135,13 @@ A small card next to the pointer shows progress; click its **×** to cancel.
 |---|---|
 | Image (JPG, PNG, HEIC, SVG, …) | PNG, JPG, WEBP², HEIC, TIFF, AVIF, BMP, PDF, DOCX, ZIP |
 | PDF | DOCX, JPG, PNG, TXT, Markdown, EPUB, PPTX, XLSX, ZIP |
-| Document (TXT, RTF, RTFD, DOCX, DOC, ODT, HTML, Markdown) | PDF, DOCX, TXT, Markdown, EPUB, HTML, RTF, ZIP |
-| Spreadsheet (CSV, TSV, XLSX) | XLSX, CSV, TSV, PDF, ODS¹, ZIP |
+| Document (TXT, RTF, RTFD, DOCX, DOC, ODT, HTML, Markdown) | PDF, DOCX, TXT, Markdown, EPUB, HTML, RTF, PAGES³, ZIP |
+| Spreadsheet (CSV, TSV, XLSX) | XLSX, CSV, TSV, PDF, ODS¹, NUMBERS³, ZIP |
 | Spreadsheet (XLS, ODS)¹ | XLSX, CSV, PDF, ODS, ZIP |
-| Slides (PPTX, PPT, ODP)¹ | PDF, JPG, PNG (one image per slide), ZIP |
+| Slides (PPTX, PPT, ODP)¹ | PDF, JPG, PNG (one image per slide), KEY³, ZIP |
+| Pages document | PDF⁴, DOCX¹, RTF¹, TXT¹, JPG⁴, PNG⁴, ZIP |
+| Numbers spreadsheet | PDF⁴, XLSX¹, CSV¹, ODS¹, JPG⁴, PNG⁴, ZIP |
+| Keynote deck | PDF⁴, PPTX¹, JPG⁴, PNG⁴ (one image per slide), ZIP |
 | Audio (MP3, M4A, WAV, AIFF, FLAC, OGG², Opus², WMA², …) | MP3², M4A, WAV, AIFF, FLAC, OGG², Opus², WMA², ZIP |
 | Video (MP4, MOV, MKV², WebM², AVI², WMV², …) | MP4, MOV, M4A, GIF, MP3², MKV², WebM², AVI², WMV², ZIP |
 | Subtitles (SRT, VTT) | TXT, SRT, VTT, ZIP |
@@ -147,6 +151,14 @@ A small card next to the pointer shows progress; click its **×** to cancel.
 Drag several files at once to convert them all; mixed selections show only the
 formats every file supports. Several files sent to ZIP, TAR or TAR.GZ go into
 one archive.
+
+³ Offered when Pages, Numbers or Keynote is installed; that app does the
+saving, so macOS asks once whether OpenShelf may control it (Privacy &
+Security → Automation). Pages takes DOCX, DOC, RTF and TXT; Numbers XLSX, XLS,
+CSV and TSV; Keynote PPTX and PPT. ⁴ With LibreOffice, from the whole
+document; without it, from the preview Pages, Numbers and Keynote save inside
+each file: a PDF of every page in older files, a picture of the first page
+(JPG and PNG only) in newer ones. Files without a preview need LibreOffice.
 
 ¹ Needs LibreOffice. ² Needs ffmpeg (`brew install webp` also adds WebP).
 
@@ -162,8 +174,7 @@ Homebrew** runs `brew install` for you. Copies from Homebrew (`brew install ffmp
 `brew install --cask libreoffice`) are used too and take precedence. Without
 them those wedges are hidden, and dragging a file only they can open (an MKV,
 a PowerPoint deck) says which one it needs. GIFs from video are made without
-ffmpeg, though it makes slightly cleaner ones when installed. Keynote files
-can't be converted, and Apple's Pages format isn't offered.
+ffmpeg, though it makes slightly cleaner ones when installed.
 
 #### Markdown and Word documents
 

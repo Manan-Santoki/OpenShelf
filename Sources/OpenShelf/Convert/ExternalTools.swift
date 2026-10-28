@@ -1,7 +1,7 @@
 import Foundation
 
 /// Optional tools found on this Mac: ffmpeg and ffprobe, cwebp, LibreOffice,
-/// and Pandoc with a program it can make PDFs with.
+/// Pandoc with a program it can make PDFs with, and Pages, Numbers and Keynote.
 struct ExternalTools: Equatable, Sendable {
     var ffmpeg: URL?
     var cwebp: URL?
@@ -10,6 +10,8 @@ struct ExternalTools: Equatable, Sendable {
     var pandoc: URL? = nil
     /// A typesetter Pandoc can make PDFs with (see `PandocConversion.pdfEngines`).
     var pdfEngine: URL? = nil
+    /// Which of Pages, Numbers and Keynote are installed, to save files as theirs.
+    var iWorkApps: Set<IWorkFormat> = []
 
     /// Never runs ffmpeg: see `WebPEncoder.isOffered`.
     var canEncodeWebP: Bool {
@@ -77,7 +79,12 @@ struct ExternalTools: Equatable, Sendable {
                 .map { $0.appendingPathComponent("Contents/MacOS/soffice") }
                 .first { FileManager.default.isExecutableFile(atPath: $0.path) },
             pandoc: pandoc,
-            pdfEngine: pdfEngine
+            pdfEngine: pdfEngine,
+            iWorkApps: ignored.contains("iwork") ? [] : Set(IWorkFormat.allCases.filter { app in
+                locations.applicationDirectories.contains { directory in
+                    Bundle(url: directory.appendingPathComponent(app.appName + ".app"))?.bundleIdentifier == app.bundleIdentifier
+                }
+            })
         )
     }
 
@@ -85,7 +92,8 @@ struct ExternalTools: Equatable, Sendable {
     /// try OpenShelf as someone without them sees it, and to try installing
     /// them from Settings: `defaults write app.openshelf.OpenShelf
     /// IgnoredExternalTools -array ffmpeg cwebp libreoffice pandoc` ("ffmpeg"
-    /// covers ffprobe too). `defaults delete` the key to undo.
+    /// covers ffprobe too; "iwork" hides Pages, Numbers and Keynote).
+    /// `defaults delete` the key to undo.
     static var ignoredTools: Set<String> {
         let names = UserDefaults.standard.stringArray(forKey: "IgnoredExternalTools") ?? []
         return Set(names.map { $0.lowercased() })
@@ -101,6 +109,8 @@ struct ToolLocations: Sendable {
     /// Where OpenShelf installs tools itself (see `ToolInstallation`).
     var ownCommandDirectories: [URL] = []
     var ownLibreOfficeApps: [URL] = []
+    /// Where Pages, Numbers and Keynote are looked for.
+    var applicationDirectories: [URL] = []
 
     /// Homebrew, MacPorts and the PATH come first: tools people installed
     /// themselves and keep up to date. OpenShelf's own copies (`ManagedTools`)
@@ -117,7 +127,12 @@ struct ToolLocations: Sendable {
                 + [ManagedTools.directory],
             libreOfficeApps: [URL(fileURLWithPath: "/Applications/LibreOffice.app"), ownApp],
             ownCommandDirectories: [ManagedTools.directory],
-            ownLibreOfficeApps: [ownApp]
+            ownLibreOfficeApps: [ownApp],
+            // Where the App Store puts Pages, Numbers and Keynote.
+            applicationDirectories: [
+                URL(fileURLWithPath: "/Applications"),
+                FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications"),
+            ]
         )
     }
 }

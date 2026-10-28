@@ -29,7 +29,7 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>OpenShelf asks Finder which files are selected, so the keyboard shortcut can open a wheel for them. It never changes anything in Finder.</string>
+	<string>OpenShelf asks Finder which files are selected, so the keyboard shortcut can open a wheel for them, and asks Pages, Numbers or Keynote to save a copy of a file when you convert to their format. It never changes your files.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>MIT License</string>
 	<key>SUFeedURL</key>

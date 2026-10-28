@@ -15,6 +15,21 @@ Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
   shortcut) and the result is added to that same shelf, so it's right there
   with the original. Files dragged in from Finder or another app behave as
   before. Turn it off in Settings → Shelves.
+- **Pages, Numbers and Keynote files convert.** Drag a `.pages`, `.numbers`
+  or `.key` file and the Convert wheel offers PDF, JPG and PNG, plus DOCX,
+  RTF and TXT for Pages documents, XLSX, CSV and ODS for Numbers
+  spreadsheets and PPTX for Keynote decks. With LibreOffice installed
+  (Settings → Extra Formats) the whole document is converted. Without it,
+  OpenShelf uses the preview these apps save inside each file: older files
+  become a full PDF or one picture per page, newer ones a picture of the first
+  page. A file with no preview says it needs LibreOffice. Both the single-file
+  and the folder ("package") versions of these documents work.
+- **Save as Pages, Numbers or Keynote.** When the app is installed, Word, RTF
+  and text files get a PAGES wedge, spreadsheets (XLSX, XLS, CSV, TSV) a
+  NUMBERS wedge and PowerPoint decks a KEY wedge. The app itself does the
+  saving, so the first time macOS asks whether OpenShelf may control it; if
+  that's turned off, the message says where to turn it back on (System
+  Settings → Privacy & Security → Automation).
 
 ### Fixed and improved
 
