@@ -24,6 +24,8 @@ SPARKLE_FLAGS     := -F $(SPARKLE_DIR) -framework Sparkle -Xlinker -rpath -Xlink
 SWIFTC = swiftc -sdk "$(SDK)" -swift-version 6 -parse-as-library -O $(SPARKLE_FLAGS)
 
 # Assembles $(APP_BUNDLE) around $(BUILD_DIR)/$(APP_NAME) and ad-hoc signs it.
+# The App Intents metadata (Shortcuts and Spotlight actions) needs Xcode; the
+# script warns and carries on without it otherwise. SKIP_APPINTENTS=1 skips it.
 define bundle_app
 	rm -rf "$(APP_BUNDLE)"
 	mkdir -p "$(APP_BUNDLE)/Contents/MacOS" "$(APP_BUNDLE)/Contents/Resources" "$(APP_BUNDLE)/Contents/Frameworks"
@@ -31,6 +33,7 @@ define bundle_app
 	cp Support/Info.plist "$(APP_BUNDLE)/Contents/Info.plist"
 	cp Support/AppIcon.icns "$(APP_BUNDLE)/Contents/Resources/AppIcon.icns"
 	ditto "$(SPARKLE_FRAMEWORK)" "$(APP_BUNDLE)/Contents/Frameworks/Sparkle.framework"
+	SDK="$(SDK)" EXTRA_SWIFTC_FLAGS="-F $(SPARKLE_DIR)" sh scripts/appintents-metadata.sh "$(APP_BUNDLE)" "$(BUILD_DIR)/appintents" $(SOURCES)
 	codesign --force --deep --sign - "$(APP_BUNDLE)"
 endef
 
