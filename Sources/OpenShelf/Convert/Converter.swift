@@ -56,13 +56,13 @@ enum Converter {
         case .image:
             return [try await ImageConversion.convert(source, to: format, tools: tools, settings: settings.image)]
         case .pdf:
-            return try PDFConversion.convert(source, to: format, imageQuality: settings.image.quality)
+            return try PDFConversion.convert(source, to: format, imageQuality: settings.image.quality, progress: progress)
         case .document:
             return [try await DocumentConversion.convert(source, to: format, tools: tools)]
         case .spreadsheet:
             return try await SpreadsheetConversion.convert(source, to: format, tools: tools)
         case .presentation:
-            return try await OfficeConversion.convert(source, to: format, tools: tools)
+            return try await OfficeConversion.convert(source, to: format, tools: tools, progress: progress)
         case .audio, .video:
             return [try await MediaConversion.convert(source, to: format, tools: tools, settings: settings, progress: progress)]
         case .subtitle:

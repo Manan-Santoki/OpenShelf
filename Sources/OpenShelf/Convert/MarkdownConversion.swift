@@ -32,10 +32,10 @@ enum MarkdownConversion {
             let range = NSRange(location: 0, length: text.length)
             try text.data(from: range, documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]).write(to: destination)
         case .pdf:
-            try await MainActor.run {
-                let text = MarkdownRichText.attributedString(document, baseURL: folder, width: DocumentConversion.printableWidth)
-                try DocumentConversion.printPDF(text, to: destination)
-            }
+            // Built here like RTF's (pictures load from disk); only the
+            // printing needs the main thread.
+            let text = MarkdownRichText.attributedString(document, baseURL: folder, width: DocumentConversion.printableWidth)
+            try await DocumentConversion.printPDFOnMain(text, to: destination)
         default:
             throw ConversionError.unsupported("Markdown to \(format.title)")
         }

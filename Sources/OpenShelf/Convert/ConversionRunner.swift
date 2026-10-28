@@ -66,21 +66,23 @@ final class ConversionRunner {
             var failures: [String] = []
             for (index, sources) in jobs.enumerated() {
                 if Task.isCancelled { break }
+                let step = StepProgress(index: index, total: total) { toasts.updateProgress($0, subtitle: $1) }
                 do {
                     saved += try await operation(sources) { fraction in
-                        Task { @MainActor in toasts.updateProgress((Double(index) + fraction) / Double(total)) }
+                        Task { @MainActor in step.report(fraction) }
                     }
                 } catch is CancellationError {
+                    step.cancel()
                     break
                 } catch {
                     failures.append("\(sources[0].lastPathComponent): \(error.localizedDescription)")
                 }
-                toasts.updateProgress(Double(index + 1) / Double(total), subtitle: "\(index + 1) of \(total) saved")
+                step.finish(subtitle: "\(index + 1) of \(total) saved")
             }
             return (saved, failures)
         }
 
-        toasts.showProgress(Toast(systemImage: "arrow.triangle.2.circlepath", title: title, subtitle: "0 of \(total) saved", progress: 0), near: location) {
+        toasts.showProgress(Toast(systemImage: "arrow.triangle.2.circlepath", title: title, subtitle: "0 of \(total) saved", progress: .determinate(0)), near: location) {
             job.cancel()
         }
         let (saved, failures) = await job.value
@@ -94,5 +96,50 @@ final class ConversionRunner {
             // Worded like the editors' confirmations.
             toasts.show(SaveOutcome(saved: saved, detail: savedSubtitle).toast)
         }
+    }
+}
+
+/// Tracks one file's share of the batch toast. Conversions that can't
+/// measure their own progress (LibreOffice, Pandoc, AppKit printing…) simply
+/// never call `report`; after a short wait with nothing to show, this swaps
+/// the toast to a busy bar instead of leaving it looking stuck.
+///
+/// Internal, not private, for tests.
+@MainActor
+final class StepProgress {
+    /// How long a file gets to report real progress before this gives up and
+    /// shows a busy bar instead.
+    static let indeterminateDelay: Duration = .milliseconds(350)
+
+    private let index: Int
+    private let total: Int
+    /// Sets the toast's progress, and its subtitle when given.
+    private let update: @MainActor (ToastProgress, String?) -> Void
+    private var pending: Task<Void, Never>?
+
+    init(index: Int, total: Int, update: @escaping @MainActor (ToastProgress, String?) -> Void) {
+        self.index = index
+        self.total = total
+        self.update = update
+        pending = Task { [weak self] in
+            try? await Task.sleep(for: Self.indeterminateDelay)
+            guard let self, !Task.isCancelled else { return }
+            self.update(.indeterminate, nil)
+        }
+    }
+
+    /// `fraction` is this file's own 0...1 progress.
+    func report(_ fraction: Double) {
+        pending?.cancel()
+        update(.determinate((Double(index) + min(max(fraction, 0), 1)) / Double(total)), nil)
+    }
+
+    func finish(subtitle: String) {
+        pending?.cancel()
+        update(.determinate(Double(index + 1) / Double(total)), subtitle)
+    }
+
+    func cancel() {
+        pending?.cancel()
     }
 }
