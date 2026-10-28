@@ -23,6 +23,12 @@ SPARKLE_FLAGS     := -F $(SPARKLE_DIR) -framework Sparkle -Xlinker -rpath -Xlink
 
 SWIFTC = swiftc -sdk "$(SDK)" -swift-version 6 -parse-as-library -O $(SPARKLE_FLAGS)
 
+# The linker's record of what it linked. App Intents' metadata step reads it
+# to see that AppIntents.framework is linked, as it does in Xcode, and skips
+# the app otherwise; the framework is named explicitly so it's always listed.
+DEPENDENCY_INFO := $(BUILD_DIR)/$(APP_NAME)_dependency_info.dat
+LINK_RECORD     = -framework AppIntents -Xlinker -dependency_info -Xlinker $(1)
+
 # Assembles $(APP_BUNDLE) around $(BUILD_DIR)/$(APP_NAME) and ad-hoc signs it.
 # The App Intents metadata (Shortcuts and Spotlight actions) needs Xcode; the
 # script warns and carries on without it otherwise. SKIP_APPINTENTS=1 skips it.
@@ -33,7 +39,7 @@ define bundle_app
 	cp Support/Info.plist "$(APP_BUNDLE)/Contents/Info.plist"
 	cp Support/AppIcon.icns "$(APP_BUNDLE)/Contents/Resources/AppIcon.icns"
 	ditto "$(SPARKLE_FRAMEWORK)" "$(APP_BUNDLE)/Contents/Frameworks/Sparkle.framework"
-	SDK="$(SDK)" EXTRA_SWIFTC_FLAGS="-F $(SPARKLE_DIR)" sh scripts/appintents-metadata.sh "$(APP_BUNDLE)" "$(BUILD_DIR)/appintents" $(SOURCES)
+	SDK="$(SDK)" DEPENDENCY_INFO="$(DEPENDENCY_INFO)" EXTRA_SWIFTC_FLAGS="-F $(SPARKLE_DIR)" sh scripts/appintents-metadata.sh "$(APP_BUNDLE)" "$(BUILD_DIR)/appintents" $(SOURCES)
 	codesign --force --deep --sign - "$(APP_BUNDLE)"
 endef
 
@@ -44,7 +50,7 @@ build: $(BUILD_DIR)/$(APP_NAME)
 
 $(BUILD_DIR)/$(APP_NAME): $(SOURCES) $(SPARKLE_FRAMEWORK)
 	mkdir -p $(BUILD_DIR)
-	$(SWIFTC) -target $(ARCH)-apple-macosx14.0 $(SOURCES) -o $@
+	$(SWIFTC) -target $(ARCH)-apple-macosx14.0 $(SOURCES) $(call LINK_RECORD,$(DEPENDENCY_INFO)) -o $@
 
 sparkle: $(SPARKLE_FRAMEWORK)
 
@@ -67,8 +73,9 @@ run: app
 release: $(SPARKLE_FRAMEWORK)
 	mkdir -p $(BUILD_DIR)/arm64 $(BUILD_DIR)/x86_64
 	for arch in arm64 x86_64; do \
-		$(SWIFTC) -target $$arch-apple-macosx14.0 $(SOURCES) -o $(BUILD_DIR)/$$arch/$(APP_NAME) || exit 1; \
+		$(SWIFTC) -target $$arch-apple-macosx14.0 $(SOURCES) $(call LINK_RECORD,$(BUILD_DIR)/$$arch/$(APP_NAME)_dependency_info.dat) -o $(BUILD_DIR)/$$arch/$(APP_NAME) || exit 1; \
 	done
+	cp $(BUILD_DIR)/$(ARCH)/$(APP_NAME)_dependency_info.dat $(DEPENDENCY_INFO)
 	lipo -create -output $(BUILD_DIR)/$(APP_NAME) $(BUILD_DIR)/arm64/$(APP_NAME) $(BUILD_DIR)/x86_64/$(APP_NAME)
 	$(bundle_app)
 	rm -f "$(RELEASE_ZIP)"

@@ -422,7 +422,10 @@ in the app's process (`openAppWhenRun` is false) and never go online.
 - **Build:** `make` runs `scripts/appintents-metadata.sh`, which compiles the
   sources once more for their constant values (`-emit-const-values-path`) and
   runs Xcode's `appintentsmetadataprocessor` to write
-  `Contents/Resources/Metadata.appintents`. Without that tool it warns and the
+  `Contents/Resources/Metadata.appintents`. The processor only handles apps
+  whose linker dependency info lists AppIntents.framework, so the app is
+  linked with `-framework AppIntents -Xlinker -dependency_info` and that file
+  is passed along. Without that tool it warns and the
   app builds without the actions.
 
 ## 8. Roadmap
