@@ -11,6 +11,8 @@ struct DragSourceArea: NSViewRepresentable {
     var onDoubleClick: () -> Void
     var menu: (NSView) -> NSMenu?
     var onDragEnded: ([ShelfItem], NSDragOperation) -> Void
+    /// Called right as a drag of this shelf's items begins. No-op by default.
+    var onDragBegan: () -> Void = {}
 
     func makeNSView(context: Context) -> DragSourceView {
         let view = DragSourceView()
@@ -80,6 +82,7 @@ final class DragSourceView: NSView, NSDraggingSource {
     private func beginDrag(with event: NSEvent) {
         guard let items = configuration?.dragItems(), !items.isEmpty else { return }
         draggedItems = items
+        configuration?.onDragBegan()
 
         let side = min(bounds.width, bounds.height, 64)
         let origin = NSPoint(x: bounds.midX - side / 2, y: bounds.midY - side / 2)
@@ -106,6 +109,7 @@ final class DragSourceView: NSView, NSDraggingSource {
     func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
         let items = draggedItems
         draggedItems = []
+        Shelf.activeDragSource = nil
         configuration?.onDragEnded(items, operation)
     }
 }

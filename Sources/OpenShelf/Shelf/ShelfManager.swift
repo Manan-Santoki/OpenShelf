@@ -30,6 +30,14 @@ final class ShelfManager {
         controllers.last?.shelf.selectedItems.map(\.url) ?? []
     }
 
+    /// The shelf with keyboard focus, or nil when none has one.
+    var keyShelf: Shelf? {
+        controllers.first { $0.window?.isKeyWindow == true }?.shelf
+    }
+
+    /// The most recently used shelf, or nil when none is open.
+    var recentShelf: Shelf? { controllers.last?.shelf }
+
     /// Brings every shelf to the front, sliding out any hidden at an edge, and
     /// focuses the most recently used one.
     func showAll() {
@@ -57,6 +65,22 @@ final class ShelfManager {
         }
         recent.shelf.add(urls)
         recent.present()
+    }
+
+    /// Adds the files a conversion or tool wrote back to the shelf the
+    /// operation was started from, when Settings → Shelves allows it and
+    /// that shelf is still open. Does nothing otherwise — including when the
+    /// shelf was closed or removed while the operation ran, which is never
+    /// treated as a reason to reopen it.
+    /// - Parameter isEnabled: nil reads Settings → Shelves' toggle; tests
+    ///   pass an explicit value instead.
+    func addConversionResults(_ urls: [URL], sourceShelfID: Shelf.ID?, isEnabled: Bool? = nil) {
+        let isEnabled = isEnabled ?? Preferences.shared.addsConversionResultsToShelf
+        guard !urls.isEmpty,
+              let shelf = ShelfConversionTarget.resolve(sourceShelfID: sourceShelfID, isEnabled: isEnabled, openShelves: openShelves)
+        else { return }
+        shelf.add(urls)
+        scheduleSave()
     }
 
     /// Updates every open reference after files move through the Actions wheel.

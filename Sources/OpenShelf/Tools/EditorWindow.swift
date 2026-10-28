@@ -159,9 +159,17 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
     private static var open: [EditorWindowController] = []
     private let model = EditorPresentation()
 
+    /// Called with the files an editor wrote, and the shelf the files being
+    /// edited came from, if any. Wired once at launch to add them back to
+    /// that shelf when Settings → Shelves allows it.
+    static var onSaved: (([URL], Shelf.ID?) -> Void)?
+
+    /// - Parameter sourceShelfID: The shelf the files being edited came
+    ///   from, if any; carried through to `onSaved` once something is written.
     static func present<Content: View>(
         size: CGSize,
         near location: NSPoint = NSEvent.mouseLocation,
+        sourceShelfID: Shelf.ID? = nil,
         @ViewBuilder content: (EditorActions) -> Content
     ) {
         ColorPanelPlacement.install()
@@ -169,7 +177,10 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
         let actions = EditorActions(
             close: { [weak controller] in controller?.dismiss() },
             finished: { [weak controller] outcome in
-                if outcome.savedAnything { controller?.dismiss() }
+                if outcome.savedAnything {
+                    controller?.dismiss()
+                    onSaved?(outcome.saved, sourceShelfID)
+                }
                 // A mixed or empty result has more to read than "Saved".
                 let duration: Duration = outcome.unchanged > 0 ? .seconds(3) : .seconds(1.8)
                 ToastController.shared.show(outcome.toast, for: duration)

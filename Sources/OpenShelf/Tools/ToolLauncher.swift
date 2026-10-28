@@ -4,13 +4,16 @@ import AppKit
 /// one-click tools (Combine, Mute, Read QR).
 @MainActor
 enum ToolLauncher {
-    static func open(_ tool: FileTool, with urls: [URL], near location: NSPoint = NSEvent.mouseLocation) {
+    /// - Parameter sourceShelfID: The shelf `urls` were dragged or selected
+    ///   from, if any; carried through so the tool's output can be added
+    ///   back to it.
+    static func open(_ tool: FileTool, with urls: [URL], near location: NSPoint = NSEvent.mouseLocation, sourceShelfID: Shelf.ID? = nil) {
         guard !urls.isEmpty else { return }
         let runner = ConversionRunner.shared
 
         switch tool {
         case .compress, .metadata, .edit, .annotate, .addBackground, .crop, .resize, .removeBackground, .redact:
-            openImageEditor(tool, with: urls, near: location)
+            openImageEditor(tool, with: urls, near: location, sourceShelfID: sourceShelfID)
 
         case .readQR:
             Task {
@@ -29,45 +32,45 @@ enum ToolLauncher {
             }
 
         case .combinePDF:
-            runner.run(title: "Combining into PDF", jobs: [urls], near: location) { sources, _ in
+            runner.run(title: "Combining into PDF", jobs: [urls], near: location, sourceShelfID: sourceShelfID) { sources, _ in
                 [try await PDFTools.combine(sources)]
             }
 
         case .mute:
-            runner.run(title: "Removing audio", jobs: urls.map { [$0] }, near: location) { sources, progress in
+            runner.run(title: "Removing audio", jobs: urls.map { [$0] }, near: location, sourceShelfID: sourceShelfID) { sources, progress in
                 [try await MediaTools.mute(sources[0], progress: progress)]
             }
 
         case .ocr:
-            EditorWindowController.present(size: OCREditor.windowSize, near: location) { OCREditor(urls: urls, actions: $0) }
+            EditorWindowController.present(size: OCREditor.windowSize, near: location, sourceShelfID: sourceShelfID) { OCREditor(urls: urls, actions: $0) }
 
         case .organizePages:
-            EditorWindowController.present(size: PDFPagesEditor.windowSize(for: urls.count), near: location) { PDFPagesEditor(urls: urls, actions: $0) }
+            EditorWindowController.present(size: PDFPagesEditor.windowSize(for: urls.count), near: location, sourceShelfID: sourceShelfID) { PDFPagesEditor(urls: urls, actions: $0) }
         case .splitPDF:
-            EditorWindowController.present(size: PDFSplitEditor.windowSize(for: urls.count), near: location) { PDFSplitEditor(urls: urls, actions: $0) }
+            EditorWindowController.present(size: PDFSplitEditor.windowSize(for: urls.count), near: location, sourceShelfID: sourceShelfID) { PDFSplitEditor(urls: urls, actions: $0) }
         case .compressPDF:
-            EditorWindowController.present(size: PDFCompressEditor.windowSize, near: location) { PDFCompressEditor(urls: urls, actions: $0) }
+            EditorWindowController.present(size: PDFCompressEditor.windowSize, near: location, sourceShelfID: sourceShelfID) { PDFCompressEditor(urls: urls, actions: $0) }
         case .pdfMetadata:
-            EditorWindowController.present(size: PDFMetadataEditor.windowSize, near: location) { PDFMetadataEditor(urls: urls, actions: $0) }
+            EditorWindowController.present(size: PDFMetadataEditor.windowSize, near: location, sourceShelfID: sourceShelfID) { PDFMetadataEditor(urls: urls, actions: $0) }
 
         case .trim:
-            EditorWindowController.present(size: MediaTrimEditor.windowSize(for: urls.count), near: location) { MediaTrimEditor(urls: urls, actions: $0) }
+            EditorWindowController.present(size: MediaTrimEditor.windowSize(for: urls.count), near: location, sourceShelfID: sourceShelfID) { MediaTrimEditor(urls: urls, actions: $0) }
         case .speed:
-            EditorWindowController.present(size: MediaSpeedEditor.windowSize, near: location) { MediaSpeedEditor(urls: urls, actions: $0) }
+            EditorWindowController.present(size: MediaSpeedEditor.windowSize, near: location, sourceShelfID: sourceShelfID) { MediaSpeedEditor(urls: urls, actions: $0) }
         case .cropVideo:
-            EditorWindowController.present(size: VideoCropEditor.windowSize(for: urls.count), near: location) { VideoCropEditor(urls: urls, actions: $0) }
+            EditorWindowController.present(size: VideoCropEditor.windowSize(for: urls.count), near: location, sourceShelfID: sourceShelfID) { VideoCropEditor(urls: urls, actions: $0) }
         case .compressVideo:
-            EditorWindowController.present(size: VideoCompressEditor.windowSize, near: location) { VideoCompressEditor(urls: urls, actions: $0) }
+            EditorWindowController.present(size: VideoCompressEditor.windowSize, near: location, sourceShelfID: sourceShelfID) { VideoCompressEditor(urls: urls, actions: $0) }
         case .mergeMedia:
-            EditorWindowController.present(size: MediaMergeEditor.windowSize, near: location) { MediaMergeEditor(urls: urls, actions: $0) }
+            EditorWindowController.present(size: MediaMergeEditor.windowSize, near: location, sourceShelfID: sourceShelfID) { MediaMergeEditor(urls: urls, actions: $0) }
         case .splitMedia:
-            EditorWindowController.present(size: MediaSplitEditor.windowSize(for: urls.count), near: location) { MediaSplitEditor(urls: urls, actions: $0) }
+            EditorWindowController.present(size: MediaSplitEditor.windowSize(for: urls.count), near: location, sourceShelfID: sourceShelfID) { MediaSplitEditor(urls: urls, actions: $0) }
         case .rotateVideo:
-            EditorWindowController.present(size: VideoRotateEditor.windowSize(for: urls.count), near: location) { VideoRotateEditor(urls: urls, actions: $0) }
+            EditorWindowController.present(size: VideoRotateEditor.windowSize(for: urls.count), near: location, sourceShelfID: sourceShelfID) { VideoRotateEditor(urls: urls, actions: $0) }
         }
     }
 
-    private static func openImageEditor(_ tool: FileTool, with urls: [URL], near location: NSPoint) {
+    private static func openImageEditor(_ tool: FileTool, with urls: [URL], near location: NSPoint, sourceShelfID: Shelf.ID?) {
         let images: [EditableImage]
         do {
             images = try urls.map(EditableImage.load)
@@ -79,23 +82,23 @@ enum ToolLauncher {
 
         switch tool {
         case .crop:
-            EditorWindowController.present(size: CropEditor.windowSize(for: images.count), near: location) { CropEditor(images: images, actions: $0) }
+            EditorWindowController.present(size: CropEditor.windowSize(for: images.count), near: location, sourceShelfID: sourceShelfID) { CropEditor(images: images, actions: $0) }
         case .addBackground:
-            EditorWindowController.present(size: AddBackgroundEditor.windowSize(for: images.count), near: location) { AddBackgroundEditor(images: images, actions: $0) }
+            EditorWindowController.present(size: AddBackgroundEditor.windowSize(for: images.count), near: location, sourceShelfID: sourceShelfID) { AddBackgroundEditor(images: images, actions: $0) }
         case .annotate:
-            EditorWindowController.present(size: AnnotateEditor.windowSize(for: images.count), near: location) { AnnotateEditor(images: images, actions: $0) }
+            EditorWindowController.present(size: AnnotateEditor.windowSize(for: images.count), near: location, sourceShelfID: sourceShelfID) { AnnotateEditor(images: images, actions: $0) }
         case .redact:
-            EditorWindowController.present(size: RedactEditor.windowSize(for: images.count), near: location) { RedactEditor(images: images, actions: $0) }
+            EditorWindowController.present(size: RedactEditor.windowSize(for: images.count), near: location, sourceShelfID: sourceShelfID) { RedactEditor(images: images, actions: $0) }
         case .edit:
-            EditorWindowController.present(size: AdjustEditor.windowSize(for: images.count), near: location) { AdjustEditor(images: images, actions: $0) }
+            EditorWindowController.present(size: AdjustEditor.windowSize(for: images.count), near: location, sourceShelfID: sourceShelfID) { AdjustEditor(images: images, actions: $0) }
         case .compress:
-            EditorWindowController.present(size: CompressEditor.windowSize, near: location) { CompressEditor(images: images, actions: $0) }
+            EditorWindowController.present(size: CompressEditor.windowSize, near: location, sourceShelfID: sourceShelfID) { CompressEditor(images: images, actions: $0) }
         case .metadata:
-            EditorWindowController.present(size: MetadataEditor.windowSize, near: location) { MetadataEditor(images: images, actions: $0) }
+            EditorWindowController.present(size: MetadataEditor.windowSize, near: location, sourceShelfID: sourceShelfID) { MetadataEditor(images: images, actions: $0) }
         case .resize:
-            EditorWindowController.present(size: ResizeEditor.windowSize, near: location) { ResizeEditor(images: images, actions: $0) }
+            EditorWindowController.present(size: ResizeEditor.windowSize, near: location, sourceShelfID: sourceShelfID) { ResizeEditor(images: images, actions: $0) }
         case .removeBackground:
-            EditorWindowController.present(size: RemoveBackgroundEditor.windowSize(for: images.count), near: location) { RemoveBackgroundEditor(images: images, actions: $0) }
+            EditorWindowController.present(size: RemoveBackgroundEditor.windowSize(for: images.count), near: location, sourceShelfID: sourceShelfID) { RemoveBackgroundEditor(images: images, actions: $0) }
         default:
             break
         }

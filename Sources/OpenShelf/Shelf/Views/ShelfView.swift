@@ -132,7 +132,8 @@ private struct CollapsedShelfView: View {
                     onSelect: { _ in },
                     onDoubleClick: { withAnimation(.snappy) { shelf.isExpanded = true } },
                     menu: { anchor in ShelfMenu.make(for: shelf.items, in: shelf, anchor: anchor) },
-                    onDragEnded: { dragged, operation in shelf.didDragOut(dragged, operation: operation, removeDragged: Preferences.shared.removeAfterDragOut) }
+                    onDragEnded: { dragged, operation in shelf.didDragOut(dragged, operation: operation, removeDragged: Preferences.shared.removeAfterDragOut) },
+                    onDragBegan: { Shelf.activeDragSource = shelf }
                 )
             }
             .padding(.bottom, 14)
@@ -349,7 +350,8 @@ private struct ItemDragArea: View {
             onSelect: { modifiers in shelf.select(item, modifiers: modifiers) },
             onDoubleClick: { FileActions.open(shelf.targets(for: item).map(\.url)) },
             menu: { anchor in ShelfMenu.make(for: shelf.targets(for: item), in: shelf, anchor: anchor) },
-            onDragEnded: { dragged, operation in shelf.didDragOut(dragged, operation: operation, removeDragged: Preferences.shared.removeAfterDragOut) }
+            onDragEnded: { dragged, operation in shelf.didDragOut(dragged, operation: operation, removeDragged: Preferences.shared.removeAfterDragOut) },
+            onDragBegan: { Shelf.activeDragSource = shelf }
         )
     }
 }

@@ -6,6 +6,16 @@ tags `v<version>` and publishes a GitHub release with that section as notes.
 
 Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
 
+## Unreleased
+
+### New
+
+- **Conversion and tool results return to their shelf.** Convert or edit a
+  file that's on a shelf (with the Convert or Tools wheel, or the keyboard
+  shortcut) and the result is added to that same shelf, so it's right there
+  with the original. Files dragged in from Finder or another app behave as
+  before. Turn it off in Settings → Shelves.
+
 ## [1.7.0] - 2026-10-25
 
 A hands-on tour, and Pandoc in one click.

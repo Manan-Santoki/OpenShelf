@@ -111,6 +111,13 @@ struct ShelvesSettingsPane: View {
                 Toggle("Restore shelves when OpenShelf opens", isOn: $preferences.restoresShelves)
                 Toggle("Hide docked shelves to the screen edge", isOn: $preferences.hidesDockedShelves)
             }
+            Section {
+                Toggle("Add conversion and tool results back to the shelf", isOn: $preferences.addsConversionResultsToShelf)
+            } footer: {
+                Text("When a file on a shelf is converted or edited with the Tools wheel, the result is added to that shelf too. Files dragged in from elsewhere aren't affected.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .settingsPane()
     }

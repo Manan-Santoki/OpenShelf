@@ -17,6 +17,12 @@ enum ShelfViewMode: String, Codable {
 @MainActor
 @Observable
 final class Shelf: Identifiable {
+    /// The shelf whose own drag source began the system drag currently in
+    /// progress, if any. Set for the lifetime of that one drag, so a
+    /// conversion or tool it leads to can add its results back here. Never
+    /// set for drags that didn't start on a shelf (Finder, other apps).
+    static weak var activeDragSource: Shelf?
+
     let id = UUID()
     private(set) var items: [ShelfItem] = []
     var selection: Set<ShelfItem.ID> = []
