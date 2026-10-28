@@ -107,6 +107,46 @@ struct PDFConversionProgressTests {
         #expect(pdf.pageCount >= 1)
         #expect(pdf.string?.contains("Rich text") == true)
     }
+
+    /// Markdown's rich text, pictures loaded from disk included, is now built
+    /// off the main thread; the picture must still make it into the PDF.
+    @Test func markdownPicturesStillPrintToPDF() async throws {
+        let directory = try makeDirectory("progress-pictures")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try writeRedSquare(to: directory.appendingPathComponent("red.png"))
+        let source = directory.appendingPathComponent("notes.md")
+        try "# Pictures\n\n![Red](red.png)\n\nAfter the picture.\n".write(to: source, atomically: true, encoding: .utf8)
+
+        let output = try await Converter.convert(source, to: .pdf, tools: ExternalTools()) { _ in }
+        let pdf = try #require(output.first.flatMap { PDFDocument(url: $0) })
+        let page = try #require(pdf.page(at: 0))
+        #expect(pdf.string?.contains("After the picture") == true)
+        #expect(redPixels(on: page) > 100)
+    }
+
+    private func writeRedSquare(to url: URL) throws {
+        let context = try #require(CGContext(data: nil, width: 120, height: 120, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.setFillColor(red: 1, green: 0, blue: 0, alpha: 1)
+        context.fill(CGRect(x: 0, y: 0, width: 120, height: 120))
+        let image = try #require(context.makeImage())
+        let data = try #require(NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]))
+        try data.write(to: url)
+    }
+
+    private func redPixels(on page: PDFPage) -> Int {
+        let bounds = page.bounds(for: .mediaBox)
+        guard let cgImage = page.thumbnail(of: bounds.size, for: .mediaBox).cgImage(forProposedRect: nil, context: nil, hints: nil) else { return 0 }
+        let bitmap = NSBitmapImageRep(cgImage: cgImage)
+        var count = 0
+        for y in stride(from: 0, to: bitmap.pixelsHigh, by: 2) {
+            for x in stride(from: 0, to: bitmap.pixelsWide, by: 2) {
+                guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { continue }
+                // Printing shifts pure red towards orange, so allow some slack.
+                if color.redComponent > 0.7, color.greenComponent < 0.45, color.blueComponent < 0.4 { count += 1 }
+            }
+        }
+        return count
+    }
 }
 
 /// `StepProgress` backs the Convert wheel's progress toast: a real fraction
