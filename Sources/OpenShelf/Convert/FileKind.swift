@@ -22,7 +22,8 @@ enum FileKind: Hashable {
         // ".ts" is an MPEG transport stream or TypeScript source; only the bytes tell.
         let isTypeScript = extensionName == "ts" && MediaFormats.isTransportStream(url) == false
         // Formats the system types don't describe well (or at all) go by name.
-        // RTFD is a folder on disk but a document to people.
+        // RTFD, and Pages, Numbers and Keynote packages, can be folders on
+        // disk but are documents to people.
         if let kind = Self.kindsByExtension[extensionName], !isTypeScript {
             self = kind
             return
@@ -47,11 +48,12 @@ enum FileKind: Hashable {
     }
 
     /// Extensions classified before asking the system: subtitles, spreadsheets
-    /// whose types conform to plain text (CSV), and media containers that
-    /// macOS doesn't play itself.
+    /// whose types conform to plain text (CSV), iWork documents (whose types
+    /// only exist with the apps installed), and media containers that macOS
+    /// doesn't play itself.
     static let kindsByExtension: [String: FileKind] = {
-        var kinds: [String: FileKind] = ["srt": .subtitle, "vtt": .subtitle, "rtfd": .document]
-        for ext in ["csv", "tsv", "xlsx", "xls", "ods"] { kinds[ext] = .spreadsheet }
+        var kinds: [String: FileKind] = ["srt": .subtitle, "vtt": .subtitle, "rtfd": .document, "pages": .document]
+        for ext in ["csv", "tsv", "xlsx", "xls", "ods", "numbers"] { kinds[ext] = .spreadsheet }
         for ext in ["ppt", "pptx", "odp", "key"] { kinds[ext] = .presentation }
         for ext in MediaFormats.ffmpegOnlyVideoExtensions { kinds[ext] = .video }
         for ext in MediaFormats.ffmpegOnlyAudioExtensions { kinds[ext] = .audio }

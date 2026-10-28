@@ -142,7 +142,7 @@ struct FormatCatalogTests {
     @Test func officeFormatsNeedLibreOffice() {
         #expect(ConversionCatalog.formats(for: [url("a.pptx")], tools: none) == [.zip])
         #expect(ConversionCatalog.formats(for: [url("a.pptx")], tools: all) == [.pdf, .jpg, .png, .zip])
-        #expect(ConversionCatalog.formats(for: [url("a.key")], tools: all) == [.zip])
+        #expect(ConversionCatalog.formats(for: [url("a.key")], tools: all) == [.pdf, .pptx, .jpg, .png, .zip])
         #expect(ConversionCatalog.formats(for: [url("a.xls")], tools: none) == [.zip])
         #expect(ConversionCatalog.formats(for: [url("a.csv")], tools: none) == [.xlsx, .tsv, .pdf, .zip])
         #expect(ConversionCatalog.formats(for: [url("a.csv")], tools: all) == [.xlsx, .tsv, .pdf, .ods, .zip])
@@ -163,7 +163,7 @@ struct FormatCatalogTests {
     }
 
     @Test func wheelsStayWithinTwelveWedges() {
-        for name in ["a.jpg", "a.pdf", "a.docx", "a.mkv", "a.mov", "a.ogg", "a.aiff", "a.csv", "a.xls", "a.pptx"] {
+        for name in ["a.jpg", "a.pdf", "a.docx", "a.mkv", "a.mov", "a.ogg", "a.aiff", "a.csv", "a.xls", "a.pptx", "a.pages", "a.numbers", "a.key"] {
             #expect(ConversionCatalog.formats(for: [url(name)], tools: all).count <= ConversionCatalog.maxWedges)
         }
     }

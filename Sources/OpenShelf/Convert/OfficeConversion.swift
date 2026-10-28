@@ -1,15 +1,18 @@
 import Foundation
 
-/// Office formats macOS can't read or write itself (PowerPoint, XLS, ODS…),
-/// converted by LibreOffice when it's installed (Settings → Extra Formats).
+/// Office formats macOS can't read or write itself (PowerPoint, XLS, ODS,
+/// Pages, Numbers, Keynote…), converted by LibreOffice when it's installed
+/// (Settings → Extra Formats).
 enum OfficeConversion {
     /// How long LibreOffice gets before the conversion is abandoned.
     static let timeout: Duration = .seconds(120)
 
+    /// - Parameter pageLabel: How numbered images are labelled ("Slide 2", "Page 2").
     static func convert(
         _ source: URL,
         to format: OutputFormat,
         tools: ExternalTools,
+        pageLabel: String = "Slide",
         progress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> [URL] {
         guard let soffice = tools.libreOffice else {
@@ -20,12 +23,12 @@ enum OfficeConversion {
         let output = workspace.appendingPathComponent("out")
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
 
-        // Slides become images by way of a PDF, one picture per slide.
+        // Slides (and pages) become images by way of a PDF, one picture each.
         if format == .jpg || format == .png {
             let pdf = try await run(soffice, source: source, filter: "pdf", extension: "pdf", workspace: workspace, output: output)
             let named = workspace.appendingPathComponent(source.deletingPathExtension().lastPathComponent + ".pdf")
             try FileManager.default.moveItem(at: pdf, to: named)
-            return try PDFConversion.convert(named, to: format, savingNextTo: source, pageLabel: "Slide", progress: progress)
+            return try PDFConversion.convert(named, to: format, savingNextTo: source, pageLabel: pageLabel, progress: progress)
         }
 
         guard let pathExtension = format.fileExtension, let filter = filter(for: format) else {
@@ -44,6 +47,9 @@ enum OfficeConversion {
         case .docx: "docx"
         case .xlsx: "xlsx"
         case .ods: "ods"
+        case .pptx: "pptx"
+        case .rtf: "rtf"
+        case .txt: "txt:Text (encoded):UTF8"
         // Comma-separated, double quotes, UTF-8 (76), first sheet.
         case .csv: "csv:Text - txt - csv (StarCalc):44,34,76,1"
         default: nil

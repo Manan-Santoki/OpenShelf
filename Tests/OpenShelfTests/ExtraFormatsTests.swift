@@ -76,7 +76,7 @@ struct MissingToolAdviceTests {
         for name in ["a.mkv", "a.webm", "a.avi", "a.ogg", "a.wma"] {
             #expect(blocking(urls(name), none) == .ffmpeg, "\(name)")
         }
-        for name in ["a.pptx", "a.ppt", "a.odp", "a.xls", "a.ods"] {
+        for name in ["a.pptx", "a.ppt", "a.odp", "a.xls", "a.ods", "a.key", "a.pages", "a.numbers"] {
             #expect(blocking(urls(name), none) == .libreOffice, "\(name)")
         }
         #expect(blocking(urls("a.pptx"), ffmpegOnly) == .libreOffice)
@@ -88,8 +88,6 @@ struct MissingToolAdviceTests {
         defer { try? FileManager.default.removeItem(at: folder) }
         #expect(blocking([folder], none) == nil)
         #expect(blocking(urls("a.xyz123"), none) == nil)
-        // Keynote can't be converted even with LibreOffice.
-        #expect(blocking(urls("a.key"), none) == nil)
         // An MKV and a deck share no format whatever is installed.
         #expect(blocking(urls("a.mkv", "b.pptx"), none) == nil)
         #expect(blocking(urls("a.mkv"), ffmpegOnly) == nil)

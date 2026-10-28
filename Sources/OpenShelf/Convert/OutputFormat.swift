@@ -16,6 +16,8 @@ enum OutputFormat: String, CaseIterable, Hashable, Sendable {
     case srt, vtt
     // Archives
     case zip, tar, tgz, extract
+    // Apple's own, saved by Pages, Numbers and Keynote
+    case pages, numbers, key
 
     var title: String {
         switch self {
@@ -71,6 +73,11 @@ enum OutputFormat: String, CaseIterable, Hashable, Sendable {
         [.mp3, .ogg, .opus, .wma, .mkv, .webm, .avi, .wmv].contains(self)
     }
 
+    /// The app that saves this format, for PAGES, NUMBERS and KEY.
+    var iWorkFormat: IWorkFormat? {
+        IWorkFormat.allCases.first { $0.outputFormat == self }
+    }
+
     /// Audio-only outputs, which need a sound track in the source.
     var isAudioOnly: Bool {
         [.m4a, .mp3, .wav, .aiff, .flac, .ogg, .opus, .wma].contains(self)
@@ -80,8 +87,8 @@ enum OutputFormat: String, CaseIterable, Hashable, Sendable {
 /// Which conversions apply to which files.
 ///
 /// Wheels stay at 12 items or fewer (the largest, images, has 10); more than
-/// seven are shown over two pages, in `WheelOrdering`'s order. PAGES is never
-/// offered: it's Apple's private format.
+/// seven are shown over two pages, in `WheelOrdering`'s order. PAGES, NUMBERS
+/// and KEY are offered only with the app installed, which does the saving.
 enum ConversionCatalog {
     /// The most wedges a wheel shows; the last one is always ZIP.
     static let maxWedges = 12
@@ -110,6 +117,12 @@ enum ConversionCatalog {
         let hasFFmpeg = tools.ffmpeg != nil
         var formats: [OutputFormat]
 
+        // Pages, Numbers and Keynote files, whether zip files or folders.
+        if let iWork = IWorkFormat(url: url) {
+            formats = IWorkConversion.formats(for: url, format: iWork, tools: tools)
+            return formats.isEmpty ? [.zip] : Array(formats.prefix(maxWedges - 1)) + [.zip]
+        }
+
         switch FileKind(url: url) {
         case .image:
             formats = [.png, .jpg, .heic, .tiff, .avif, .bmp, .pdf, .docx]
@@ -121,8 +134,8 @@ enum ConversionCatalog {
         case .spreadsheet:
             formats = spreadsheetFormats(ext: ext, tools: tools)
         case .presentation:
-            // Slides need LibreOffice to render; Keynote files can't be read at all.
-            formats = tools.libreOffice != nil && ext != "key" ? [.pdf, .jpg, .png] : []
+            // Slides need LibreOffice to render.
+            formats = tools.libreOffice != nil ? [.pdf, .jpg, .png] : []
         case .audio:
             if MediaFormats.isAVFoundationReadable(url) {
                 formats = [.m4a, .wav, .aiff, .flac]
@@ -149,6 +162,10 @@ enum ConversionCatalog {
             return [.extract]
         case .folder, .other:
             return [.zip, .tar, .tgz]
+        }
+        // Pages, Numbers and Keynote save what they open as their own documents.
+        if let iWork = IWorkFormat.importing(extension: ext), tools.iWorkApps.contains(iWork) {
+            formats.append(iWork.outputFormat)
         }
         formats.removeAll { $0.matches(extension: ext) }
         return Array(formats.prefix(maxWedges - 1)) + [.zip]
