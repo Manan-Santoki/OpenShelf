@@ -2,14 +2,22 @@ import AppKit
 import Observation
 import SwiftUI
 
+/// How a progress toast shows a job that's under way: a real 0...1 fraction
+/// where one can be measured, or a busy bar where it can't (an external
+/// tool with no progress output, AppKit printing a whole document at once…).
+enum ToastProgress: Equatable {
+    case determinate(Double)
+    case indeterminate
+}
+
 /// A short message shown next to the pointer: a confirmation after an action, or
 /// the progress of a longer job.
 struct Toast: Equatable {
     var systemImage: String
     var title: String
     var subtitle: String?
-    /// 0...1 for a job in progress; nil for a plain confirmation.
-    var progress: Double?
+    /// Set for a job in progress; nil for a plain confirmation.
+    var progress: ToastProgress?
 }
 
 @MainActor
@@ -49,7 +57,7 @@ final class ToastController {
     }
 
     /// Updates the progress toast currently on screen.
-    func updateProgress(_ progress: Double, subtitle: String? = nil) {
+    func updateProgress(_ progress: ToastProgress, subtitle: String? = nil) {
         guard var toast = model.toast, toast.progress != nil else { return }
         toast.progress = progress
         if let subtitle { toast.subtitle = subtitle }
@@ -126,8 +134,8 @@ private struct ToastView: View {
     var body: some View {
         Group {
             if let toast = model.toast {
-                if let progress = toast.progress {
-                    ProgressCard(toast: toast, progress: progress, onCancel: model.onCancel)
+                if toast.progress != nil {
+                    ProgressCard(toast: toast, onCancel: model.onCancel)
                 } else {
                     ConfirmationPill(toast: toast)
                 }
@@ -183,8 +191,13 @@ private struct ConfirmationPill: View {
 
 private struct ProgressCard: View {
     let toast: Toast
-    let progress: Double
     let onCancel: (() -> Void)?
+
+    /// The determinate fraction, or nil while busy with nothing measurable to show.
+    private var fraction: Double? {
+        guard case .determinate(let value) = toast.progress else { return nil }
+        return value
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
@@ -214,10 +227,18 @@ private struct ProgressCard: View {
                     }
                 }
             }
-            ProgressView(value: min(max(progress, 0), 1))
-                .progressViewStyle(.linear)
-                .tint(.accentColor)
-                .animation(.easeOut(duration: 0.2), value: progress)
+            Group {
+                if let fraction {
+                    ProgressView(value: min(max(fraction, 0), 1))
+                        .animation(.easeOut(duration: 0.2), value: fraction)
+                } else {
+                    // Busy, with nothing measurable to show: a moving bar
+                    // beats one frozen at whatever fraction it last saw.
+                    ProgressView()
+                }
+            }
+            .progressViewStyle(.linear)
+            .tint(.accentColor)
         }
         .frame(width: 244)
         .padding(12)
@@ -228,6 +249,6 @@ private struct ProgressCard: View {
                 .shadow(color: .black.opacity(0.18), radius: 12, y: 5)
         }
         .accessibilityElement(children: .contain)
-        .accessibilityValue("\(Int(progress * 100)) percent")
+        .accessibilityValue(fraction.map { "\(Int($0 * 100)) percent" } ?? "In progress")
     }
 }

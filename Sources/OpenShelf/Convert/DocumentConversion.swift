@@ -11,12 +11,14 @@ enum PDFConversion {
     ///     `source` is an intermediate PDF (e.g. made from slides).
     ///   - pageLabel: How numbered image files are labelled ("Page 2", "Slide 2").
     ///   - imageQuality: JPEG quality for page images; nil for the usual 0.92.
+    ///   - progress: Reported 0...1 across the pages as they're read or rendered.
     static func convert(
         _ source: URL,
         to format: OutputFormat,
         savingNextTo original: URL? = nil,
         pageLabel: String = "Page",
-        imageQuality: Double? = nil
+        imageQuality: Double? = nil,
+        progress: @escaping @Sendable (Double) -> Void = { _ in }
     ) throws -> [URL] {
         guard let document = PDFDocument(url: source) else { throw ConversionError.unreadable(source) }
         let original = original ?? source
@@ -38,11 +40,14 @@ enum PDFConversion {
         case .docx:
             let destination = OutputNaming.destination(for: original, pathExtension: "docx")
             let text = NSMutableAttributedString()
+            let pageCount = max(document.pageCount, 1)
             for index in 0..<document.pageCount {
+                try Task.checkCancellation()
                 if let page = document.page(at: index)?.attributedString {
                     text.append(page)
                     text.append(NSAttributedString(string: "\n\n"))
                 }
+                progress(Double(index + 1) / Double(pageCount))
             }
             if text.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 // Scanned PDFs have no text layer; keep the pages as pictures instead.
@@ -58,10 +63,13 @@ enum PDFConversion {
 
         case .jpg, .png:
             let type = format.imageIOType!
+            let pageCount = max(document.pageCount, 1)
             // Rendered and written a page at a time: 500 pages at 300 dpi held
             // together came to about 16 GB.
-            return try (0..<document.pageCount).compactMap { index in
-                try autoreleasepool {
+            return try (0..<document.pageCount).compactMap { index -> URL? in
+                try Task.checkCancellation()
+                return try autoreleasepool {
+                    defer { progress(Double(index + 1) / Double(pageCount)) }
                     guard let page = document.page(at: index), let image = renderPage(page, dpi: renderDPI) else { return nil }
                     let suffix = document.pageCount == 1 ? nil : "\(pageLabel) \(index + 1)"
                     let destination = OutputNaming.destination(for: original, suffix: suffix, pathExtension: format.rawValue)
@@ -71,7 +79,7 @@ enum PDFConversion {
             }
 
         case .md:
-            let pages = try pageTexts(of: document, source: source)
+            let pages = try pageTexts(of: document, source: source, progress: progress)
             let markdown = pages.map { page in
                 DocumentStructure.markdown(PDFText.paragraphs(fromPageText: page).map { .paragraph([TextRun(text: $0)]) })
             }
@@ -84,7 +92,10 @@ enum PDFConversion {
             // A chapter per page: text where the page has some, the page image where it doesn't.
             var chapters: [EpubChapter] = []
             var images: [String: Data] = [:]
+            let pageCount = max(document.pageCount, 1)
             for index in 0..<document.pageCount {
+                try Task.checkCancellation()
+                defer { progress(Double(index + 1) / Double(pageCount)) }
                 guard let page = document.page(at: index) else { continue }
                 let text = page.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 let body: String
@@ -104,11 +115,11 @@ enum PDFConversion {
         case .pptx:
             let first = document.page(at: 0).map(displaySize) ?? CGSize(width: 720, height: 540)
             let destination = OutputNaming.destination(for: original, pathExtension: "pptx")
-            try PptxWriter.write(slides: renderPages(of: document, dpi: 160), slideSize: first, to: destination)
+            try PptxWriter.write(slides: renderPages(of: document, dpi: 160, progress: progress), slideSize: first, to: destination)
             return [destination]
 
         case .xlsx:
-            let pages = try pageTexts(of: document, source: source)
+            let pages = try pageTexts(of: document, source: source, progress: progress)
             let sheets = pages.enumerated().map { index, text in
                 (name: "Page \(index + 1)", table: PDFText.rows(fromPageText: text))
             }
@@ -122,8 +133,17 @@ enum PDFConversion {
     }
 
     /// Each page's text, refusing PDFs that have none (scans).
-    private static func pageTexts(of document: PDFDocument, source: URL) throws -> [String] {
-        let pages = (0..<document.pageCount).map { document.page(at: $0)?.string ?? "" }
+    private static func pageTexts(
+        of document: PDFDocument,
+        source: URL,
+        progress: @escaping @Sendable (Double) -> Void = { _ in }
+    ) throws -> [String] {
+        let pageCount = max(document.pageCount, 1)
+        let pages = try (0..<document.pageCount).map { index -> String in
+            try Task.checkCancellation()
+            defer { progress(Double(index + 1) / Double(pageCount)) }
+            return document.page(at: index)?.string ?? ""
+        }
         guard pages.contains(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
             throw ConversionError.failed("“\(source.lastPathComponent)” has no text to extract (it looks like a scan).")
         }
@@ -149,9 +169,15 @@ enum PDFConversion {
         return page.thumbnail(of: pixels, for: .mediaBox).cgImage(forProposedRect: &rect, context: nil, hints: nil)
     }
 
-    private static func renderPages(of document: PDFDocument, dpi: Double) -> [CGImage] {
-        (0..<document.pageCount).compactMap { index in
-            document.page(at: index).flatMap { renderPage($0, dpi: dpi) }
+    private static func renderPages(
+        of document: PDFDocument,
+        dpi: Double,
+        progress: @escaping @Sendable (Double) -> Void = { _ in }
+    ) -> [CGImage] {
+        let pageCount = max(document.pageCount, 1)
+        return (0..<document.pageCount).compactMap { index -> CGImage? in
+            defer { progress(Double(index + 1) / Double(pageCount)) }
+            return document.page(at: index).flatMap { renderPage($0, dpi: dpi) }
         }
     }
 }
@@ -210,7 +236,8 @@ enum DocumentConversion {
         }
 
         let isHTML = ["html", "htm"].contains(source.pathExtension.lowercased())
-        if format == .pdf || isHTML {
+        if isHTML {
+            // AppKit's HTML importer only works on the main thread.
             try await MainActor.run {
                 let text = try readRich(source)
                 if format == .pdf {
@@ -219,6 +246,10 @@ enum DocumentConversion {
                     try write(text, as: format, source: source, to: destination)
                 }
             }
+        } else if format == .pdf {
+            // Reading RTF, DOCX or ODT is safe here and can take a while;
+            // only the printing itself needs the main thread.
+            try await printPDFOnMain(readRich(source), to: destination)
         } else {
             try write(readRich(source), as: format, source: source, to: destination)
         }
@@ -279,6 +310,13 @@ enum DocumentConversion {
     /// The width text is laid out in on a US Letter page with 0.75 in margins.
     static let printableWidth: CGFloat = 612 - 54 * 2
 
+    /// Hops to the main thread just for `printPDF(_:to:)`, so that building
+    /// `text` (reading the file, loading its pictures) stays off it.
+    static func printPDFOnMain(_ text: NSAttributedString, to url: URL) async throws {
+        let text = PrintableText(value: text)
+        try await MainActor.run { try printPDF(text.value, to: url) }
+    }
+
     /// Lays rich text out on US Letter pages and prints it to a PDF file. AppKit
     /// printing keeps tables and images that Core Text would drop.
     @MainActor
@@ -312,6 +350,11 @@ enum DocumentConversion {
         operation.showsProgressPanel = false
         guard operation.run() else { throw EditableImageError.unwritable(url) }
     }
+}
+
+/// Rich text built off the main thread and handed to it, untouched, to print.
+private struct PrintableText: @unchecked Sendable {
+    let value: NSAttributedString
 }
 
 /// Reads text files whatever their encoding.
