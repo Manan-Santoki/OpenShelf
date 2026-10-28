@@ -158,4 +158,42 @@ struct FinderSelectionTests {
         #expect(FinderSelection.toast(for: .finderNotFrontmost)?.title == "Select files in Finder first")
         #expect(FinderSelection.toast(for: .files(files)) == nil)
     }
+
+    @Test func emptySelectionToastOffersSettingsOnASecondPress() {
+        let toast = FinderSelection.toast(for: .noSelection, shortcut: .defaultOpenWheel)
+        #expect(toast?.subtitle == "Press ⌃⌥Space again for Settings")
+        #expect(FinderSelection.toast(for: .noSelection)?.subtitle == nil)
+        #expect(FinderSelection.toast(for: .notPermitted, shortcut: .defaultOpenWheel)?.subtitle?.contains("Automation") == true)
+    }
+}
+
+struct RepeatedEmptyPressTests {
+    let start = ContinuousClock.now
+
+    @Test func secondPressSoonAfterCounts() {
+        var presses = RepeatedEmptyPress()
+        #expect(!presses.record(at: start))
+        #expect(presses.record(at: start + .milliseconds(800)))
+    }
+
+    @Test func slowSecondPressStartsOver() {
+        var presses = RepeatedEmptyPress()
+        #expect(!presses.record(at: start))
+        #expect(!presses.record(at: start + .seconds(3)))
+        #expect(presses.record(at: start + .seconds(4)))
+    }
+
+    @Test func pressAfterASecondPressStartsOver() {
+        var presses = RepeatedEmptyPress()
+        _ = presses.record(at: start)
+        #expect(presses.record(at: start + .milliseconds(500)))
+        #expect(!presses.record(at: start + .seconds(1)))
+    }
+
+    @Test func openingAWheelInBetweenStartsOver() {
+        var presses = RepeatedEmptyPress()
+        _ = presses.record(at: start)
+        presses.reset()
+        #expect(!presses.record(at: start + .milliseconds(500)))
+    }
 }
