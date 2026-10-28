@@ -675,6 +675,20 @@ footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
             <img src="assets/editor-trim.webp" alt="The Trim editor showing a video preview above a filmstrip with selection handles" width="1292" height="1212" loading="lazy">
           </div>
         </article>
+        <article class="card tile span-3 reveal">
+          <span class="tag">Shelves</span>
+          <h3>Watched folders</h3>
+          <p>Point OpenShelf at Downloads, your screenshot folder or any inbox. New files pop onto a shelf of their own once they've finished arriving, ready to drag into a message.</p>
+          <div class="chips"><span class="chip">Downloads</span><span class="chip">Screenshots</span><span class="chip">Project inbox</span></div>
+          <p>Each folder can also convert new files or open them in a tool, like every screenshot to JPG. Nothing is watched until you add a folder.</p>
+        </article>
+        <article class="card tile span-3 reveal">
+          <span class="tag">iWork</span>
+          <h3>Pages, Numbers and Keynote</h3>
+          <p>Turn <code>.pages</code>, <code>.numbers</code> and <code>.key</code> files into PDFs, pictures, or Word, Excel and PowerPoint files. And the other way: Word files, spreadsheets and slides get a wedge to save them in Apple's formats.</p>
+          <div class="chips"><span class="chip">PAGES → DOCX · PDF</span><span class="chip">NUMBERS → XLSX · CSV</span><span class="chip">KEY → PPTX · PDF</span></div>
+          <p>Saving to Pages, Numbers or Keynote uses the app itself. Word, Excel and PowerPoint need LibreOffice; without it, PDFs and pictures come from the preview inside the file.</p>
+        </article>
         <article class="card tile span-6 reveal">
           <span class="tag">Formats</span>
           <h3>Every everyday format, and then some</h3>
@@ -738,7 +752,7 @@ footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
         <div class="install-steps">
           <ol>
             <li><div><b>Download the DMG</b><span>The latest release, straight from GitHub.</span></div></li>
-            <li><div><b>Drag OpenShelf to Applications</b><span>Then open it. It lives in your menu bar, and a short welcome guide appears the first time.</span></div></li>
+            <li><div><b>Drag OpenShelf to Applications</b><span>Then open it. It lives in your menu bar, and a hands-on tour appears the first time.</span></div></li>
             <li><div><b>Try it</b><span>Drag any file, tap <kbd class="kc">⇧</kbd>, and drop it on a wedge.</span></div></li>
           </ol>
           <details class="firstrun">
@@ -790,7 +804,7 @@ footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
           <div class="ans">
             <p>Most formats work out of the box. Two free, optional tools add more:</p>
             <p><b>ffmpeg</b> (<code>brew install ffmpeg</code>) adds MP3, OGG, Opus, WMA, MKV, WebM, AVI, WMV and GIF; <code>brew install webp</code> adds WEBP.</p>
-            <p><b>LibreOffice</b> (<code>brew install --cask libreoffice</code>) adds slides (PowerPoint and ODP) and XLS/ODS spreadsheets.</p>
+            <p><b>LibreOffice</b> (<code>brew install --cask libreoffice</code>) adds slides (PowerPoint and ODP), XLS/ODS spreadsheets, and whole-document conversion of Pages, Numbers and Keynote files.</p>
             <p>Their wedges stay hidden until the tool is installed.</p>
           </div>
         </details>

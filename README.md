@@ -334,8 +334,11 @@ OpenShelf can write to are converted in a temporary folder and handed on;
 Add to Shelf keeps such files in
 `~/Library/Application Support/OpenShelf/From Shortcuts`.
 
-The actions need a build made with Xcode installed (the release builds are);
-see [Build & run](#build--run).
+**Not in releases yet.** macOS only runs Shortcuts actions from apps signed
+with an Apple developer certificate, and OpenShelf's releases are ad-hoc
+signed for now, so the actions are left out of them until that changes. A
+build made with Xcode installed includes them (see [Build & run](#build--run)),
+but they only run once it's signed with a Developer ID.
 
 ### Updates
 

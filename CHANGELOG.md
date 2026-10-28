@@ -10,6 +10,24 @@ Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
 
 ### New
 
+- **OpenShelf in Shortcuts and Spotlight.** Convert Files, Compress, Extract
+  Text (OCR), Remove Background, Combine into PDF, Remove Audio, Read QR Codes
+  and Add to Shelf are now actions in the Shortcuts app, so you can chain
+  them, add them to a Finder Quick Action, or run them on everything that
+  lands in a folder with a folder automation, no dragging needed. On macOS 26
+  and later the main ones are in Spotlight too. They run entirely on your Mac,
+  like the wheels, and save results next to the originals.
+
+  These are in the code but switched off in release builds until releases
+  are signed with an Apple developer certificate: macOS only runs Shortcuts
+  actions from apps signed that way.
+
+## [1.8.0] - 2026-10-28
+
+Watched folders, Pages, Numbers and Keynote, and ready for macOS 27.
+
+### New
+
 - **Watched folders and a screenshot shelf.** Pick folders such as Downloads
   or a project inbox in Settings → Shelves → Watched Folders, or click
   **Watch Screenshots** to follow wherever your screenshots are saved. New
@@ -41,13 +59,6 @@ Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
   The app itself does the saving, so the first time macOS asks whether
   OpenShelf may control it; if that's turned off, OpenShelf opens the setting
   (System Settings → Privacy & Security → Automation).
-- **OpenShelf in Shortcuts and Spotlight.** Convert Files, Compress, Extract
-  Text (OCR), Remove Background, Combine into PDF, Remove Audio, Read QR Codes
-  and Add to Shelf are now actions in the Shortcuts app, so you can chain
-  them, add them to a Finder Quick Action, or run them on everything that
-  lands in a folder with a folder automation, no dragging needed. On macOS 26
-  and later the main ones are in Spotlight too. They run entirely on your Mac,
-  like the wheels, and save results next to the originals.
 
 ### Fixed and improved
 
