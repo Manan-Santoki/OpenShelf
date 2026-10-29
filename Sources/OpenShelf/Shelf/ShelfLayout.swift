@@ -21,7 +21,16 @@ enum ShelfLayout {
     static func size(itemCount: Int, isExpanded: Bool, viewMode: ShelfViewMode) -> CGSize {
         guard itemCount > 0 else { return emptySize }
         guard isExpanded else { return collapsedSize }
+        return CGSize(width: expandedWidth, height: min(expandedHeight(itemCount: itemCount, viewMode: viewMode), maxHeight))
+    }
 
+    /// Whether an expanded shelf is too tall to show every file at once.
+    static func needsScrolling(itemCount: Int, viewMode: ShelfViewMode) -> Bool {
+        expandedHeight(itemCount: itemCount, viewMode: viewMode) > maxHeight
+    }
+
+    /// The height that fits every file, before `maxHeight` caps it.
+    private static func expandedHeight(itemCount: Int, viewMode: ShelfViewMode) -> CGFloat {
         let contentHeight: CGFloat
         switch viewMode {
         case .grid:
@@ -30,7 +39,6 @@ enum ShelfLayout {
         case .list:
             contentHeight = CGFloat(itemCount) * rowHeight
         }
-        let height = headerHeight + contentHeight + contentPadding * 2
-        return CGSize(width: expandedWidth, height: min(height, maxHeight))
+        return headerHeight + contentHeight + contentPadding * 2
     }
 }

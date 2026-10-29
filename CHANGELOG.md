@@ -22,6 +22,20 @@ Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
   are signed with an Apple developer certificate: macOS only runs Shortcuts
   actions from apps signed that way.
 
+## [1.8.1] - 2026-10-28
+
+Smoother shelves.
+
+### Fixed and improved
+
+- **Shelves move like the rest of macOS.** A shelf docked at a screen edge
+  now slides out when you point at its tab and slides back behind the edge
+  when you move away, instead of appearing or vanishing in a blink, and its
+  tab shows up once it's gone. Expanding and collapsing a shelf grows and
+  shrinks it evenly instead of jumping most of the way at once. Every shelf
+  animation is shorter and no longer bounces, and the scroll bar no longer
+  flashes down the side of a shelf that shows all its files.
+
 ## [1.8.0] - 2026-10-28
 
 Watched folders, Pages, Numbers and Keynote, and ready for macOS 27.

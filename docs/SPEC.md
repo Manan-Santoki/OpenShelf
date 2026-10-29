@@ -299,6 +299,10 @@ never copies or modifies them by itself).
   clicking the tab, or dragging files onto it, slides the shelf back out so the
   drop lands on it; adding files from the Actions wheel also reveals it. With
   Reduce Motion the shelf fades instead of sliding. Can be turned off in Settings.
+- **Motion:** sliding, expanding and collapsing take 0.25 s on Core Animation's
+  default curve, with no bounce; a hiding shelf fades only near the edge, and
+  its tab appears once it's gone. The stack and the full view swap at once and
+  are laid out at the shelf's final size, which the window then uncovers.
 - **Restoring:** open shelves (files, position, docked edge, expanded state and
   view mode) are saved to `~/Library/Application Support/OpenShelf/shelves.json`
   shortly after each change and on quit, and reopened at launch. Each file is

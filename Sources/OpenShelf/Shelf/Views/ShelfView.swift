@@ -8,10 +8,10 @@ struct ShelfView: View {
 
     var body: some View {
         content
-            .scaleEffect(isShown || reduceMotion ? 1 : 0.86)
+            .scaleEffect(isShown || reduceMotion ? 1 : 0.96)
             .opacity(isShown ? 1 : 0)
             .onAppear {
-                withAnimation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.36, dampingFraction: 0.72)) {
+                withAnimation(.easeOut(duration: reduceMotion ? 0.15 : 0.18)) {
                     isShown = true
                 }
             }
@@ -20,20 +20,50 @@ struct ShelfView: View {
     private var content: some View {
         VStack(spacing: 0) {
             ShelfHeader(shelf: shelf, close: close)
-            Group {
+            // Each view is laid out once, at its own final size, and the window
+            // grows or shrinks over it. Following the window instead re-laid
+            // out every file on every frame of the resize, dropping it to a
+            // handful of frames.
+            ZStack(alignment: bodyAlignment) {
                 if shelf.items.isEmpty {
                     EmptyShelfView()
+                        .frame(width: bodySize(isExpanded: false).width, height: bodySize(isExpanded: false).height)
                 } else if shelf.isExpanded {
                     ExpandedShelfView(shelf: shelf)
+                        .frame(width: bodySize(isExpanded: true).width, height: bodySize(isExpanded: true).height)
+                        // Swapped at once; the window's resize is the motion.
+                        // A fade would also make SwiftUI set up a layer to
+                        // fade in, which stalls the resize while it waits.
+                        .transition(.identity)
                 } else {
                     CollapsedShelfView(shelf: shelf)
+                        .frame(width: bodySize(isExpanded: false).width, height: bodySize(isExpanded: false).height)
+                        .transition(.identity)
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Zero minimums: take the window's size, not the larger view's.
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: bodyAlignment)
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: shelf.items.map(\.id))
+        .animation(.smooth(duration: 0.25), value: shelf.items.map(\.id))
         // Drops are taken by the window's ShelfDropView, which adds them at once.
         .background { ShelfBackground(dockedEdge: shelf.dockedEdge, isDropTargeted: shelf.isDropTargeted) }
+        .clipShape(ShelfBackground.shape(dockedEdge: shelf.dockedEdge))
+    }
+
+    /// The window's size in that state, less the header.
+    private func bodySize(isExpanded: Bool) -> CGSize {
+        let size = ShelfLayout.size(itemCount: shelf.items.count, isExpanded: isExpanded, viewMode: shelf.viewMode)
+        return CGSize(width: size.width, height: size.height - ShelfLayout.headerHeight)
+    }
+
+    /// Pinned to the side the window doesn't move: the top, and the docked
+    /// edge (or the middle when undocked, as it grows from its centre).
+    private var bodyAlignment: Alignment {
+        switch shelf.dockedEdge {
+        case .left: .topLeading
+        case .right: .topTrailing
+        case nil: .top
+        }
     }
 }
 
@@ -62,7 +92,7 @@ private struct ShelfHeader: View {
                 HeaderButton(
                     systemImage: shelf.isExpanded ? "chevron.up" : "chevron.down",
                     help: shelf.isExpanded ? "Collapse" : "Show all files"
-                ) { withAnimation(.snappy) { shelf.isExpanded.toggle() } }
+                ) { withAnimation(.smooth(duration: 0.25)) { shelf.isExpanded.toggle() } }
             }
         }
         .padding(.horizontal, 8)
@@ -123,14 +153,14 @@ private struct CollapsedShelfView: View {
         StackPreview(items: Array(shelf.items.suffix(3)), totalCount: shelf.items.count, isSpread: isHovered)
             .frame(width: 100, height: 100)
             .onHover { hovering in
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.65)) { isHovered = hovering }
+                withAnimation(.easeOut(duration: 0.15)) { isHovered = hovering }
             }
             .overlay {
                 DragSourceArea(
                     isSelected: { true },
                     dragItems: { shelf.items },
                     onSelect: { _ in },
-                    onDoubleClick: { withAnimation(.snappy) { shelf.isExpanded = true } },
+                    onDoubleClick: { withAnimation(.smooth(duration: 0.25)) { shelf.isExpanded = true } },
                     menu: { anchor in ShelfMenu.make(for: shelf.items, in: shelf, anchor: anchor) },
                     onDragEnded: { dragged, operation in shelf.didDragOut(dragged, operation: operation, removeDragged: Preferences.shared.removeAfterDragOut) },
                     onDragBegan: { Shelf.activeDragSource = shelf }
@@ -197,9 +227,12 @@ private struct ExpandedShelfView: View {
                         .overlay(alignment: .topLeading) { bandOverlay }
                         .coordinateSpace(.named(Self.space))
                 }
+                // A shelf that shows every file has nothing to scroll; without
+                // this the scroller flashes down the side as it opens.
+                .scrollIndicators(ShelfLayout.needsScrolling(itemCount: shelf.items.count, viewMode: shelf.viewMode) ? .automatic : .never)
                 .onChange(of: shelf.scrollTarget) { _, target in
                     guard let target else { return }
-                    withAnimation(.snappy) { proxy.scrollTo(target, anchor: .center) }
+                    withAnimation(.smooth(duration: 0.25)) { proxy.scrollTo(target, anchor: .center) }
                     shelf.scrollTarget = nil
                 }
             }
@@ -306,7 +339,7 @@ private struct ItemTile: View {
         }
         .frame(width: ShelfLayout.tileSize.width, height: ShelfLayout.tileSize.height, alignment: .top)
         .onHover { hovering in
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) { isHovered = hovering }
+            withAnimation(.easeOut(duration: 0.12)) { isHovered = hovering }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(item.name)
@@ -375,7 +408,7 @@ private struct ShelfBackground: View {
     let isDropTargeted: Bool
 
     var body: some View {
-        let shape = UnevenRoundedRectangle(cornerRadii: cornerRadii, style: .continuous)
+        let shape = Self.shape(dockedEdge: dockedEdge)
         shape
             .fill(.regularMaterial)
             .overlay { shape.fill(Color.accentColor.opacity(isDropTargeted ? 0.15 : 0)) }
@@ -389,12 +422,13 @@ private struct ShelfBackground: View {
     }
 
     /// Square off the corners that touch the screen edge when docked.
-    private var cornerRadii: RectangleCornerRadii {
+    static func shape(dockedEdge: ShelfEdge?) -> UnevenRoundedRectangle {
         let radius = ShelfLayout.cornerRadius
-        return switch dockedEdge {
+        let cornerRadii = switch dockedEdge {
         case .left: RectangleCornerRadii(topLeading: 0, bottomLeading: 0, bottomTrailing: radius, topTrailing: radius)
         case .right: RectangleCornerRadii(topLeading: radius, bottomLeading: radius, bottomTrailing: 0, topTrailing: 0)
         case nil: RectangleCornerRadii(topLeading: radius, bottomLeading: radius, bottomTrailing: radius, topTrailing: radius)
         }
+        return UnevenRoundedRectangle(cornerRadii: cornerRadii, style: .continuous)
     }
 }

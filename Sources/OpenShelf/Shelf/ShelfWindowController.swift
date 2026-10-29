@@ -185,9 +185,8 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
         isApplyingFrame = true
         if animated && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
             NSAnimationContext.runAnimationGroup { context in
-                // Fast start with a long, soft settle.
-                context.duration = 0.32
-                context.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.25, 1)
+                context.duration = Motion.resizeDuration
+                context.timingFunction = Motion.move
                 panel.animator().setFrame(frame, display: true)
             } completionHandler: { [weak self] in
                 MainActor.assumeIsolated {
@@ -285,22 +284,32 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
         pointerAwaySince = nil
         let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
 
+        let tabFrame = EdgeHiding.tabFrame(for: shown, edge: edge, in: visibleFrame)
         isApplyingFrame = true
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = reduceMotion ? 0.15 : 0.28
-            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            context.duration = reduceMotion ? 0.15 : Motion.hideDuration
             if !reduceMotion {
+                // Visibly slides the whole way: an ease-in alone keeps it still
+                // while it fades, then moves it once it can't be seen.
+                context.timingFunction = Motion.slideAway
                 panel.animator().setFrame(EdgeHiding.hiddenFrame(for: shown, edge: edge, in: visibleFrame), display: true)
             }
-            panel.animator().alphaValue = 0
         } completionHandler: { [weak self] in
             MainActor.assumeIsolated {
                 guard let self, self.isHidden else { return }
                 self.panel?.orderOut(nil)
                 self.isApplyingFrame = false
+                // The tab takes over once the shelf has gone, not before.
+                self.edgeTab.show(at: tabFrame, edge: edge, count: self.shelf.items.count)
             }
         }
-        edgeTab.show(at: EdgeHiding.tabFrame(for: shown, edge: edge, in: visibleFrame), edge: edge, count: shelf.items.count)
+        NSAnimationContext.runAnimationGroup { context in
+            // Stays solid for most of the slide and fades as it reaches the
+            // edge, so it doesn't linger over a neighbouring display.
+            context.duration = reduceMotion ? 0.15 : Motion.hideDuration
+            context.timingFunction = reduceMotion ? CAMediaTimingFunction(name: .easeOut) : Motion.lateFade
+            panel.animator().alphaValue = 0
+        }
     }
 
     /// Slides a hidden shelf back out from the edge.
@@ -317,18 +326,28 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
         }
         panel.alphaValue = 0
         panel.orderFrontRegardless()
+        // Draw it now, before the slide's clock starts; otherwise that first
+        // draw eats the start of the slide and the shelf appears part way out.
+        panel.displayIfNeeded()
+        CATransaction.flush()
 
         isApplyingFrame = true
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = reduceMotion ? 0.15 : 0.34
-            context.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.25, 1)
+            context.duration = reduceMotion ? 0.15 : Motion.revealDuration
+            context.timingFunction = Motion.move
             panel.animator().setFrame(shown, display: true)
-            panel.animator().alphaValue = 1
         } completionHandler: { [weak self] in
             MainActor.assumeIsolated {
                 self?.isApplyingFrame = false
                 self?.panel?.invalidateShadow()
             }
+        }
+        NSAnimationContext.runAnimationGroup { context in
+            // Solid early in the slide, so it reads as sliding out rather than
+            // fading in.
+            context.duration = reduceMotion ? 0.15 : Motion.revealDuration * 0.4
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.animator().alphaValue = 1
         }
     }
 
@@ -363,4 +382,21 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
         }
         return true
     }
+}
+
+/// Timing for the shelf's own movements: short, with no bounce, like AppKit's
+/// own. The window moves frame by frame, so a curve that does most of its
+/// travel in the first few frames looks like a jump.
+@MainActor
+private enum Motion {
+    static let resizeDuration = 0.25
+    static let revealDuration = 0.25
+    static let hideDuration = 0.25
+
+    /// Core Animation's default curve: a short ease in and a long, soft settle.
+    static let move = CAMediaTimingFunction(controlPoints: 0.25, 0.1, 0.25, 1)
+    /// Speeds up, then slows to a stop just past the edge.
+    static let slideAway = CAMediaTimingFunction(name: .easeInEaseOut)
+    /// Barely fades until the end.
+    static let lateFade = CAMediaTimingFunction(controlPoints: 0.55, 0, 0.9, 0.6)
 }

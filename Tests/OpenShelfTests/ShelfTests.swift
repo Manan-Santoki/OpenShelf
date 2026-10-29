@@ -63,6 +63,15 @@ struct ShelfTests {
         #expect(ShelfLayout.size(itemCount: 500, isExpanded: true, viewMode: .list).height == ShelfLayout.maxHeight)
         #expect(ShelfLayout.size(itemCount: 3, isExpanded: false, viewMode: .grid) == ShelfLayout.collapsedSize)
     }
+
+    @Test func onlyShelvesTallerThanTheCapScroll() {
+        #expect(!ShelfLayout.needsScrolling(itemCount: 5, viewMode: .grid))
+        #expect(ShelfLayout.needsScrolling(itemCount: 500, viewMode: .list))
+        // The last count that fits shows everything at its full height.
+        let fitting = (1...100).last { !ShelfLayout.needsScrolling(itemCount: $0, viewMode: .list) }!
+        #expect(ShelfLayout.size(itemCount: fitting, isExpanded: true, viewMode: .list).height <= ShelfLayout.maxHeight)
+        #expect(ShelfLayout.needsScrolling(itemCount: fitting + 1, viewMode: .list))
+    }
 }
 
 struct TriggerMatcherTests {
