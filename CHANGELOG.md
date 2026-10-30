@@ -22,6 +22,10 @@ Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
   are signed with an Apple developer certificate: macOS only runs Shortcuts
   actions from apps signed that way.
 
+## [1.8.2] - 2026-10-30
+
+Word documents keep their pictures in PDFs.
+
 ### Fixed and improved
 
 - **Word to PDF keeps pictures without LibreOffice.** Converting a Word
