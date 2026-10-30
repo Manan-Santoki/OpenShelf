@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://github.com/Manan-Santoki/OpenShelf/releases/latest"><img height="40" src="https://img.shields.io/github/v/release/Manan-Santoki/OpenShelf?style=for-the-badge&label=latest&color=3d7bfd&labelColor=131316&logo=github" alt="Latest release"></a>
   &nbsp;
-  <a href="https://github.com/Manan-Santoki/OpenShelf/releases"><img height="40" src="https://img.shields.io/github/downloads/Manan-Santoki/OpenShelf/total?style=for-the-badge&label=downloads&color=2ea043&labelColor=131316&logo=apple&logoColor=white" alt="Downloads"></a>
+  <a href="https://openshelf.space/download"><img height="40" src="https://img.shields.io/endpoint?url=https%3A%2F%2Fopenshelf.space%2Fapi%2Fbadge%2Fdownloads&style=for-the-badge&labelColor=131316&logo=apple&logoColor=white" alt="Downloads"></a>
 </p>
 
 <p align="center">
@@ -55,8 +55,8 @@ See [docs/SPEC.md](docs/SPEC.md) for the full behaviour and roadmap.
 
 ## Install
 
-1. Download **`OpenShelf-<version>.dmg`** from the
-   [latest release](https://github.com/Manan-Santoki/OpenShelf/releases/latest).
+1. [Download the latest **OpenShelf DMG**](https://openshelf.space/download)
+   (or pick a version from [Releases](https://github.com/Manan-Santoki/OpenShelf/releases)).
 2. Open it and drag **OpenShelf** onto the **Applications** folder.
 3. Open OpenShelf from Applications. It lives in the menu bar (the wheel icon),
    and a hands-on tour opens the first time (see below).
@@ -459,6 +459,12 @@ installed copies find the update: Sparkle reads
 the project's EdDSA key (stored as the `SPARKLE_PRIVATE_KEY` repository
 secret; the public key is `SUPublicEDKey` in `Support/Info.plist`). The **CI**
 workflow builds and tests every push and pull request.
+
+The website ([openshelf.space](https://openshelf.space), in `website/`) picks
+up a release by itself: its server reads the newest release from GitHub, so
+the download buttons, version and download count update within ten minutes.
+The count is DMG downloads only; GitHub's own total also counts every update
+check and in-app update.
 
 ## Contributing
 
