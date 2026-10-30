@@ -247,6 +247,17 @@ enum DocumentConversion {
                 }
             }
         } else if format == .pdf {
+            // AppKit's Word reader drops pictures; Quick Look keeps them.
+            if QuickLookConversion.canConvert(source) {
+                do {
+                    try await QuickLookConversion.pdf(from: source, to: destination)
+                    return destination
+                } catch is CancellationError {
+                    throw CancellationError()
+                } catch {
+                    try? FileManager.default.removeItem(at: destination)
+                }
+            }
             // Reading RTF, DOCX or ODT is safe here and can take a while;
             // only the printing itself needs the main thread.
             try await printPDFOnMain(readRich(source), to: destination)
