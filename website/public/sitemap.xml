@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>https://openshelf.space/</loc>
+    <lastmod>2026-10-30</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <image:image><image:loc>https://openshelf.space/assets/og-image.png</image:loc></image:image>
+    <image:image><image:loc>https://openshelf.space/assets/wheel-convert.webp</image:loc></image:image>
+    <image:image><image:loc>https://openshelf.space/assets/wheel-tools.webp</image:loc></image:image>
+    <image:image><image:loc>https://openshelf.space/assets/wheel-actions.webp</image:loc></image:image>
+    <image:image><image:loc>https://openshelf.space/assets/shelf-expanded.webp</image:loc></image:image>
+  </url>
+</urlset>
