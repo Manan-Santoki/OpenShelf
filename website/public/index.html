@@ -30,7 +30,7 @@
 {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "OpenShelf",
  "operatingSystem": "macOS 14 or later", "applicationCategory": "UtilitiesApplication",
  "description": "A free, open-source Mac app: drag any file, tap a key and drop it on a wheel to convert it, edit it or put it on a floating shelf.",
- "url": "https://openshelf.space/", "downloadUrl": "https://github.com/Manan-Santoki/OpenShelf/releases/latest",
+ "url": "https://openshelf.space/", "downloadUrl": "https://openshelf.space/download",
  "license": "https://opensource.org/licenses/MIT", "image": "https://openshelf.space/assets/icon.png",
  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}
 </script>
@@ -481,7 +481,7 @@ footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
       <a class="icon-link" href="https://github.com/Manan-Santoki/OpenShelf" aria-label="OpenShelf on GitHub">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.73-1.54-2.56-.29-5.25-1.28-5.25-5.69 0-1.26.45-2.29 1.19-3.09-.12-.29-.52-1.47.11-3.06 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.77.11 3.06.74.8 1.19 1.83 1.19 3.09 0 4.42-2.7 5.39-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z"/></svg>
       </a>
-      <a class="btn primary small download-link" href="https://github.com/Manan-Santoki/OpenShelf/releases/latest"><span class="download-label" data-prefix="Download">Download</span></a>
+      <a class="btn primary small download-link" href="/download"><span class="download-label">Download<!--version--></span></a>
       <details class="menu">
         <summary aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 8h16M4 16h16"/></svg></summary>
         <nav class="menu-panel" aria-label="Mobile">
@@ -502,21 +502,21 @@ footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
   <div class="hero" id="top">
     <div class="wrap">
       <div class="intro">
-        <a class="news" id="news" href="https://github.com/Manan-Santoki/OpenShelf/releases/latest" hidden><b>New</b><span id="news-text">See what's new</span><span aria-hidden="true">→</span></a>
+        <!--news-->
         <div class="eyebrow">Free &amp; open source · for Mac</div>
         <h1>Drag. Tap. <span>Done.</span></h1>
         <p class="lede">While you drag any file, tap a key and a wheel opens under the pointer: drop on a wedge to <b>convert it, edit it or park it on a shelf</b>.</p>
         <div class="cta">
-          <a class="btn primary download-link" href="https://github.com/Manan-Santoki/OpenShelf/releases/latest">
+          <a class="btn primary download-link" href="/download">
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.37 12.46c-.02-2.13 1.74-3.15 1.82-3.2-1-1.45-2.54-1.65-3.08-1.67-1.31-.13-2.56.77-3.22.77-.67 0-1.69-.75-2.78-.73-1.43.02-2.75.83-3.48 2.11-1.49 2.58-.38 6.39 1.06 8.48.71 1.02 1.55 2.17 2.65 2.13 1.07-.04 1.47-.69 2.76-.69 1.28 0 1.65.69 2.78.67 1.15-.02 1.87-1.04 2.57-2.07.81-1.18 1.14-2.33 1.16-2.39-.03-.01-2.21-.85-2.24-3.41zM14.28 6.21c.58-.71.98-1.69.87-2.67-.84.03-1.87.56-2.47 1.27-.54.62-1.02 1.63-.89 2.59.94.07 1.9-.48 2.49-1.19z"/></svg>
-            <span class="download-label" data-prefix="Download for Mac">Download for Mac</span>
+            <span class="download-label">Download for Mac<!--version--></span>
           </a>
           <a class="btn ghost" href="https://github.com/Manan-Santoki/OpenShelf">
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.73-1.54-2.56-.29-5.25-1.28-5.25-5.69 0-1.26.45-2.29 1.19-3.09-.12-.29-.52-1.47.11-3.06 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.77.11 3.06.74.8 1.19 1.83 1.19 3.09 0 4.42-2.7 5.39-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z"/></svg>
             View on GitHub
           </a>
         </div>
-        <div class="meta"><ul aria-label="Requirements"><li>macOS 14 or later</li><li>Ready for macOS 27</li><li>Apple silicon &amp; Intel</li><li>No account, no uploads</li></ul></div>
+        <div class="meta"><ul aria-label="At a glance"><li>macOS 14 or later</li><li>Ready for macOS 27</li><li>Apple silicon &amp; Intel</li><li>No account, no uploads</li><!--downloads--></ul></div>
       </div>
 
       <div class="demo">
@@ -863,8 +863,8 @@ footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
             <li>macOS 14 Sonoma or later, ready for macOS 27</li>
             <li>Apple silicon, or Intel up to macOS 26</li>
           </ul>
-          <a class="btn primary download-link" href="https://github.com/Manan-Santoki/OpenShelf/releases/latest"><span class="download-label" data-prefix="Download for Mac">Download for Mac</span></a>
-          <p class="sub"><a href="https://github.com/Manan-Santoki/OpenShelf/releases">All releases</a> · <a href="https://github.com/Manan-Santoki/OpenShelf/blob/main/CHANGELOG.md">What's new</a></p>
+          <a class="btn primary download-link" href="/download"><span class="download-label">Download for Mac<!--version--></span></a>
+          <p class="sub"><!--downloads-sub--><a href="https://github.com/Manan-Santoki/OpenShelf/releases">All releases</a> · <a href="https://github.com/Manan-Santoki/OpenShelf/blob/main/CHANGELOG.md">What's new</a></p>
         </div>
       </div>
     </div>
@@ -927,7 +927,7 @@ footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
       <h2>Make every drag count.</h2>
       <p class="sec-lede">Free forever. No account, no subscription, no uploads.</p>
       <div class="cta">
-        <a class="btn primary download-link" href="https://github.com/Manan-Santoki/OpenShelf/releases/latest"><span class="download-label" data-prefix="Download for Mac">Download for Mac</span></a>
+        <a class="btn primary download-link" href="/download"><span class="download-label">Download for Mac<!--version--></span></a>
         <a class="btn ghost" href="https://github.com/Manan-Santoki/OpenShelf">Star on GitHub</a>
       </div>
     </div>
@@ -981,49 +981,6 @@ function wedgePath(start, end, g) {
     "Z",
   ].join(" ");
 }
-
-// ---- Download: point every button at the newest DMG, label it with its
-// version and show a "what's new" link. The version comes from GitHub, so
-// nothing here needs editing for a release; without it, the buttons keep
-// linking to the latest release page.
-(() => {
-  const API = "https://api.github.com/repos/Manan-Santoki/OpenShelf/releases/latest";
-  const KEY = "openshelf-latest-release";
-  const apply = release => {
-    if (!release || !release.tag) return;
-    const version = release.tag.replace(/^v/, "");
-    if (release.dmg) document.querySelectorAll(".download-link").forEach(a => { a.href = release.dmg; });
-    document.querySelectorAll(".download-label").forEach(s => {
-      s.textContent = s.dataset.prefix || "Download";
-      const v = document.createElement("span");
-      v.className = "ver";
-      v.textContent = "v" + version;
-      s.append(" ", v);
-    });
-    const news = document.getElementById("news");
-    if (news && release.url) {
-      news.href = release.url;
-      document.getElementById("news-text").textContent = "Version " + version + " is out: see what's new";
-      news.hidden = false;
-    }
-  };
-  // Reuse a recent answer so repeat visits don't spend GitHub's per-visitor rate limit.
-  try {
-    const cached = JSON.parse(sessionStorage.getItem(KEY) || "null");
-    if (cached && Date.now() - cached.at < 30 * 60 * 1000) { apply(cached); return; }
-  } catch (_) {}
-  if (!window.fetch) return;
-  fetch(API, { headers: { Accept: "application/vnd.github+json" } })
-    .then(r => r.ok ? r.json() : null)
-    .then(data => {
-      if (!data || data.draft || data.prerelease) return;
-      const dmg = (data.assets || []).find(a => /\.dmg$/i.test(a.name));
-      const release = { tag: String(data.tag_name || ""), url: data.html_url || "", dmg: dmg ? dmg.browser_download_url : "", at: Date.now() };
-      try { sessionStorage.setItem(KEY, JSON.stringify(release)); } catch (_) {}
-      apply(release);
-    })
-    .catch(() => {});
-})();
 
 // ---- One-time reveal as sections enter the viewport.
 (() => {
