@@ -18,6 +18,9 @@ enum DocumentEngine: Equatable {
         case .pdf:
             // LibreOffice keeps a Word document's own page layout; Pandoc retypesets it.
             if tools.libreOffice != nil, ["docx", "doc", "odt", "rtf"].contains(ext) { return .libreOffice }
+            // The built-in way prints Word documents as Quick Look shows them;
+            // Pandoc would drop their pictures and retypeset them.
+            if QuickLookConversion.extensions.contains(ext) { return .builtIn }
             if pandocCanWrite, PandocConversion.readers[ext] != nil, ext != "rtf" { return .pandoc }
         case .md, .epub:
             if pandocCanWrite, PandocConversion.readers[ext] != nil { return .pandoc }

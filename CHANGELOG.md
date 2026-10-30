@@ -22,6 +22,14 @@ Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
   are signed with an Apple developer certificate: macOS only runs Shortcuts
   actions from apps signed that way.
 
+### Fixed and improved
+
+- **Word to PDF keeps pictures without LibreOffice.** Converting a Word
+  document (.docx or .doc) to PDF used to drop its pictures and page layout
+  unless LibreOffice was installed. It's now printed the way Quick Look shows
+  it, with its pictures, headers, formatting, paper size and margins.
+  LibreOffice still does it when it's installed.
+
 ## [1.8.1] - 2026-10-28
 
 Smoother shelves.

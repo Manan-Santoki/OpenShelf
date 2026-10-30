@@ -434,6 +434,9 @@ struct DocumentEngineTests {
         #expect(DocumentEngine.choose(for: url("a.md"), to: .txt, tools: pandoc) == .builtIn)
         #expect(DocumentEngine.choose(for: url("a.docx"), to: .md, tools: pandoc) == .pandoc)
         #expect(DocumentEngine.choose(for: url("a.txt"), to: .md, tools: pandoc) == .builtIn)
+        // Word documents print as Quick Look shows them, pictures and all.
+        #expect(DocumentEngine.choose(for: url("a.docx"), to: .pdf, tools: pandocWithTeX) == .builtIn)
+        #expect(DocumentEngine.choose(for: url("a.odt"), to: .pdf, tools: pandocWithTeX) == .pandoc)
     }
 
     @Test func libreOfficeKeepsWordLayoutsInPDFs() {
