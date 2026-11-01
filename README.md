@@ -460,9 +460,10 @@ the project's EdDSA key (stored as the `SPARKLE_PRIVATE_KEY` repository
 secret; the public key is `SUPublicEDKey` in `Support/Info.plist`). The **CI**
 workflow builds and tests every push and pull request.
 
-The website ([openshelf.space](https://openshelf.space), in `website/`) picks
-up a release by itself: its server reads the newest release from GitHub, so
-the download buttons, version and download count update within ten minutes.
+The website, [openshelf.space](https://openshelf.space), is maintained
+separately and isn't part of this repository. It picks up a release by itself:
+its server reads the newest release from GitHub, so the download buttons,
+version and download count update within ten minutes.
 The count is DMG downloads only; GitHub's own total also counts every update
 check and in-app update.
 
