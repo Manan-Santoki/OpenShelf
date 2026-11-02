@@ -6,7 +6,7 @@ enum OutputFormat: String, CaseIterable, Hashable, Sendable {
     // Images
     case png, jpg, webp, heic, tiff, avif, bmp, gif
     // Documents
-    case pdf, docx, txt, rtf, html, md, epub, pptx
+    case pdf, docx, txt, rtf, html, md, epub, pptx, odt
     // Spreadsheets
     case xlsx, csv, tsv, ods
     // Audio and video
@@ -132,6 +132,8 @@ enum ConversionCatalog {
             formats = [.docx, .jpg, .png, .txt, .md, .epub, .pptx, .xlsx]
         case .document:
             formats = [.pdf, .docx, .txt, .md, .epub, .html, .rtf]
+            // Only Pandoc writes OpenDocument text well.
+            if tools.pandoc != nil, PandocConversion.readers[ext] != nil { formats.append(.odt) }
         case .spreadsheet:
             formats = spreadsheetFormats(ext: ext, tools: tools)
         case .presentation:
@@ -162,6 +164,10 @@ enum ConversionCatalog {
             }
         case .subtitle:
             formats = [.txt, .srt, .vtt]
+        case .ebook:
+            // Without a tool that reads books, a book is just a file, as before.
+            formats = PandocConversion.formats(forBook: url, tools: tools)
+            guard !formats.isEmpty else { return [.zip, .tar, .tgz] }
         case .archive:
             return [.extract]
         case .folder, .other:

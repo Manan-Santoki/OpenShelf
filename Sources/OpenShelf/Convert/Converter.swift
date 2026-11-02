@@ -78,6 +78,8 @@ enum Converter {
             return [try await MediaConversion.convert(source, to: format, tools: tools, settings: settings, progress: progress)]
         case .subtitle:
             return [try SubtitleConversion.convert(source, to: format)]
+        case .ebook:
+            return [try await PandocConversion.convert(source, to: format, tools: tools)]
         case .archive, .folder, .other:
             throw ConversionError.unsupported("\(source.pathExtension.uppercased()) to \(format.title)")
         }

@@ -292,6 +292,9 @@ enum DocumentConversion {
             try text.data(from: range, documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]).write(to: destination)
         case .html:
             try text.data(from: range, documentAttributes: [.documentType: NSAttributedString.DocumentType.html]).write(to: destination)
+        case .odt:
+            // Should Pandoc fail, AppKit's OpenDocument writer is the fallback.
+            try text.data(from: range, documentAttributes: [.documentType: NSAttributedString.DocumentType.openDocument]).write(to: destination)
         default:
             throw ConversionError.unsupported("document to \(format.title)")
         }

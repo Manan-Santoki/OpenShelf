@@ -24,7 +24,7 @@ enum ExtraTool: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .ffmpeg: "MP3, OGG, WebP, MKV, WebM, AVI and WMV"
         case .libreOffice: "PowerPoint, Keynote, Pages, Numbers, ODP, XLS and ODS"
-        case .pandoc: "Pandoc’s Markdown, Word and EPUB conversions"
+        case .pandoc: "Pandoc’s Markdown, Word, ODT and EPUB conversions"
         }
     }
 

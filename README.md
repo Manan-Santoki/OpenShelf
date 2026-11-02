@@ -135,7 +135,8 @@ A small card next to the pointer shows progress; click its **×** to cancel.
 |---|---|
 | Image (JPG, PNG, HEIC, SVG, …) | PNG, JPG, WEBP², HEIC, TIFF, AVIF, BMP, PDF, DOCX, ZIP |
 | PDF | DOCX, JPG, PNG, TXT, Markdown, EPUB, PPTX, XLSX, ZIP |
-| Document (TXT, RTF, RTFD, DOCX, DOC, ODT, HTML, Markdown) | PDF, DOCX, TXT, Markdown, EPUB, HTML, RTF, PAGES³, ZIP |
+| Document (TXT, RTF, RTFD, DOCX, DOC, ODT, HTML, Markdown) | PDF, DOCX, TXT, Markdown, EPUB, HTML, RTF, ODT⁶, PAGES³, ZIP |
+| Book (EPUB)⁶ | DOCX, Markdown, HTML, ODT, TXT, PDF⁷, ZIP |
 | Spreadsheet (CSV, TSV, XLSX) | XLSX, CSV, TSV, PDF, ODS¹, NUMBERS³, ZIP |
 | Spreadsheet (XLS, ODS)¹ | XLSX, CSV, PDF, ODS, ZIP |
 | Slides (PPTX, PPT, ODP)¹ | PDF, JPG, PNG (one image per slide), KEY³, ZIP |
@@ -162,6 +163,8 @@ each file: a PDF of every page in older files, a picture of the first page
 
 ¹ Needs LibreOffice. ² Needs ffmpeg (`brew install webp` also adds WebP).
 ⁵ Needs whisper.cpp and a speech model (see [Optional command-line tools](#optional-command-line-tools)).
+⁶ Needs Pandoc; without it an EPUB offers ZIP, TAR and TAR.GZ as before. ODT is offered for Markdown, Word, ODT, HTML and RTF.
+⁷ Also needs a typesetter for Pandoc (see below).
 
 Both are free and optional. Install them from **Settings → Extra Formats**: one
 click downloads the official build (ffmpeg from
@@ -189,8 +192,10 @@ Word files get Word's own heading styles, numbered lists and footnotes.
 Pictures on the web are never downloaded; they're shown by their description.
 
 If [Pandoc](https://pandoc.org) is installed, OpenShelf uses it instead for
-Markdown to Word, HTML, EPUB and RTF, and for
-Word, ODT and HTML to Markdown and EPUB. Pandoc's PDFs also need a typesetter
+Markdown to Word, HTML, EPUB, RTF and ODT, and for
+Word, ODT and HTML to Markdown, EPUB and ODT. Pandoc also opens EPUB books:
+they become Word, Markdown, HTML (pictures included), ODT, plain text and,
+with a typesetter, PDF. Pandoc's PDFs also need a typesetter
 such as MacTeX, Tectonic or Typst; without one, PDFs keep OpenShelf's own
 layout. With LibreOffice installed, Word and ODT documents become PDFs through
 it, keeping their page layout. Should either fail, the built-in conversion
@@ -212,6 +217,8 @@ your PATH, and run with a minimal environment, never your shell's.
 | Tool | Install | Adds |
 |---|---|---|
 | [whisper.cpp](https://github.com/ggml-org/whisper.cpp) | `brew install whisper-cpp`, plus a model (below) | Audio to TXT, SRT and VTT; video to SRT and VTT |
+| [Pandoc](https://pandoc.org) | `brew install pandoc` (or **Install** in Settings) | ODT output; EPUB to DOCX, Markdown, HTML, ODT and TXT |
+| A PDF typesetter for Pandoc | `brew install tectonic` or `brew install typst`, or [MacTeX](https://tug.org/mactex/) | PDFs through Pandoc, e.g. EPUB to PDF |
 
 **Transcripts and subtitles** are made entirely on your Mac: the sound is
 decoded (by macOS, or by ffmpeg for formats macOS can't read) and whisper.cpp

@@ -12,7 +12,7 @@ enum DocumentEngine: Equatable {
         // Pandoc makes PDFs only through a typesetter.
         let pandocCanWrite = tools.pandoc != nil && (format != .pdf || tools.pdfEngine != nil)
         if MarkdownConversion.isMarkdown(source) {
-            return pandocCanWrite && [.docx, .html, .epub, .rtf, .pdf].contains(format) ? .pandoc : .builtIn
+            return pandocCanWrite && [.docx, .html, .epub, .rtf, .odt, .pdf].contains(format) ? .pandoc : .builtIn
         }
         switch format {
         case .pdf:
@@ -22,7 +22,7 @@ enum DocumentEngine: Equatable {
             // Pandoc would drop their pictures and retypeset them.
             if QuickLookConversion.extensions.contains(ext) { return .builtIn }
             if pandocCanWrite, PandocConversion.readers[ext] != nil, ext != "rtf" { return .pandoc }
-        case .md, .epub:
+        case .md, .epub, .odt:
             if pandocCanWrite, PandocConversion.readers[ext] != nil { return .pandoc }
         default:
             break
@@ -46,7 +46,14 @@ enum PandocConversion {
     static let readers: [String: String] = [
         "md": "markdown", "markdown": "markdown", "mdown": "markdown", "mkd": "markdown", "mkdn": "markdown",
         "docx": "docx", "odt": "odt", "html": "html", "htm": "html", "rtf": "rtf",
+        "epub": "epub",
     ]
+
+    /// What an EPUB book becomes through Pandoc, in wheel order; none without it.
+    static func formats(forBook url: URL, tools: ExternalTools) -> [OutputFormat] {
+        guard tools.pandoc != nil, readers[url.pathExtension.lowercased()] != nil else { return [] }
+        return [.docx, .md, .html, .odt, .txt] + (tools.pdfEngine != nil ? [.pdf] : [])
+    }
 
     static func writer(for format: OutputFormat) -> String? {
         switch format {
@@ -55,6 +62,8 @@ enum PandocConversion {
         case .epub: "epub3"
         case .md: "gfm"
         case .rtf: "rtf"
+        case .odt: "odt"
+        case .txt: "plain"
         // Pandoc picks the writer that suits the typesetter.
         case .pdf: ""
         default: nil
@@ -65,11 +74,16 @@ enum PandocConversion {
     static func arguments(source: URL, format: OutputFormat, output: URL, pdfEngine: URL?) -> [String]? {
         guard let reader = readers[source.pathExtension.lowercased()], let writer = writer(for: format) else { return nil }
         var arguments = [source.path, "--from", reader]
-        if !writer.isEmpty { arguments += ["--to", writer] }
+        // A book's chapters come wrapped in HTML that Markdown would carry
+        // along as raw <span>s and <div>s; plain Markdown reads better.
+        let bookToMarkdown = reader == "epub" && format == .md
+        if !writer.isEmpty { arguments += ["--to", bookToMarkdown ? writer + "-raw_html" : writer] }
         // Pictures next to the document are found wherever Pandoc runs.
         arguments += ["--output", output.path, "--resource-path", source.deletingLastPathComponent().path]
-        // A whole document rather than a fragment; Markdown has no such thing.
-        if format != .md { arguments.append("--standalone") }
+        // A whole document rather than a fragment; Markdown and text have no such thing.
+        if format != .md, format != .txt { arguments.append("--standalone") }
+        // A book's pictures are inside it; a web page needs them inside too.
+        if format == .html, reader == "epub" { arguments.append("--embed-resources") }
         if format == .html || format == .epub {
             // The page's title, without adding a heading to it.
             arguments += ["--metadata", "pagetitle=\(source.deletingPathExtension().lastPathComponent)"]
@@ -82,7 +96,7 @@ enum PandocConversion {
                 // LaTeX's default margins are very wide; links are coloured instead of boxed.
                 arguments += ["--variable", "geometry:margin=1in", "--variable", "colorlinks=true"]
             }
-        case .md:
+        case .md, .txt:
             arguments += ["--wrap", "none"]
         default:
             break
@@ -90,7 +104,12 @@ enum PandocConversion {
         return arguments
     }
 
-    static func convert(_ source: URL, to format: OutputFormat, tools: ExternalTools) async throws -> URL {
+    static func convert(
+        _ source: URL,
+        to format: OutputFormat,
+        tools: ExternalTools,
+        runner: @escaping ToolRunner = ProcessRunner.live
+    ) async throws -> URL {
         guard let pandoc = tools.pandoc else { throw MissingToolError(name: "Pandoc") }
         let workspace = try PackageZip.makeWorkspace("pandoc")
         defer { try? FileManager.default.removeItem(at: workspace) }
@@ -106,7 +125,7 @@ enum PandocConversion {
 
         try await withThrowingTaskGroup(of: Void.self) { group in
             group.addTask {
-                try await ProcessRunner.run(pandoc, arguments, currentDirectory: workspace, extraEnvironment: environment)
+                try await runner(ToolInvocation(executable: pandoc, arguments: arguments, currentDirectory: workspace, extraEnvironment: environment)) { _ in }
             }
             group.addTask {
                 try await Task.sleep(for: timeout)
