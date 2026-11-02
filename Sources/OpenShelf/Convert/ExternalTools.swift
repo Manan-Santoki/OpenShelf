@@ -2,7 +2,7 @@ import Foundation
 
 /// Optional tools found on this Mac: ffmpeg and ffprobe, cwebp, LibreOffice,
 /// Pandoc with a program it can make PDFs with, whisper.cpp with a speech
-/// model, and Pages, Numbers and Keynote.
+/// model, calibre's ebook-convert, and Pages, Numbers and Keynote.
 struct ExternalTools: Equatable, Sendable {
     var ffmpeg: URL?
     var cwebp: URL?
@@ -17,6 +17,9 @@ struct ExternalTools: Equatable, Sendable {
     var whisper: URL? = nil
     /// The speech model whisper.cpp transcribes with (see `Transcription.preferredModel`).
     var whisperModel: URL? = nil
+
+    /// calibre's book converter.
+    var ebookConvert: URL? = nil
 
     /// whisper.cpp does nothing without a model, so both are needed.
     var canTranscribe: Bool {
@@ -83,6 +86,12 @@ struct ExternalTools: Equatable, Sendable {
         }.first
         // Homebrew's whisper.cpp names it whisper-cli; builds before 1.7.4, whisper-cpp.
         let whisper = find("whisper-cli", ignoredAs: "whisper") ?? find("whisper-cpp", ignoredAs: "whisper")
+        // calibre's command-line tools live inside its app; `brew install
+        // --cask calibre` also links them into Homebrew's bin.
+        let calibreApps = ignored.contains("calibre") ? [] : locations.calibreApps
+        let ebookConvert = calibreApps.map { $0.appendingPathComponent("Contents/MacOS/ebook-convert") }
+            .first { FileManager.default.isExecutableFile(atPath: $0.path) }
+            ?? find("ebook-convert", ignoredAs: "calibre")
         return ExternalTools(
             ffmpeg: find("ffmpeg", ignoredAs: "ffmpeg"),
             cwebp: find("cwebp", ignoredAs: "cwebp"),
@@ -100,14 +109,15 @@ struct ExternalTools: Equatable, Sendable {
                 }
             }),
             whisper: whisper,
-            whisperModel: whisper == nil ? nil : Transcription.preferredModel(in: locations.modelDirectories)
+            whisperModel: whisper == nil ? nil : Transcription.preferredModel(in: locations.modelDirectories),
+            ebookConvert: ebookConvert
         )
     }
 
     /// Tools whose Homebrew, MacPorts and /Applications copies are ignored, to
     /// try OpenShelf as someone without them sees it, and to try installing
     /// them from Settings: `defaults write app.openshelf.OpenShelf
-    /// IgnoredExternalTools -array ffmpeg cwebp libreoffice pandoc whisper`
+    /// IgnoredExternalTools -array ffmpeg cwebp libreoffice pandoc whisper calibre`
     /// ("ffmpeg" covers ffprobe too; "iwork" hides Pages, Numbers and Keynote).
     /// `defaults delete` the key to undo.
     static var ignoredTools: Set<String> {
@@ -129,6 +139,8 @@ struct ToolLocations: Sendable {
     var applicationDirectories: [URL] = []
     /// Where whisper.cpp's speech models are looked for.
     var modelDirectories: [URL] = []
+    /// Where calibre.app is looked for.
+    var calibreApps: [URL] = []
 
     /// Homebrew, MacPorts and the PATH come first: tools people installed
     /// themselves and keep up to date. OpenShelf's own copies (`ManagedTools`)
@@ -151,7 +163,11 @@ struct ToolLocations: Sendable {
                 URL(fileURLWithPath: "/Applications"),
                 FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications"),
             ],
-            modelDirectories: [ManagedTools.modelsDirectory]
+            modelDirectories: [ManagedTools.modelsDirectory],
+            calibreApps: [
+                URL(fileURLWithPath: "/Applications/calibre.app"),
+                FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications/calibre.app"),
+            ]
         )
     }
 }

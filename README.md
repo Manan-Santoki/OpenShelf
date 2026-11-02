@@ -134,9 +134,10 @@ A small card next to the pointer shows progress; click its **×** to cancel.
 | Drag a… | Convert to |
 |---|---|
 | Image (JPG, PNG, HEIC, SVG, …) | PNG, JPG, WEBP², HEIC, TIFF, AVIF, BMP, PDF, DOCX, ZIP |
-| PDF | DOCX, JPG, PNG, TXT, Markdown, EPUB, PPTX, XLSX, ZIP |
+| PDF | DOCX, JPG, PNG, TXT, Markdown, EPUB, PPTX, XLSX, MOBI⁸, AZW3⁸, ZIP |
 | Document (TXT, RTF, RTFD, DOCX, DOC, ODT, HTML, Markdown) | PDF, DOCX, TXT, Markdown, EPUB, HTML, RTF, ODT⁶, PAGES³, ZIP |
-| Book (EPUB)⁶ | DOCX, Markdown, HTML, ODT, TXT, PDF⁷, ZIP |
+| Book (EPUB)⁶ ⁸ | MOBI⁸, AZW3⁸, PDF⁷ ⁸, DOCX⁶, Markdown⁶, HTML⁶, ODT⁶, TXT⁶, ZIP |
+| Kindle book (MOBI, AZW3, AZW)⁸ | EPUB, MOBI, AZW3, PDF, ZIP |
 | Spreadsheet (CSV, TSV, XLSX) | XLSX, CSV, TSV, PDF, ODS¹, NUMBERS³, ZIP |
 | Spreadsheet (XLS, ODS)¹ | XLSX, CSV, PDF, ODS, ZIP |
 | Slides (PPTX, PPT, ODP)¹ | PDF, JPG, PNG (one image per slide), KEY³, ZIP |
@@ -164,7 +165,8 @@ each file: a PDF of every page in older files, a picture of the first page
 ¹ Needs LibreOffice. ² Needs ffmpeg (`brew install webp` also adds WebP).
 ⁵ Needs whisper.cpp and a speech model (see [Optional command-line tools](#optional-command-line-tools)).
 ⁶ Needs Pandoc; without it an EPUB offers ZIP, TAR and TAR.GZ as before. ODT is offered for Markdown, Word, ODT, HTML and RTF.
-⁷ Also needs a typesetter for Pandoc (see below).
+⁷ Through Pandoc, also needs a typesetter (see below); with calibre installed, calibre makes it instead.
+⁸ Needs calibre.
 
 Both are free and optional. Install them from **Settings → Extra Formats**: one
 click downloads the official build (ffmpeg from
@@ -219,6 +221,7 @@ your PATH, and run with a minimal environment, never your shell's.
 | [whisper.cpp](https://github.com/ggml-org/whisper.cpp) | `brew install whisper-cpp`, plus a model (below) | Audio to TXT, SRT and VTT; video to SRT and VTT |
 | [Pandoc](https://pandoc.org) | `brew install pandoc` (or **Install** in Settings) | ODT output; EPUB to DOCX, Markdown, HTML, ODT and TXT |
 | A PDF typesetter for Pandoc | `brew install tectonic` or `brew install typst`, or [MacTeX](https://tug.org/mactex/) | PDFs through Pandoc, e.g. EPUB to PDF |
+| [calibre](https://calibre-ebook.com) | `brew install --cask calibre` | EPUB, MOBI and AZW3 to each other and to PDF; PDF to MOBI and AZW3 |
 
 **Transcripts and subtitles** are made entirely on your Mac: the sound is
 decoded (by macOS, or by ffmpeg for formats macOS can't read) and whisper.cpp
@@ -237,6 +240,12 @@ mkdir -p ~/Library/Application\ Support/OpenShelf/Models
 curl -L -o ~/Library/Application\ Support/OpenShelf/Models/ggml-base.bin \
   https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin
 ```
+
+**Ebooks** go through calibre's `ebook-convert`, found inside `calibre.app` in
+`/Applications` or `~/Applications`, or on Homebrew's path. DRM-protected
+Kindle books can't be converted. calibre makes PDFs with a built-in browser
+engine that occasionally crashes; OpenShelf tries once more when it does, and
+macOS may still show a "calibre quit unexpectedly" report.
 
 #### Output settings
 

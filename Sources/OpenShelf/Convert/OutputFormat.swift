@@ -14,6 +14,8 @@ enum OutputFormat: String, CaseIterable, Hashable, Sendable {
     case mkv, webm, avi, wmv
     // Subtitles
     case srt, vtt
+    // Kindle books, made by calibre
+    case mobi, azw3
     // Archives
     case zip, tar, tgz, extract
     // Apple's own, saved by Pages, Numbers and Keynote
@@ -130,6 +132,7 @@ enum ConversionCatalog {
             if tools.canEncodeWebP { formats.insert(.webp, at: 2) }
         case .pdf:
             formats = [.docx, .jpg, .png, .txt, .md, .epub, .pptx, .xlsx]
+            if tools.ebookConvert != nil { formats += EbookConversion.formatsForPDF }
         case .document:
             formats = [.pdf, .docx, .txt, .md, .epub, .html, .rtf]
             // Only Pandoc writes OpenDocument text well.
@@ -166,7 +169,7 @@ enum ConversionCatalog {
             formats = [.txt, .srt, .vtt]
         case .ebook:
             // Without a tool that reads books, a book is just a file, as before.
-            formats = PandocConversion.formats(forBook: url, tools: tools)
+            formats = EbookConversion.formats(forBook: url, tools: tools)
             guard !formats.isEmpty else { return [.zip, .tar, .tgz] }
         case .archive:
             return [.extract]

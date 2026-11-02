@@ -18,6 +18,7 @@ enum IntentFormat: String, AppEnum, CaseIterable {
     case mp4, mov, m4a, mp3, wav, aiff, flac, ogg, opus, wma
     case mkv, webm, avi, wmv
     case srt, vtt
+    case mobi, azw3
     case zip, tar, tgz, extract
     case pages, numbers, key
 
@@ -32,6 +33,7 @@ enum IntentFormat: String, AppEnum, CaseIterable {
             .ogg: "OGG", .opus: "OPUS", .wma: "WMA",
             .mkv: "MKV", .webm: "WEBM", .avi: "AVI", .wmv: "WMV",
             .srt: "SRT", .vtt: "VTT",
+            .mobi: "MOBI", .azw3: "AZW3",
             .zip: "ZIP", .tar: "TAR", .tgz: "TAR.GZ", .extract: "UNZIP",
             .pages: "PAGES", .numbers: "NUMBERS", .key: "KEY",
         ]

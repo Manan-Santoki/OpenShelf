@@ -55,6 +55,11 @@ enum Converter {
             break
         }
 
+        // calibre's conversions: books, and PDFs to Kindle formats.
+        if EbookConversion.handles(source, to: format, tools: tools) {
+            return [try await EbookConversion.convert(source, to: format, tools: tools, progress: progress)]
+        }
+
         // Pages, Numbers and Keynote files, before their kind's own converters.
         if let iWork = IWorkFormat(url: source) {
             return try await IWorkConversion.convert(source, from: iWork, to: format, tools: tools, settings: settings, progress: progress)
