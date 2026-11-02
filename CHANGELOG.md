@@ -10,6 +10,25 @@ Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
 
 ### New
 
+- **OpenShelf in Shortcuts and Spotlight.** Convert Files, Compress, Extract
+  Text (OCR), Remove Background, Combine into PDF, Remove Audio, Read QR Codes
+  and Add to Shelf are now actions in the Shortcuts app, so you can chain
+  them, add them to a Finder Quick Action, or run them on everything that
+  lands in a folder with a folder automation, no dragging needed. On macOS 26
+  and later the main ones are in Spotlight too. They run entirely on your Mac,
+  like the wheels, and save results next to the originals.
+
+  These are in the code but switched off in release builds until releases
+  are signed with an Apple developer certificate: macOS only runs Shortcuts
+  actions from apps signed that way.
+
+## [1.9.0] - 2026-11-01
+
+Transcripts and subtitles, ODT and EPUB through Pandoc, and ebooks with
+calibre, all from free tools you install yourself.
+
+### New
+
 - **Transcripts and subtitles, made on your Mac.** With
   [whisper.cpp](https://github.com/ggml-org/whisper.cpp) installed
   (`brew install whisper-cpp`) and a speech model in
@@ -27,18 +46,6 @@ Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
   installed (`brew install --cask calibre`), EPUB, MOBI and AZW3 books
   convert to each other and to PDF, and PDFs convert to MOBI and AZW3, with
   progress. OpenShelf never installs calibre; without it nothing changes.
-
-- **OpenShelf in Shortcuts and Spotlight.** Convert Files, Compress, Extract
-  Text (OCR), Remove Background, Combine into PDF, Remove Audio, Read QR Codes
-  and Add to Shelf are now actions in the Shortcuts app, so you can chain
-  them, add them to a Finder Quick Action, or run them on everything that
-  lands in a folder with a folder automation, no dragging needed. On macOS 26
-  and later the main ones are in Spotlight too. They run entirely on your Mac,
-  like the wheels, and save results next to the originals.
-
-  These are in the code but switched off in release builds until releases
-  are signed with an Apple developer certificate: macOS only runs Shortcuts
-  actions from apps signed that way.
 
 ## [1.8.2] - 2026-10-30
 
