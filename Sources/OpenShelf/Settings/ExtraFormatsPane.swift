@@ -2,7 +2,8 @@ import AppKit
 import SwiftUI
 
 /// Settings → Extra Formats: ffmpeg, LibreOffice and Pandoc, whether they're
-/// on this Mac and where from, and installing or removing them.
+/// on this Mac and where from, and installing or removing them; then the
+/// command-line tools OpenShelf only uses (`OptionalTool`).
 struct ExtraFormatsPane: View {
     let installer: ToolInstaller
 
@@ -17,8 +18,28 @@ struct ExtraFormatsPane: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            Section {
+                ForEach(OptionalTool.allCases) { tool in
+                    OptionalToolRow(tool: tool, tools: installer.tools)
+                }
+            } header: {
+                Text("Command-line tools")
+            } footer: {
+                Text("OpenShelf uses these when they’re installed, and never downloads or installs them itself. Their conversions appear on the wheel once they’re found.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .settingsPane()
+    }
+
+    /// What decides an optional tool's row height, for `SettingsTab.heightSignature`.
+    static func layout(of tool: OptionalTool, tools: ExternalTools) -> String {
+        switch tool.state(in: tools) {
+        case .missing: "missing"
+        case .incomplete: "incomplete"
+        case .installed: "installed"
+        }
     }
 
     /// What decides a row's height, for `SettingsTab.heightSignature`.
@@ -177,6 +198,65 @@ private struct FailureControls: View {
     }
 
     private func copyHomebrewCommand() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(tool.homebrewCommand, forType: .string)
+        hasCopiedCommand = true
+        Task {
+            try? await Task.sleep(for: .seconds(1.5))
+            hasCopiedCommand = false
+        }
+    }
+}
+
+/// A tool OpenShelf only uses: installed, installed but missing something,
+/// or how to install it.
+private struct OptionalToolRow: View {
+    let tool: OptionalTool
+    let tools: ExternalTools
+    @State private var hasCopiedCommand = false
+
+    var body: some View {
+        let state = tool.state(in: tools)
+        LabeledContent {
+            switch state {
+            case .installed(let path):
+                Label {
+                    Text("Installed")
+                } icon: {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                }
+                .help("\(tool.name) at \(path.path)")
+            case .incomplete:
+                Button("Open Models Folder") { openModelsFolder() }
+            case .missing:
+                Button(hasCopiedCommand ? "Copied" : "Copy Command") { copyCommand() }
+                    .help(tool.homebrewCommand)
+            }
+        } label: {
+            Text(tool.name)
+            Text(tool.unlocks)
+            switch state {
+            case .missing:
+                Text("To enable, install it with Homebrew: \(tool.homebrewCommand)")
+                    .font(.caption)
+                    .textSelection(.enabled)
+            case .incomplete:
+                Text(.init(tool.completionHint))
+                    .font(.caption)
+            case .installed:
+                EmptyView()
+            }
+        }
+    }
+
+    private func openModelsFolder() {
+        let folder = ManagedTools.modelsDirectory
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(folder)
+    }
+
+    private func copyCommand() {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(tool.homebrewCommand, forType: .string)
         hasCopiedCommand = true

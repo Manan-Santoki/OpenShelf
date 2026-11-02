@@ -72,6 +72,7 @@ enum SettingsTab: String, CaseIterable, Sendable {
         case .extraFormats:
             ExtraTool.allCases.map { ExtraFormatsPane.layout(of: $0, installer: .shared) }
                 + ["typesetter \(ToolInstaller.shared.tools.pdfEngine != nil)"]
+                + OptionalTool.allCases.map { ExtraFormatsPane.layout(of: $0, tools: ToolInstaller.shared.tools) }
         case .shelves:
             // A row per watched folder; a missing folder's row says so.
             WatchedFolders.shared.folders.map { folder in

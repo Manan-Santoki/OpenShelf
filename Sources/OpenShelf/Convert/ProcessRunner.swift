@@ -29,6 +29,36 @@ struct MissingToolError: LocalizedError, Equatable {
     }
 }
 
+/// One run of a command-line tool, as the optional-tool converters (whisper.cpp,
+/// Pandoc, calibre) describe it: arguments are always an array, never a shell
+/// string, and files are always passed as absolute paths, so a name starting
+/// with "-" can't be read as an option.
+struct ToolInvocation: Equatable, Sendable {
+    var executable: URL
+    var arguments: [String]
+    var currentDirectory: URL? = nil
+    /// Added to the minimal environment (see `ChildEnvironment`).
+    var extraEnvironment: [String: String] = [:]
+}
+
+/// Starts a tool and passes on each line it prints (standard output and
+/// error), for progress. `ProcessRunner` normally; tests swap in a fake that
+/// records the invocation and writes what the tool would have.
+typealias ToolRunner = @Sendable (ToolInvocation, _ onLine: @escaping @Sendable (String) -> Void) async throws -> Void
+
+extension ProcessRunner {
+    static let live: ToolRunner = { invocation, onLine in
+        try await run(
+            invocation.executable,
+            invocation.arguments,
+            currentDirectory: invocation.currentDirectory,
+            extraEnvironment: invocation.extraEnvironment,
+            onOutputLine: onLine,
+            onErrorLine: onLine
+        )
+    }
+}
+
 /// Runs command-line tools without blocking, with cancellation and line-by-line
 /// output for progress reporting.
 enum ProcessRunner {
@@ -39,7 +69,8 @@ enum ProcessRunner {
         standardInputFile: URL? = nil,
         standardOutputFile: URL? = nil,
         extraEnvironment: [String: String] = [:],
-        onOutputLine: (@Sendable (String) -> Void)? = nil
+        onOutputLine: (@Sendable (String) -> Void)? = nil,
+        onErrorLine: (@Sendable (String) -> Void)? = nil
     ) async throws {
         // Launching a missing file fails with a cryptic "file doesn't exist";
         // an optional tool may have been uninstalled since it was detected.
@@ -66,7 +97,7 @@ enum ProcessRunner {
         let readers = DispatchGroup()
         let errorPipe = Pipe()
         process.standardError = errorPipe
-        readToEnd(errorPipe.fileHandleForReading, group: readers) { box.appendError($0) }
+        readToEnd(errorPipe.fileHandleForReading, group: readers) { box.appendError($0, onLine: onErrorLine) }
 
         let outputPipe = Pipe()
         // Also close parent writers when launch fails, so the reader threads
@@ -100,6 +131,7 @@ enum ProcessRunner {
         // A process the tool started may keep a pipe open; don't wait on it for long.
         await waitForReaders(readers, upTo: .seconds(2))
         box.finishOutput(onLine: onOutputLine)
+        box.finishError(onLine: onErrorLine)
         try Task.checkCancellation()
         guard process.terminationStatus == 0 else {
             throw ProcessFailure(tool: executable.lastPathComponent, message: box.lastErrorLine)
@@ -145,6 +177,7 @@ private final class ProcessBox: @unchecked Sendable {
     private let lock = NSLock()
     private var errorData = Data()
     private var pendingOutput = ""
+    private var pendingError = ""
 
     func terminate() {
         lock.withLock {
@@ -152,8 +185,31 @@ private final class ProcessBox: @unchecked Sendable {
         }
     }
 
-    func appendError(_ data: Data) {
-        lock.withLock { errorData.append(data) }
+    func appendError(_ data: Data, onLine: (@Sendable (String) -> Void)? = nil) {
+        let lines: [String] = lock.withLock {
+            errorData.append(data)
+            guard onLine != nil else { return [] }
+            return Self.splitLines(&pendingError, adding: data)
+        }
+        if let onLine { lines.forEach(onLine) }
+    }
+
+    /// Delivers a last error line that had no line break after it.
+    func finishError(onLine: (@Sendable (String) -> Void)?) {
+        guard let onLine else { return }
+        let rest: String = lock.withLock {
+            defer { pendingError = "" }
+            return pendingError
+        }
+        if !rest.isEmpty { onLine(rest) }
+    }
+
+    /// Adds `data` to `pending` and takes out the complete lines.
+    private static func splitLines(_ pending: inout String, adding data: Data) -> [String] {
+        pending += String(decoding: data, as: UTF8.self)
+        var parts = pending.components(separatedBy: "\n")
+        pending = parts.removeLast()
+        return parts
     }
 
     var lastErrorLine: String {
@@ -178,12 +234,7 @@ private final class ProcessBox: @unchecked Sendable {
 
     func appendOutput(_ data: Data, onLine: (@Sendable (String) -> Void)?) {
         guard let onLine, !data.isEmpty else { return }
-        let lines: [String] = lock.withLock {
-            pendingOutput += String(decoding: data, as: UTF8.self)
-            var parts = pendingOutput.components(separatedBy: "\n")
-            pendingOutput = parts.removeLast()
-            return parts
-        }
+        let lines: [String] = lock.withLock { Self.splitLines(&pendingOutput, adding: data) }
         lines.forEach(onLine)
     }
 }

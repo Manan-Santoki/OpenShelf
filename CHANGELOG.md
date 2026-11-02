@@ -10,6 +10,15 @@ Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
 
 ### New
 
+- **Transcripts and subtitles, made on your Mac.** With
+  [whisper.cpp](https://github.com/ggml-org/whisper.cpp) installed
+  (`brew install whisper-cpp`) and a speech model in
+  `~/Library/Application Support/OpenShelf/Models`, the Convert wheel turns
+  audio into TXT, SRT and VTT, and video into SRT and VTT. Nothing is
+  uploaded. Without whisper.cpp or a model the wedges don't appear;
+  Settings → Extra Formats says what's missing. OpenShelf never downloads
+  whisper.cpp or its models itself.
+
 - **OpenShelf in Shortcuts and Spotlight.** Convert Files, Compress, Extract
   Text (OCR), Remove Background, Combine into PDF, Remove Audio, Read QR Codes
   and Add to Shelf are now actions in the Shortcuts app, so you can chain

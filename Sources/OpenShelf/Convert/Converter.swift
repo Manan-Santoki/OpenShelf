@@ -72,6 +72,9 @@ enum Converter {
         case .presentation:
             return try await OfficeConversion.convert(source, to: format, tools: tools, progress: progress)
         case .audio, .video:
+            if Transcription.handles(format) {
+                return [try await Transcription.convert(source, to: format, tools: tools, progress: progress)]
+            }
             return [try await MediaConversion.convert(source, to: format, tools: tools, settings: settings, progress: progress)]
         case .subtitle:
             return [try SubtitleConversion.convert(source, to: format)]

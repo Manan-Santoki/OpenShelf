@@ -86,7 +86,8 @@ enum OutputFormat: String, CaseIterable, Hashable, Sendable {
 
 /// Which conversions apply to which files.
 ///
-/// Wheels stay at 12 items or fewer (the largest, images, has 10); more than
+/// Wheels stay at 12 items or fewer (the largest, audio and video with ffmpeg
+/// and whisper.cpp, have 12); more than
 /// seven are shown over two pages, in `WheelOrdering`'s order. PAGES, NUMBERS
 /// and KEY are offered only with the app installed, which does the saving.
 enum ConversionCatalog {
@@ -144,6 +145,8 @@ enum ConversionCatalog {
                 // Ogg, Opus, WMA and friends can only be decoded by ffmpeg.
                 formats = hasFFmpeg ? [.mp3, .m4a, .wav, .aiff, .flac, .ogg, .opus, .wma] : []
             }
+            // Speech to text, once there's a way to read the sound.
+            if tools.canTranscribe, !formats.isEmpty { formats += Transcription.audioFormats }
         case .video:
             if MediaFormats.isAVFoundationReadable(url) {
                 // GIF is made natively when ffmpeg isn't installed.
@@ -152,9 +155,10 @@ enum ConversionCatalog {
             } else {
                 formats = hasFFmpeg ? [.mp4, .mov, .m4a, .gif, .mp3, .mkv, .webm, .avi, .wmv] : []
             }
-            // Silent videos have nothing to extract as audio.
+            if tools.canTranscribe, !formats.isEmpty { formats += Transcription.videoFormats }
+            // Silent videos have nothing to extract as audio, or to transcribe.
             if MediaProbe.hasAudioTrack(url.resolvingSymlinksInPath(), ffprobe: tools.ffprobe) == false {
-                formats.removeAll(where: \.isAudioOnly)
+                formats.removeAll { $0.isAudioOnly || Transcription.handles($0) }
             }
         case .subtitle:
             formats = [.txt, .srt, .vtt]
