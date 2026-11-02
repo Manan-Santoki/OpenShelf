@@ -21,8 +21,8 @@ enum WheelOrdering {
     static let formatsBySource: [FileKind: [OutputFormat]] = [
         .image: [.png, .jpg, .heic, .webp, .pdf, .avif, .tiff, .bmp, .docx, .zip],
         .pdf: [.docx, .jpg, .png, .txt, .pptx, .xlsx, .md, .epub, .zip],
-        .video: [.mp4, .mov, .gif, .mp3, .m4a, .webm, .mkv, .avi, .wmv, .zip],
-        .audio: [.mp3, .m4a, .wav, .flac, .aiff, .ogg, .opus, .wma, .zip],
+        .video: [.mp4, .mov, .gif, .mp3, .m4a, .srt, .webm, .mkv, .avi, .wmv, .vtt, .zip],
+        .audio: [.mp3, .m4a, .wav, .txt, .srt, .flac, .aiff, .ogg, .opus, .wma, .vtt, .zip],
     ]
 
     /// `tools` (from `FileTool.available`) in wheel order.

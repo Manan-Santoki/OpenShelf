@@ -142,8 +142,8 @@ A small card next to the pointer shows progress; click its **×** to cancel.
 | Pages document | PDF⁴, DOCX¹, RTF¹, TXT¹, JPG⁴, PNG⁴, ZIP |
 | Numbers spreadsheet | PDF⁴, XLSX¹, CSV¹, ODS¹, JPG⁴, PNG⁴, ZIP |
 | Keynote deck | PDF⁴, PPTX¹, JPG⁴, PNG⁴ (one image per slide), ZIP |
-| Audio (MP3, M4A, WAV, AIFF, FLAC, OGG², Opus², WMA², …) | MP3², M4A, WAV, AIFF, FLAC, OGG², Opus², WMA², ZIP |
-| Video (MP4, MOV, MKV², WebM², AVI², WMV², …) | MP4, MOV, M4A, GIF, MP3², MKV², WebM², AVI², WMV², ZIP |
+| Audio (MP3, M4A, WAV, AIFF, FLAC, OGG², Opus², WMA², …) | MP3², M4A, WAV, AIFF, FLAC, OGG², Opus², WMA², TXT⁵, SRT⁵, VTT⁵, ZIP |
+| Video (MP4, MOV, MKV², WebM², AVI², WMV², …) | MP4, MOV, M4A, GIF, MP3², MKV², WebM², AVI², WMV², SRT⁵, VTT⁵, ZIP |
 | Subtitles (SRT, VTT) | TXT, SRT, VTT, ZIP |
 | Archive (ZIP, TAR, GZ, 7Z, RAR) | Unzip into a folder |
 | Folder or anything else | ZIP, TAR, TAR.GZ |
@@ -161,6 +161,7 @@ each file: a PDF of every page in older files, a picture of the first page
 (JPG and PNG only) in newer ones. Files without a preview need LibreOffice.
 
 ¹ Needs LibreOffice. ² Needs ffmpeg (`brew install webp` also adds WebP).
+⁵ Needs whisper.cpp and a speech model (see [Optional command-line tools](#optional-command-line-tools)).
 
 Both are free and optional. Install them from **Settings → Extra Formats**: one
 click downloads the official build (ffmpeg from
@@ -198,6 +199,37 @@ Install Pandoc from **Settings → Extra Formats** like ffmpeg and LibreOffice:
 OpenShelf downloads its official build from GitHub, checks the checksum GitHub
 lists and John MacFarlane's code signature, and installs it for you alone.
 Homebrew's copy (`brew install pandoc`) is used too.
+
+#### Optional command-line tools
+
+A few conversions come from free command-line tools that OpenShelf uses when
+they're installed, but never downloads, bundles or installs itself. Without
+one, its wedges simply aren't on the wheel; **Settings → Extra Formats** lists
+each with the command that installs it. They're found in Homebrew's folders on
+Apple silicon (`/opt/homebrew/bin`) and Intel (`/usr/local/bin`), MacPorts and
+your PATH, and run with a minimal environment, never your shell's.
+
+| Tool | Install | Adds |
+|---|---|---|
+| [whisper.cpp](https://github.com/ggml-org/whisper.cpp) | `brew install whisper-cpp`, plus a model (below) | Audio to TXT, SRT and VTT; video to SRT and VTT |
+
+**Transcripts and subtitles** are made entirely on your Mac: the sound is
+decoded (by macOS, or by ffmpeg for formats macOS can't read) and whisper.cpp
+recognises the speech; nothing is uploaded. whisper.cpp needs a speech model,
+which OpenShelf doesn't download either: put a `ggml-*.bin` file from
+[huggingface.co/ggerganov/whisper.cpp](https://huggingface.co/ggerganov/whisper.cpp/tree/main)
+in `~/Library/Application Support/OpenShelf/Models` (**Settings → Extra
+Formats → Open Models Folder**). `ggml-base.bin` (150 MB) is quick and good;
+`ggml-small.bin` or `ggml-large-v3-turbo.bin` are more accurate and slower.
+Models ending in `.en` are English-only; the others detect the language. With
+several models, the most capable is used.
+
+```sh
+brew install whisper-cpp
+mkdir -p ~/Library/Application\ Support/OpenShelf/Models
+curl -L -o ~/Library/Application\ Support/OpenShelf/Models/ggml-base.bin \
+  https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin
+```
 
 #### Output settings
 
@@ -362,7 +394,8 @@ tab you used last:
   results back to the shelf, and [watched folders](#watched-folders)
 - **Output:** how conversions encode video, audio, images and GIFs (see
   [Output settings](#output-settings))
-- **Extra Formats:** install or remove ffmpeg, LibreOffice and Pandoc
+- **Extra Formats:** install or remove ffmpeg, LibreOffice and Pandoc, and
+  see which [optional command-line tools](#optional-command-line-tools) are found
 - **Updates:** automatic checks and installs, and Check Now
 
 If the wheel icon is out of sight (behind the notch, or tucked into the menu
