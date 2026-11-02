@@ -23,6 +23,10 @@ Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
   Word, Markdown, HTML (pictures included), ODT and plain text, plus PDF
   when a typesetter such as Tectonic, Typst or MacTeX is installed. Without
   Pandoc an EPUB offers ZIP, TAR and TAR.GZ, as before.
+- **Ebooks with calibre.** With [calibre](https://calibre-ebook.com)
+  installed (`brew install --cask calibre`), EPUB, MOBI and AZW3 books
+  convert to each other and to PDF, and PDFs convert to MOBI and AZW3, with
+  progress. OpenShelf never installs calibre; without it nothing changes.
 
 - **OpenShelf in Shortcuts and Spotlight.** Convert Files, Compress, Extract
   Text (OCR), Remove Background, Combine into PDF, Remove Audio, Read QR Codes

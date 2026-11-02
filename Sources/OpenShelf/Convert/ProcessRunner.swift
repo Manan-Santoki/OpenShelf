@@ -3,9 +3,13 @@ import Foundation
 struct ProcessFailure: LocalizedError {
     let tool: String
     let message: String
+    /// Whether the tool crashed (ended by a signal such as SIGSEGV) rather
+    /// than exiting with an error of its own.
+    var crashed: Bool = false
 
     var errorDescription: String? {
-        message.isEmpty ? "\(tool) failed." : "\(tool) failed: \(FailureMessage.sanitized(message))"
+        if crashed { return "\(tool) crashed." }
+        return message.isEmpty ? "\(tool) failed." : "\(tool) failed: \(FailureMessage.sanitized(message))"
     }
 }
 
@@ -134,7 +138,11 @@ enum ProcessRunner {
         box.finishError(onLine: onErrorLine)
         try Task.checkCancellation()
         guard process.terminationStatus == 0 else {
-            throw ProcessFailure(tool: executable.lastPathComponent, message: box.lastErrorLine)
+            throw ProcessFailure(
+                tool: executable.lastPathComponent,
+                message: box.lastErrorLine,
+                crashed: process.terminationReason == .uncaughtSignal
+            )
         }
     }
 }
@@ -168,6 +176,15 @@ private final class OnceFlag: @unchecked Sendable {
     private let lock = NSLock()
     private var claimed = false
     func claim() -> Bool { lock.withLock { defer { claimed = true }; return !claimed } }
+}
+
+/// Whether `line` is one of Chromium's own log lines, as calibre's PDF
+/// output writes them: "[60878:259:1101/181024.142716:ERROR:service_utils.cc(339)] …".
+func isChromiumLog(_ line: Substring) -> Bool {
+    guard line.hasPrefix("["), let close = line.firstIndex(of: "]") else { return false }
+    let fields = line[line.index(after: line.startIndex)..<close].split(separator: ":")
+    return fields.count >= 5 && fields[0].allSatisfy(\.isNumber)
+        && ["INFO", "WARNING", "ERROR", "FATAL", "VERBOSE1"].contains(fields[3])
 }
 
 /// Owns a `Process` and its buffered output so they can be shared with the
@@ -214,9 +231,10 @@ private final class ProcessBox: @unchecked Sendable {
 
     var lastErrorLine: String {
         lock.withLock {
-            String(decoding: errorData, as: UTF8.self)
-                .split(whereSeparator: \.isNewline)
-                .last
+            let lines = String(decoding: errorData, as: UTF8.self).split(whereSeparator: \.isNewline)
+            // Chromium inside calibre logs "[pid:tid:date:ERROR:file(line)] …"
+            // after the real error; that's never the reason a tool failed.
+            return (lines.last { !isChromiumLog($0) } ?? lines.last)
                 .map(String.init)?
                 .trimmingCharacters(in: .whitespaces) ?? ""
         }

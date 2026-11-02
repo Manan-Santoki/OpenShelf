@@ -11,7 +11,7 @@ enum FileKind: Hashable {
     case audio
     case video
     case subtitle
-    /// EPUB books, which Pandoc reads.
+    /// EPUB and Kindle books, which calibre (and, for EPUB, Pandoc) reads.
     case ebook
     case archive
     case folder
@@ -57,6 +57,7 @@ enum FileKind: Hashable {
         var kinds: [String: FileKind] = ["srt": .subtitle, "vtt": .subtitle, "rtfd": .document, "pages": .document, "epub": .ebook]
         for ext in ["csv", "tsv", "xlsx", "xls", "ods", "numbers"] { kinds[ext] = .spreadsheet }
         for ext in ["ppt", "pptx", "odp", "key"] { kinds[ext] = .presentation }
+        for ext in EbookConversion.bookExtensions { kinds[ext] = .ebook }
         for ext in MediaFormats.ffmpegOnlyVideoExtensions { kinds[ext] = .video }
         for ext in MediaFormats.ffmpegOnlyAudioExtensions { kinds[ext] = .audio }
         return kinds
