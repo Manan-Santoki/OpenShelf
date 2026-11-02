@@ -11,6 +11,8 @@ enum FileKind: Hashable {
     case audio
     case video
     case subtitle
+    /// EPUB books, which Pandoc reads.
+    case ebook
     case archive
     case folder
     case other
@@ -52,7 +54,7 @@ enum FileKind: Hashable {
     /// only exist with the apps installed), and media containers that macOS
     /// doesn't play itself.
     static let kindsByExtension: [String: FileKind] = {
-        var kinds: [String: FileKind] = ["srt": .subtitle, "vtt": .subtitle, "rtfd": .document, "pages": .document]
+        var kinds: [String: FileKind] = ["srt": .subtitle, "vtt": .subtitle, "rtfd": .document, "pages": .document, "epub": .ebook]
         for ext in ["csv", "tsv", "xlsx", "xls", "ods", "numbers"] { kinds[ext] = .spreadsheet }
         for ext in ["ppt", "pptx", "odp", "key"] { kinds[ext] = .presentation }
         for ext in MediaFormats.ffmpegOnlyVideoExtensions { kinds[ext] = .video }

@@ -13,7 +13,7 @@ import Foundation
 /// `OutputFormat.title`; tests check the two lists match.
 enum IntentFormat: String, AppEnum, CaseIterable {
     case png, jpg, webp, heic, tiff, avif, bmp, gif
-    case pdf, docx, txt, rtf, html, md, epub, pptx
+    case pdf, docx, txt, rtf, html, md, epub, pptx, odt
     case xlsx, csv, tsv, ods
     case mp4, mov, m4a, mp3, wav, aiff, flac, ogg, opus, wma
     case mkv, webm, avi, wmv
@@ -26,7 +26,7 @@ enum IntentFormat: String, AppEnum, CaseIterable {
     static var caseDisplayRepresentations: [IntentFormat: DisplayRepresentation] {
         [
             .png: "PNG", .jpg: "JPG", .webp: "WEBP", .heic: "HEIC", .tiff: "TIFF", .avif: "AVIF", .bmp: "BMP", .gif: "GIF",
-            .pdf: "PDF", .docx: "DOCX", .txt: "TXT", .rtf: "RTF", .html: "HTML", .md: "MD", .epub: "EPUB", .pptx: "PPTX",
+            .pdf: "PDF", .docx: "DOCX", .txt: "TXT", .rtf: "RTF", .html: "HTML", .md: "MD", .epub: "EPUB", .pptx: "PPTX", .odt: "ODT",
             .xlsx: "XLSX", .csv: "CSV", .tsv: "TSV", .ods: "ODS",
             .mp4: "MP4", .mov: "MOV", .m4a: "M4A", .mp3: "MP3", .wav: "WAV", .aiff: "AIFF", .flac: "FLAC",
             .ogg: "OGG", .opus: "OPUS", .wma: "WMA",

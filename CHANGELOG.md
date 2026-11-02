@@ -18,6 +18,11 @@ Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
   uploaded. Without whisper.cpp or a model the wedges don't appear;
   Settings → Extra Formats says what's missing. OpenShelf never downloads
   whisper.cpp or its models itself.
+- **ODT and EPUB through Pandoc.** With Pandoc installed, Markdown, Word,
+  HTML and RTF documents also convert to ODT, and EPUB books convert to
+  Word, Markdown, HTML (pictures included), ODT and plain text, plus PDF
+  when a typesetter such as Tectonic, Typst or MacTeX is installed. Without
+  Pandoc an EPUB offers ZIP, TAR and TAR.GZ, as before.
 
 - **OpenShelf in Shortcuts and Spotlight.** Convert Files, Compress, Extract
   Text (OCR), Remove Background, Combine into PDF, Remove Audio, Read QR Codes
