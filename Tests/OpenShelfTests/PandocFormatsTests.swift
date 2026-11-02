@@ -144,7 +144,7 @@ struct PandocFormatsTests {
 
     static var real: ExternalTools { ExternalTools.detect(ignoring: []) }
 
-    @Test(.enabled(if: real.pandoc != nil))
+    @Test(.enabled(if: RealToolTests.enabled && real.pandoc != nil))
     func convertsForRealOnThisMac() async throws {
         let folder = try ToolFolder("pandoc-real")
         defer { folder.remove() }
