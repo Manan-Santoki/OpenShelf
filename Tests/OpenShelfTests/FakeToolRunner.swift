@@ -59,3 +59,11 @@ struct ToolFolder {
 
     func remove() { try? FileManager.default.removeItem(at: root) }
 }
+
+/// End-to-end tests that run the real whisper.cpp, Pandoc and calibre. They
+/// keep every core busy (calibre starts Chromium for PDFs), which slows the
+/// timing-sensitive media tests running beside them, so they're opt-in:
+/// `OPENSHELF_TOOL_TESTS=1 swift test`, with the tools installed.
+enum RealToolTests {
+    static var enabled: Bool { ProcessInfo.processInfo.environment["OPENSHELF_TOOL_TESTS"] == "1" }
+}

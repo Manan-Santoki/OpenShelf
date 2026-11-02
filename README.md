@@ -439,6 +439,12 @@ Shortcuts actions appear, using `appintentsmetadataprocessor` from Xcode. With
 only the Command Line Tools it prints a warning and builds the app without
 them; everything else works. `SKIP_APPINTENTS=1 make app` skips the step.
 
+Tests never need ffmpeg, LibreOffice, Pandoc, whisper.cpp or calibre: the
+optional-tool converters are tested with a fake process runner. To also run
+them end to end against the tools installed on your Mac,
+`OPENSHELF_TOOL_TESTS=1 swift test` (they're opt-in because they keep every
+core busy).
+
 You can also open `Package.swift` in Xcode.
 
 ## Project layout

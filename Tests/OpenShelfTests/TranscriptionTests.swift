@@ -228,7 +228,7 @@ struct TranscriptionTests {
 
     static var realTools: ExternalTools { ExternalTools.detect(ignoring: []) }
 
-    @Test(.enabled(if: realTools.canTranscribe), .timeLimit(.minutes(5)))
+    @Test(.enabled(if: RealToolTests.enabled && realTools.canTranscribe), .timeLimit(.minutes(5)))
     func transcribesSpeechOnThisMac() async throws {
         let folder = try ToolFolder("transcribe-real")
         defer { folder.remove() }
