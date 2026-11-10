@@ -45,6 +45,61 @@ internal static class Native
         return null;
     }
 
+    // ---- keyboard hook, hot key, foreground ----
+    public const int WH_KEYBOARD_LL = 13;
+    public const int WM_KEYDOWN = 0x100, WM_KEYUP = 0x101, WM_SYSKEYDOWN = 0x104, WM_SYSKEYUP = 0x105, WM_HOTKEY = 0x312;
+    public const uint MOD_ALT = 1, MOD_CONTROL = 2, MOD_SHIFT = 4, MOD_WIN = 8, MOD_NOREPEAT = 0x4000;
+    public static readonly nint HWND_MESSAGE = new(-3);
+
+    public delegate nint LowLevelKeyboardProc(int code, nint wParam, nint lParam);
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct KBDLLHOOKSTRUCT { public uint vkCode, scanCode, flags, time; public nint dwExtraInfo; }
+
+    [DllImport("user32.dll", SetLastError = true)] public static extern nint SetWindowsHookEx(int idHook, LowLevelKeyboardProc proc, nint module, uint threadId);
+    [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static extern bool UnhookWindowsHookEx(nint hook);
+    [DllImport("user32.dll")] public static extern nint CallNextHookEx(nint hook, int code, nint wParam, nint lParam);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] public static extern nint GetModuleHandle(string? name);
+    [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static extern bool RegisterHotKey(nint hWnd, int id, uint modifiers, uint vk);
+    [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static extern bool UnregisterHotKey(nint hWnd, int id);
+    [DllImport("user32.dll")] public static extern nint GetForegroundWindow();
+    [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static extern bool SetForegroundWindow(nint hWnd);
+    [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(nint hWnd, out uint processId);
+    [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static extern bool AttachThreadInput(uint from, uint to, [MarshalAs(UnmanagedType.Bool)] bool attach);
+    [DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetClassName(nint hWnd, System.Text.StringBuilder sb, int max);
+
+    public static string ClassNameOf(nint hwnd)
+    {
+        var sb = new System.Text.StringBuilder(256);
+        return GetClassName(hwnd, sb, sb.Capacity) > 0 ? sb.ToString() : "";
+    }
+
+    /// <summary>Brings a window to the foreground even when the process did not just receive input.</summary>
+    public static void ForceForeground(nint hwnd)
+    {
+        try
+        {
+            var fg = GetForegroundWindow();
+            var fgThread = fg == 0 ? 0 : GetWindowThreadProcessId(fg, out _);
+            var me = GetCurrentThreadId();
+            var attached = fgThread != 0 && fgThread != me && AttachThreadInput(me, fgThread, true);
+            SetForegroundWindow(hwnd);
+            if (attached) AttachThreadInput(me, fgThread, false);
+        }
+        catch (Exception ex) { Log.Error("ForceForeground", ex); }
+    }
+
+    public static Modifiers HeldModifiers()
+    {
+        var m = Modifiers.None;
+        if (IsDown(VK_SHIFT)) m |= Modifiers.Shift;
+        if (IsDown(VK_CONTROL)) m |= Modifiers.Control;
+        if (IsDown(VK_MENU)) m |= Modifiers.Alt;
+        if (IsDown(VK_LWIN) || IsDown(VK_RWIN)) m |= Modifiers.Win;
+        return m;
+    }
+
     public static bool IsDown(int vk) => (GetAsyncKeyState(vk) & 0x8000) != 0;
 
     public static ScreenPoint CursorPos()

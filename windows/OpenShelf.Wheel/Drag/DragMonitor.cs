@@ -10,6 +10,7 @@ internal sealed class DragMonitor : IDisposable
     private readonly DispatcherTimer _timer;
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly ModifierChord _chord = new(ModifierChord.DefaultSettleDelay);
+    private readonly ShakeDetector _shake = new();
     private bool _down, _active;
     private Native.POINT _origin;
 
@@ -19,6 +20,13 @@ internal sealed class DragMonitor : IDisposable
     public event Action? DragEnded;
     /// <summary>A modifier chord was chosen during a possible drag, with the current pointer.</summary>
     public event Action<WheelKind, ScreenPoint>? ChordChosen;
+
+    /// <summary>The trigger keys in force; read on every chord so changes in Settings apply at once.</summary>
+    public Func<TriggerMatcher> Matcher { get; set; } = () => TriggerMatcher.Default;
+    /// <summary>Turns shake-to-open on or off.</summary>
+    public bool ShakeEnabled { get; set; }
+    /// <summary>The pointer was shaken during a possible drag.</summary>
+    public event Action<ScreenPoint>? Shaken;
 
     public DragMonitor()
     {
@@ -45,6 +53,7 @@ internal sealed class DragMonitor : IDisposable
                     {
                         _active = false;
                         _chord.Reset();
+                        _shake.Reset();
                         Log.Write("possible drag ended");
                         DragEnded?.Invoke();
                     }
@@ -58,6 +67,7 @@ internal sealed class DragMonitor : IDisposable
                 _active = false;
                 _origin = p;
                 _chord.Reset();
+                _shake.Reset();
             }
 
             if (!_active)
@@ -70,13 +80,19 @@ internal sealed class DragMonitor : IDisposable
                 DragStarted?.Invoke(new ScreenPoint(p.X, p.Y));
             }
 
+            if (ShakeEnabled && _shake.Update(p.X, _clock.Elapsed))
+            {
+                Log.Write($"shake detected at {p.X},{p.Y}");
+                Shaken?.Invoke(new ScreenPoint(p.X, p.Y));
+            }
+
             var mods = Modifiers.None;
             if (Native.IsDown(Native.VK_SHIFT)) mods |= Modifiers.Shift;
             if (Native.IsDown(Native.VK_CONTROL)) mods |= Modifiers.Control;
             if (Native.IsDown(Native.VK_MENU)) mods |= Modifiers.Alt;
             if (Native.IsDown(Native.VK_LWIN) || Native.IsDown(Native.VK_RWIN)) mods |= Modifiers.Win;
 
-            if (_chord.Update(mods, _clock.Elapsed) is { } chosen && TriggerMatcher.Default.WheelFor(chosen) is { } kind)
+            if (_chord.Update(mods, _clock.Elapsed) is { } chosen && Matcher().WheelFor(chosen) is { } kind)
             {
                 Log.Write($"chord chosen: {chosen} -> {kind}");
                 ChordChosen?.Invoke(kind, new ScreenPoint(p.X, p.Y));

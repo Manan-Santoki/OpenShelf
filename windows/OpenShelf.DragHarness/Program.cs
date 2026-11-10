@@ -16,6 +16,9 @@ internal sealed class Options
     public string Expect = "none";
     public int WaitMs = 4000, TimeoutMs = 20000;
     public bool Keep;
+    public string Press = "";
+    public bool Shake;
+    public int PauseMs = 0;
 
     public static Options Parse(string[] args)
     {
@@ -38,6 +41,9 @@ internal sealed class Options
                 case "--wait-ms": o.WaitMs = int.Parse(Next()); break;
                 case "--timeout-ms": o.TimeoutMs = int.Parse(Next()); break;
                 case "--keep": o.Keep = true; break;
+                case "--press": o.Press = Next(); break;
+                case "--shake": o.Shake = true; break;
+                case "--pause-ms": o.PauseMs = int.Parse(Next()); break;
                 default: throw new ArgumentException($"unknown option {args[i]}");
             }
         }
@@ -173,8 +179,37 @@ internal sealed class Harness
         "shift" => 0x10,
         "ctrl" or "control" => 0x11,
         "alt" => 0x12,
+        "left" => 0x25, "up" => 0x26, "right" => 0x27, "down" => 0x28,
+        "return" or "enter" => 0x0D, "esc" => 0x1B, "tab" => 0x09,
+        var d when d.Length == 1 && char.IsDigit(d[0]) => (ushort)d[0],
         _ => throw new ArgumentException($"unknown key '{name}'"),
     };
+
+    private void Tap(string spec)
+    {
+        // "alt+1" holds the modifiers named before the last part.
+        var parts = spec.Split('+', StringSplitOptions.TrimEntries);
+        var mods = parts[..^1].Select(KeyCode).ToArray();
+        foreach (var m in mods) Key(m, true);
+        var vk = KeyCode(parts[^1]);
+        Key(vk, true);
+        Thread.Sleep(60);
+        Key(vk, false);
+        foreach (var m in mods.Reverse()) Key(m, false);
+    }
+
+    private void ShakePointer()
+    {
+        Log("shake");
+        var x0 = _x; var y0 = _y;
+        for (var r = 0; r < 5; r++)
+        {
+            var target = x0 + (r % 2 == 0 ? 80 : -80);
+            var from = _x;
+            for (var i = 1; i <= 8; i++) { MoveTo(from + (target - from) * i / 8, y0); Thread.Sleep(8); }
+        }
+        MoveTo(x0, y0);
+    }
 
     /// <summary>Releases anything this process is holding down.</summary>
     public void ReleaseAll()
@@ -351,7 +386,7 @@ internal sealed class Harness
 
     private void DriveInput(System.Drawing.Point centre, double scale)
     {
-        var keys = _o.Keys.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(KeyCode).ToArray();
+        var keys = _o.Keys.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Where(k => !k.Equals("none", StringComparison.OrdinalIgnoreCase)).Select(KeyCode).ToArray();
 
         Log($"move to window centre ({centre.X},{centre.Y})");
         MoveTo(centre.X, centre.Y);
@@ -371,13 +406,25 @@ internal sealed class Harness
         MoveSteps(_o.WheelX, _o.WheelY);
         Thread.Sleep(150);
 
-        Log($"tap keys [{_o.Keys}] hold {_o.HoldMs} ms");
-        foreach (var k in keys) Key(k, true);
-        Thread.Sleep(_o.HoldMs);
-        foreach (var k in keys.Reverse()) Key(k, false);
+        if (_o.Shake) ShakePointer();
+        if (keys.Length > 0)
+        {
+            Log($"tap keys [{_o.Keys}] hold {_o.HoldMs} ms");
+            foreach (var k in keys) Key(k, true);
+            Thread.Sleep(_o.HoldMs);
+            foreach (var k in keys.Reverse()) Key(k, false);
+        }
 
         Log($"settle {_o.SettleMs} ms (jiggling)");
         Jiggle(_o.SettleMs);
+
+        foreach (var spec in _o.Press.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            Log($"press {spec}");
+            Tap(spec);
+            Jiggle(300);
+        }
+        if (_o.PauseMs > 0) { Log($"pause {_o.PauseMs} ms"); Jiggle(_o.PauseMs); }
 
         if (_o.Wedge >= 0)
         {

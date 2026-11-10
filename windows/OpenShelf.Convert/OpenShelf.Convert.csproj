@@ -12,4 +12,8 @@
     <ProjectReference Include="..\OpenShelf.Core\OpenShelf.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Magick.NET-Q8-AnyCPU" Version="15.1.0" />
+  </ItemGroup>
+
 </Project>

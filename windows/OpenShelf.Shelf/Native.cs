@@ -56,6 +56,15 @@ internal static class Native
     public static extern int GetSystemMetricsForDpi(int index, uint dpi);
     [DllImport("user32.dll")]
     public static extern uint GetDpiForSystem();
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")]
+    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetAncestor(IntPtr hWnd, uint flags);
 
     [StructLayout(LayoutKind.Sequential)]
     struct POINT { public int X, Y; }
@@ -67,6 +76,30 @@ internal static class Native
         var cur = (long)GetWindowLongPtr(hwnd, GWL_EXSTYLE);
         SetWindowLongPtr(hwnd, GWL_EXSTYLE, (IntPtr)(cur | style));
     }
+
+    public static void RemoveExStyle(IntPtr hwnd, long style)
+    {
+        var cur = (long)GetWindowLongPtr(hwnd, GWL_EXSTYLE);
+        SetWindowLongPtr(hwnd, GWL_EXSTYLE, (IntPtr)(cur & ~style));
+    }
+
+    /// <summary>True when the foreground window belongs to this process.</summary>
+    public static bool OurProcessInFront()
+    {
+        var fg = GetForegroundWindow();
+        if (fg == IntPtr.Zero) return false;
+        GetWindowThreadProcessId(fg, out var pid);
+        return pid == (uint)Environment.ProcessId;
+    }
+
+    /// <summary>The monitor work area under a point, in physical pixels.</summary>
+    public static Box WorkAt(double x, double y)
+    {
+        var (_, w) = MonitorAt(new ScreenPoint((int)x, (int)y));
+        return new Box(w.Left, w.Top, w.Right - w.Left, w.Bottom - w.Top);
+    }
+
+    public static bool AnyMouseButtonDown() => IsDown(0x01) || IsDown(0x02) || IsDown(0x04);
 
     public static bool IsDown(int vk) => (GetAsyncKeyState(vk) & 0x8000) != 0;
 

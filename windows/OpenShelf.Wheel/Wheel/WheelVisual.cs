@@ -43,7 +43,21 @@ internal sealed class WheelVisual
 
     private readonly List<Wedge> _wedges = [];
     private readonly WheelModel _model;
+    private readonly IReadOnlyList<WheelSlot> _slots;
+    private readonly IReadOnlyDictionary<int, string> _badges;
     private readonly string _hubDefault;
+    private readonly TextBlock _nameText;
+    private readonly List<Grid> _badgeViews = [];
+
+    /// <summary>Shows or hides the number badges (they are hidden until the keyboard wheel needs them).</summary>
+    public void SetBadges(bool visible, bool animate)
+    {
+        foreach (var b in _badgeViews)
+        {
+            if (animate && Motion.Enabled) Motion.Animate(b, UIElement.OpacityProperty, visible ? 1 : 0, 120, Motion.EaseOut);
+            else { b.BeginAnimation(UIElement.OpacityProperty, null); b.Opacity = visible ? 1 : 0; }
+        }
+    }
     private readonly double _dpi;
     private readonly Ellipse _hubActive;
     private readonly Border _pill, _pillAccent, _nameRow;
@@ -55,12 +69,14 @@ internal sealed class WheelVisual
 
     public Canvas Root { get; }
 
-    public WheelVisual(WheelModel model, string hubDefault, BitmapSource? backdrop, double dpi, bool animateIn)
+    public WheelVisual(WheelModel model, IReadOnlyList<WheelSlot> slots, int page, string hubDefault, BitmapSource? backdrop, double dpi, bool animateIn)
     {
         _model = model;
+        _slots = slots;
+        _badges = WheelBadges.Keys(slots);
         _hubDefault = hubDefault;
         _dpi = dpi <= 0 ? 1 : dpi;
-        var geo = new WheelGeometry(model.Items.Count);
+        var geo = new WheelGeometry(Math.Max(1, slots.Count));
         var c = new Point(Side / 2, Side / 2);
         Root = new Canvas { Width = Side, Height = Side, IsHitTestVisible = false, UseLayoutRounding = true, SnapsToDevicePixels = true };
         TextOptions.SetTextFormattingMode(Root, TextFormattingMode.Ideal);
@@ -69,8 +85,8 @@ internal sealed class WheelVisual
         BuildDisc(c, backdrop);
 
         // Wedges (each in its own full-size container so paths keep absolute coordinates)
-        for (var i = 0; i < model.Items.Count; i++)
-            _wedges.Add(BuildWedge(geo, i, c, model.Items[i], animateIn));
+        for (var i = 0; i < slots.Count; i++)
+            _wedges.Add(BuildWedge(geo, i, c, slots[i], animateIn));
 
         // Hub
         var hub = new Grid { Width = HubRadius * 2, Height = HubRadius * 2 };
@@ -85,7 +101,7 @@ internal sealed class WheelVisual
                 Text = k == 0 ? hubDefault : "", FontFamily = Theme.Font, FontSize = 12, FontWeight = FontWeights.SemiBold,
                 Foreground = Brushes.White, TextTrimming = TextTrimming.CharacterEllipsis, TextAlignment = TextAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-                MaxWidth = 70, Opacity = k == 0 ? 1 : 0, UseLayoutRounding = true,
+                MaxWidth = 78, Opacity = k == 0 ? 1 : 0, UseLayoutRounding = true,
             };
         var pillBack = new Border { CornerRadius = new CornerRadius(11), Background = PillIdle, BorderBrush = Theme.White(0.4), BorderThickness = new Thickness(0.8) };
         _pillAccent = new Border { CornerRadius = new CornerRadius(11), Background = Theme.Brush(Accent), BorderBrush = Theme.White(0.4), BorderThickness = new Thickness(0.8), Opacity = 0 };
@@ -99,13 +115,15 @@ internal sealed class WheelVisual
         };
         hub.Children.Add(_pill);
         Place(hub, c.X - HubRadius, c.Y - HubRadius);
+        var pages = slots.Any(sl => sl.IsPageTurn) ? slots.First(sl => sl.IsPageTurn).PageCount : 1;
+        if (pages > 1) AddPageDots(c, page, pages);
 
         // Name pill above the disc
         _nameRow = new Border
         {
             Height = NameHeight, CornerRadius = new CornerRadius(NameHeight / 2), Padding = new Thickness(12, 0, 12, 0),
             Background = Theme.Brush(Theme.Surface, 0.88), BorderBrush = Theme.White(0.4), BorderThickness = new Thickness(0.8),
-            Child = new TextBlock
+            Child = _nameText = new TextBlock
             {
                 Text = model.Name, FontFamily = Theme.Font, FontSize = 12, FontWeight = FontWeights.SemiBold,
                 Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center,
@@ -119,6 +137,39 @@ internal sealed class WheelVisual
         if (animateIn) { _nameRow.Opacity = 0; } else _nameMove.Y = 0;
         Place(_nameRow, Snap(c.X - nameWidth / 2), Snap(c.Y - NameCentreAbove - NameHeight / 2));
     }
+
+    /// <summary>One dot per page under the hub pill, the current one solid.</summary>
+    private void AddPageDots(Point c, int page, int pages)
+    {
+        const double dot = 5, gap = 4;
+        var total = pages * dot + (pages - 1) * gap;
+        var left = c.X - total / 2;
+        for (var i = 0; i < pages; i++)
+        {
+            Place(new Ellipse { Width = dot, Height = dot, Fill = Brushes.White, Opacity = i == page ? 0.95 : 0.35, IsHitTestVisible = false },
+                Snap(left + i * (dot + gap)), Snap(c.Y + 19));
+        }
+    }
+
+    /// <summary>Replaces the text of the pill above the wheel (a hint, or the wheel name again) and keeps it centred.</summary>
+    public void SetNameText(string text)
+    {
+        if (_nameText.Text == text) return;
+        _nameText.Text = text;
+        _nameRow.Width = double.NaN;
+        _nameRow.Measure(new Size(double.PositiveInfinity, NameHeight));
+        var width = Math.Ceiling(Math.Min(_nameRow.DesiredSize.Width, Side - 8));
+        _nameRow.Width = width;
+        Canvas.SetLeft(_nameRow, Snap(Side / 2 - width / 2));
+    }
+
+    private string SlotTitle(WheelSlot slot) => slot.Kind switch
+    {
+        SlotKind.Item => _model.Items[slot.Item].Title,
+        SlotKind.More => $"More · {slot.TargetPage + 1}/{slot.PageCount}",
+        SlotKind.Back => $"Back · {slot.TargetPage + 1}/{slot.PageCount}",
+        _ => "",
+    };
 
     private double Snap(double v) => Math.Round(v * _dpi) / _dpi;
 
@@ -178,7 +229,7 @@ internal sealed class WheelVisual
         Place(rim, left + 0.6, top + 0.6);
     }
 
-    private Wedge BuildWedge(WheelGeometry geo, int index, Point c, WheelItem item, bool animateIn)
+    private Wedge BuildWedge(WheelGeometry geo, int index, Point c, WheelSlot slot, bool animateIn)
     {
         var angle = geo.CenterAngle(index);
         var shape = Sector(c, angle, geo.Sweep, WedgeInner, WedgeOuter, Gap, Corner);
@@ -195,9 +246,10 @@ internal sealed class WheelVisual
             Opacity = animateIn ? 0 : 1,
         };
 
-        container.Children.Add(new Path { Data = shape, Fill = WedgeFill });
-        container.Children.Add(new Path { Data = shape, Fill = WedgeSheen });
-        container.Children.Add(new Path { Data = shape, Stroke = WedgeEdge, StrokeThickness = 0.8 });
+        // A gap on a last page: there, but faint, so Back stays where More was.
+        container.Children.Add(new Path { Data = shape, Fill = WedgeFill, Opacity = slot.IsEmpty ? 0.35 : 1 });
+        if (!slot.IsEmpty) container.Children.Add(new Path { Data = shape, Fill = WedgeSheen });
+        container.Children.Add(new Path { Data = shape, Stroke = WedgeEdge, StrokeThickness = 0.8, Opacity = slot.IsEmpty ? 0.35 : 1 });
 
         // Accent layer: fades in over the base on hover; its glow is baked into one cached bitmap.
         var hot = new Canvas { Opacity = 0, CacheMode = new BitmapCache(_dpi) };
@@ -213,24 +265,50 @@ internal sealed class WheelVisual
         container.Children.Add(flash);
 
         var brush = new SolidColorBrush(Colors.White) { Opacity = 0.9 };
-        AddLabel(container, geo, angle, c, item, brush);
+        if (!slot.IsEmpty) AddLabel(container, geo, angle, c, slot, brush);
+        if (_badges.TryGetValue(index, out var key)) AddBadge(container, dir, c, key);
         Root.Children.Add(container);
         return new Wedge { Container = container, Scale = scale, Move = move, Hot = hot, Flash = flash, LabelBrush = brush, Direction = dir };
     }
 
-    private void AddLabel(Canvas parent, WheelGeometry geo, double angle, Point c, WheelItem item, Brush foreground)
+    /// <summary>A small dark circle with the wedge number at its outer edge (the key that runs it).</summary>
+    private void AddBadge(Canvas parent, Vector dir, Point c, string key)
     {
-        var title = item.Title.ToUpperInvariant();
+        const double size = 16;
+        var centre = c + dir * (WedgeOuter - 12);
+        var badge = new Grid { Width = size, Height = size, IsHitTestVisible = false, Opacity = 0 };
+        _badgeViews.Add(badge);
+        badge.Children.Add(new Ellipse { Fill = Theme.Black(0.62), Stroke = Theme.White(0.35), StrokeThickness = 0.8 });
+        badge.Children.Add(new TextBlock
+        {
+            Text = key, FontFamily = Theme.Font, FontSize = 10, FontWeight = FontWeights.Bold, Foreground = Theme.White(0.85),
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+        });
+        Canvas.SetLeft(badge, Snap(centre.X - size / 2));
+        Canvas.SetTop(badge, Snap(centre.Y - size / 2));
+        parent.Children.Add(badge);
+    }
+
+    private void AddLabel(Canvas parent, WheelGeometry geo, double angle, Point c, WheelSlot slot, Brush foreground)
+    {
+        WheelEntry? item = slot.Kind == SlotKind.Item ? _model.Items[slot.Item] : null;
+        var titleText = slot.Kind switch { SlotKind.More => "More", SlotKind.Back => "Back", _ => item!.Title };
+        var glyph = slot.Kind switch { SlotKind.More => "\uE712", SlotKind.Back => "\uE7A7", _ => item!.Glyph };
+        var title = titleText.ToUpperInvariant();
         var width = geo.LabelWidth(LabelRadius);
         var stack = new StackPanel { Width = width, UseLayoutRounding = true };
 
-        if (item.Glyph is { } glyph)
+        var icon = item?.IconPath is { } iconPath ? LoadIcon(iconPath) : null;
+        if (icon is not null || glyph is not null)
         {
-            stack.Children.Add(new TextBlock
-            {
-                Text = glyph, FontFamily = Theme.IconFont, FontSize = 17, Foreground = foreground,
-                HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 3),
-            });
+            if (icon is not null)
+                stack.Children.Add(new Image { Source = icon, Width = 22, Height = 22, Margin = new Thickness(0, 0, 0, 3), HorizontalAlignment = HorizontalAlignment.Center });
+            else
+                stack.Children.Add(new TextBlock
+                {
+                    Text = glyph, FontFamily = Theme.IconFont, FontSize = 17, Foreground = foreground,
+                    HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 3),
+                });
             var label = new TextBlock
             {
                 Text = title, FontFamily = Theme.Font, FontSize = 9.5, FontWeight = FontWeights.Bold, Foreground = foreground,
@@ -243,7 +321,7 @@ internal sealed class WheelVisual
         }
         else
         {
-            var words = item.Title.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
+            var words = titleText.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
             var size = words > 1 ? 10.5 : 13;
             stack.Children.Add(new TextBlock
             {
@@ -261,12 +339,28 @@ internal sealed class WheelVisual
         parent.Children.Add(stack);
     }
 
+    private static ImageSource? LoadIcon(string path)
+    {
+        try
+        {
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.UriSource = new Uri(path);
+            bitmap.DecodePixelWidth = 44;
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.EndInit();
+            bitmap.Freeze();
+            return bitmap;
+        }
+        catch { return null; }
+    }
+
     private double PillWidth(string text)
     {
-        var probe = new TextBlock { Text = text, FontFamily = Theme.Font, FontSize = 12, FontWeight = FontWeights.SemiBold, MaxWidth = 70 };
+        var probe = new TextBlock { Text = text, FontFamily = Theme.Font, FontSize = 12, FontWeight = FontWeights.SemiBold, MaxWidth = 78 };
         TextOptions.SetTextFormattingMode(probe, TextFormattingMode.Ideal);
         probe.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        return Math.Max(34, Math.Ceiling(probe.DesiredSize.Width) + 22);
+        return Math.Min(HubRadius * 2 - 4, Math.Max(34, Math.Ceiling(probe.DesiredSize.Width) + 18));
     }
 
     // ---- Motion ----
@@ -291,7 +385,7 @@ internal sealed class WheelVisual
     /// <summary>Highlights a wedge (or none): cross-fades the accent layer, nudges the wedge outward and updates the hub.</summary>
     public void SetHover(int? index)
     {
-        if (index is { } i && (i < 0 || i >= _wedges.Count)) index = null;
+        if (index is { } i && (i < 0 || i >= _wedges.Count || _slots[i].IsEmpty)) index = null;
         if (index == _hover) return;
         if (_hover is { } old)
         {
@@ -310,7 +404,7 @@ internal sealed class WheelVisual
             Motion.Animate(w.Move, TranslateTransform.YProperty, w.Direction.Y * Push, 160, Motion.EaseOut);
             Motion.Animate(w.LabelBrush, Brush.OpacityProperty, 1, 110, Motion.EaseOut);
         }
-        SetHub(index is { } h ? _model.Items[h].Title : _hubDefault, index is not null);
+        SetHub(index is { } h ? SlotTitle(_slots[h]) : _hubDefault, index is not null);
     }
 
     private void SetHub(string text, bool active)

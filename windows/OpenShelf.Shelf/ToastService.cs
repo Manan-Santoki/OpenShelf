@@ -12,9 +12,7 @@ namespace OpenShelf.Shelf;
 /// <summary>Small click-through confirmation card. Used on the WPF UI thread.</summary>
 public sealed class ToastService : IToastService
 {
-    const double Pad = 28;          // transparent margin for the shadow
-    const double CardRadius = 12;
-    const int CaptureMargin = 24;   // extra physical pixels captured so the blur has no faded edge
+    const double Pad = GlassCard.Pad;
     ToastWindow? _current;
 
     public void Show(string message, ScreenPoint near)
@@ -70,18 +68,6 @@ public sealed class ToastService : IToastService
             _hold.Tick += (_, _) => { _hold.Stop(); FadeOutAndClose(); };
         }
 
-        static Border Shadow(double w, double h, double blur, double opacity, double depth) => new()
-        {
-            Width = w, Height = h, Margin = new Thickness(Pad),
-            CornerRadius = new CornerRadius(CardRadius),
-            Background = Theme.Brush(Theme.Surface),
-            Effect = new DropShadowEffect
-            {
-                BlurRadius = blur, ShadowDepth = depth, Direction = 270, Opacity = opacity, Color = Colors.Black,
-                RenderingBias = RenderingBias.Quality,
-            },
-        };
-
         public void ShowNear(ScreenPoint near)
         {
             double scale = 1;
@@ -127,54 +113,12 @@ public sealed class ToastService : IToastService
             _host.RenderTransform = _rise;
             if (!Motion.Enabled) _rise.Y = 0;
 
-            _host.Children.Add(Shadow(cardW, cardH, 28, 0.35, 8));
-            _host.Children.Add(Shadow(cardW, cardH, 3, 0.25, 1));
-
-            var inner = new Grid { Width = cardW - 2, Height = cardH - 2, IsHitTestVisible = false };
-            inner.Clip = new RectangleGeometry(new Rect(0, 0, cardW - 2, cardH - 2), CardRadius - 1, CardRadius - 1);
-
-            // Photograph the screen under the card just before it appears (physical pixels).
-            bool captured = false;
-            try
-            {
-                int m = CaptureMargin;
-                int px = winX + (int)Math.Round(Pad * scale);
-                int py = winY + (int)Math.Round(Pad * scale);
-                int pw = (int)Math.Round(cardW * scale);
-                int ph = (int)Math.Round(cardH * scale);
-                var snap = Glass.Capture(px - m, py - m, pw + 2 * m, ph + 2 * m);
-                if (snap != null)
-                {
-                    var backdrop = Glass.Backdrop(snap, (pw + 2 * m) / scale, (ph + 2 * m) / scale, 22);
-                    var layer = new Canvas { Width = cardW - 2, Height = cardH - 2, IsHitTestVisible = false };
-                    Canvas.SetLeft(backdrop, -m / scale - 1);
-                    Canvas.SetTop(backdrop, -m / scale - 1);
-                    layer.Children.Add(backdrop);
-                    inner.Children.Add(layer);
-                    inner.Children.Add(new Border { Background = Theme.Brush(Theme.Surface, 0.60) });
-                    captured = true;
-                }
-            }
-            catch (Exception ex) { Log.Info("Toast capture failed: " + ex.Message); }
-
-            if (!captured)
-                inner.Children.Add(new Border { Background = Theme.Brush(Theme.Surface, 0.97) });
-            inner.Children.Add(text);
             text.HorizontalAlignment = HorizontalAlignment.Center;
             text.VerticalAlignment = VerticalAlignment.Center;
             text.Margin = new Thickness(14, 8, 14, 8);
-
-            var card = new Border
-            {
-                Width = cardW, Height = cardH, Margin = new Thickness(Pad),
-                CornerRadius = new CornerRadius(CardRadius),
-                BorderBrush = Theme.White(0.14), BorderThickness = new Thickness(1),
-                Child = inner,
-            };
-            _host.Children.Add(card);
+            GlassCard.Fill(_host, text, cardW, cardH, winX, winY, scale, hitTestable: false);
             Content = _host;
         }
-
 
         void FadeOutAndClose()
         {
