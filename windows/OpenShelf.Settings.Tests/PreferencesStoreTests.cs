@@ -117,6 +117,7 @@ public sealed class PreferencesStoreTests : IDisposable
     [Theory]
     [InlineData(Modifiers.None)]
     [InlineData(Modifiers.Win)]
+    [InlineData(Modifiers.Win | Modifiers.Shift)]
     public void TriggerNeedsCtrlAltOrShift(Modifiers m)
     {
         var p = Store();
@@ -132,7 +133,8 @@ public sealed class PreferencesStoreTests : IDisposable
         var e = Assert.Throws<ArgumentException>(() => p.SetTrigger(WheelKind.Convert, Modifiers.Control));
         Assert.Contains("Actions", e.Message);
         p.SetTrigger(WheelKind.Convert, Modifiers.Shift);   // unchanged value is fine
-        p.SetTrigger(WheelKind.Convert, Modifiers.Control | Modifiers.Win | Modifiers.Alt);
+        p.SetTrigger(WheelKind.Convert, Modifiers.Control | Modifiers.Alt);
+        Assert.Throws<ArgumentException>(() => p.SetTrigger(WheelKind.Convert, Modifiers.Control | Modifiers.Win | Modifiers.Alt));
     }
 
     [Fact]

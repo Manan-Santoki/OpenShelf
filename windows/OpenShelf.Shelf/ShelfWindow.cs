@@ -1278,11 +1278,12 @@ internal sealed class ShelfWindow : Window
         try
         {
             if (_hwnd == IntPtr.Zero || _closing) return;
-            if (!IsActive)
+            if (!IsActive || Native.GetForegroundWindow() != _hwnd)
             {
                 Native.RemoveExStyle(_hwnd, Native.WS_EX_NOACTIVATE);
-                Native.SetForegroundWindow(_hwnd);
+                bool ok = Native.SetForegroundWindow(_hwnd);
                 Activate();
+                Log.Info($"Shelf focus: IsActive={IsActive} foreground={(Native.GetForegroundWindow() == _hwnd)} setForeground={ok}");
             }
             Keyboard.Focus(this);
         }

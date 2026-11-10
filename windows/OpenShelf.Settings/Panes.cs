@@ -157,6 +157,7 @@ internal sealed class WheelsPane : Pane
                 catch (ArgumentException e) { row.SetNote(e.Message); }
                 Show();
             };
+            box.Rejected = message => row.SetNote(message);
             box.Ended = Show;
             row.Trailing = box;
             box.Begin();
@@ -277,7 +278,7 @@ internal sealed class RecorderBox : Border
         e.Handled = true;   // keep Alt from opening the window menu and keys from reaching other controls
         var key = Real(e);
         if (key == Key.Escape) { End(); return; }
-        if (key is Key.LWin or Key.RWin) return;
+        if (key is Key.LWin or Key.RWin) { Rejected?.Invoke("The Windows key can't be used here. Choose from Ctrl, Alt and Shift."); return; }
         if (Modifier(key) is not null)
         {
             _down.Add(key);

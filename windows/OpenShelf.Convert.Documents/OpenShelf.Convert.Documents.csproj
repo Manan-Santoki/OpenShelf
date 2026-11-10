@@ -16,4 +16,10 @@
     <ProjectReference Include="..\OpenShelf.Convert\OpenShelf.Convert.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="AngleSharp" Version="1.10.1" />
+    <PackageReference Include="PdfPig" Version="0.1.16" />
+    <PackageReference Include="PDFtoImage" Version="5.4.0" />
+  </ItemGroup>
+
 </Project>

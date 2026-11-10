@@ -98,6 +98,13 @@ internal sealed partial class WheelWindow
             return true;
         }
 
+        if (vk == WheelKeys.VK_ESCAPE && !keyboard)
+        {
+            // Esc during a real drag cancels the drag itself (the key must reach the drag loop), so close the wheel too.
+            Dispatcher.BeginInvoke(new Action(() => HideNow(animate: true)));
+            return false;
+        }
+
         var shift = (ModifiersOf(_modifierKeys) & Modifiers.Shift) != 0;
         var alt = (ModifiersOf(_modifierKeys) & Modifiers.Alt) != 0;
         var command = WheelKeys.Classify(vk, shift, keyboard, out var digit);

@@ -70,5 +70,7 @@ public static class WatchedFolderList
         ("convert.webp", "Convert to WebP"), ("convert.avif", "Convert to AVIF"), ("convert.pdf", "Convert to PDF"),
         ("convert.mp4", "Convert to MP4"), ("convert.gif", "Convert to GIF"),
         ("convert.m4a", "Convert to M4A"), ("convert.mp3", "Convert to MP3"),
+        ("tool.compress", "Compress"), ("tool.removebg", "Remove Background"), ("tool.ocr", "OCR"),
+        ("tool.readqr", "Read QR"), ("tool.mute", "Mute"),
     ];
 }

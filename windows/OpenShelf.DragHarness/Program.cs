@@ -506,6 +506,8 @@ internal static class Program
         // Physical pixels everywhere: Per-Monitor-V2.
         Native.SetProcessDpiAwarenessContext(-4);
 
+        if (args.Length > 0 && args[0] == "qa") return Qa.Run(args.Skip(1).ToArray());
+
         Options options;
         try { options = Options.Parse(args); }
         catch (Exception ex)

@@ -39,6 +39,9 @@ internal sealed class SelectionState<T> where T : notnull
     public void SelectAll(IEnumerable<T> items) { _selected.Clear(); foreach (var i in items) _selected.Add(i); }
     public void Clear() => _selected.Clear();
 
+    /// <summary>Selects only this item and makes it the anchor for a later Shift-click.</summary>
+    public void SelectOnly(T item) { _selected.Clear(); _selected.Add(item); SetAnchor(item); }
+
     public void Set(IEnumerable<T> items)
     {
         var next = new HashSet<T>(items);

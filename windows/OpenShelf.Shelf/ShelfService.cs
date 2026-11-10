@@ -1,3 +1,4 @@
+using System.Windows;
 using System.Windows.Threading;
 using OpenShelf.Core;
 
@@ -139,6 +140,8 @@ public sealed class ShelfService : IShelfService, IShelfHost
         if (expanded || mode != ShelfViewMode.Grid) window.SetState(expanded && model.Items.Count > 0, mode);
         window.Closed += (_, _) =>
         {
+            // Quitting closes every window: keep them in the list so the final Flush still saves the open shelves.
+            if (Application.Current is not { } app || app.Dispatcher.HasShutdownStarted) return;
             _windows.Remove(window);
             Log.Info($"Shelf closed ({_windows.Count} open)");
             ScheduleSave();

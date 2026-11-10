@@ -118,6 +118,7 @@ internal sealed partial class WheelWindow : Window
         _hintTimer.Tick += (_, _) => { _hintTimer.Stop(); _visual?.SetNameText(_model?.Name ?? ""); };
 
         SourceInitialized += (_, _) => ApplyStyles();
+        Closed += (_, _) => _windowClosed = true;
         DragEnter += OnDragEnter;
         DragOver += OnDragOver;
         DragLeave += OnDragLeave; // never closes the wheel
@@ -142,11 +143,12 @@ internal sealed partial class WheelWindow : Window
 
     private nint Handle => new WindowInteropHelper(this).EnsureHandle();
 
-    private bool _activatable, _wasActivated, _badgesOn;
+    private bool _activatable, _wasActivated, _badgesOn, _windowClosed;
     private DispatcherTimer? _badgeTimer;
 
     private void ApplyStyles()
     {
+        if (_windowClosed) return;
         try
         {
             var h = Handle;
@@ -343,6 +345,7 @@ internal sealed partial class WheelWindow : Window
     /// <summary>While fading out the window must not catch the pointer.</summary>
     private void SetClickThrough(bool on)
     {
+        if (_windowClosed) return;
         try
         {
             var h = Handle;

@@ -109,7 +109,7 @@ internal sealed class ShelfModel
     public IReadOnlyList<ShelfItem> SelectedOrAll => Selection.Count == 0 ? Items.ToList() : Selected;
 
     public void Click(ShelfItem item, bool ctrl, bool shift) { Selection.Click(Items, item, ctrl, shift); SelectionChanged?.Invoke(); }
-    public void SelectOnly(ShelfItem item) { Selection.Set(new[] { item }); SelectionChanged?.Invoke(); }
+    public void SelectOnly(ShelfItem item) { Selection.SelectOnly(item); SelectionChanged?.Invoke(); }
     public void SelectAll() { Selection.SelectAll(Items); SelectionChanged?.Invoke(); }
     public void ClearSelection() { if (Selection.Count == 0) return; Selection.Clear(); SelectionChanged?.Invoke(); }
     public void SetSelection(IEnumerable<ShelfItem> items) { Selection.Set(items); SelectionChanged?.Invoke(); }

@@ -30,7 +30,7 @@ public sealed class ConversionWheelCatalog(
     public WheelContent Convert(IReadOnlyList<string> paths)
     {
         var tools = ExternalToolsProvider.Default.Current;
-        var formats = ConversionCatalog.Formats(paths, tools);
+        var formats = ConversionCatalog.Formats(paths, tools, MediaProbe.HasAudioTrack);
         if (formats.Count == 0)
             return new WheelContent([], MissingToolAdvice.EmptyMessage(paths, formats, tools) ?? "Nothing to convert these to");
 

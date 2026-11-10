@@ -30,7 +30,7 @@ public sealed class TrayService : ITrayService
         new MenuEntry("Settings…", () => Run("Settings", _commands.OpenSettings)),
         new MenuEntry("Check for Updates…", () => Run("Check for Updates", _commands.CheckForUpdates)),
         MenuEntry.Line(),
-        new MenuEntry("Quit", () => Run("Quit", _commands.Quit)),
+        new MenuEntry("Quit", () => Run("Quit", () => { _shelves.Flush(); _commands.Quit(); })),
     };
 
     public void Start()

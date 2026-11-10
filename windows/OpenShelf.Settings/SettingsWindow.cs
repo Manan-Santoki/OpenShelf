@@ -18,7 +18,7 @@ internal sealed class SettingsWindow : Window
     public static readonly IReadOnlyList<TabDef> Tabs =
     [
         new("general", "General", ""),
-        new("wheels", "Wheels", ""),
+        new("wheels", "Wheels", ""),   // drawn: see WheelIcon
         new("shelves", "Shelves", ""),
         new("output", "Output", ""),
         new("formats", "Extra Formats", ""),
@@ -75,6 +75,7 @@ internal sealed class SettingsWindow : Window
         Content = _root;
 
         SourceInitialized += (_, _) => DarkTitleBar();
+        Loaded += (_, _) => AppIcon.Apply(this);
         Loaded += (_, _) => FirstFit();
         Activated += (_, _) => _panes[_tab].Sync();
         SelectTab(_tab, animate: false);
@@ -101,13 +102,13 @@ internal sealed class SettingsWindow : Window
         KeyboardNavigation.SetDirectionalNavigation(strip, KeyboardNavigationMode.Cycle);
         foreach (var tab in Tabs)
         {
-            var icon = Kit.Glyph(tab.Glyph, 20);
+            FrameworkElement icon = tab.Glyph.Length == 0 ? new WheelIcon(20) { HorizontalAlignment = HorizontalAlignment.Center } : Kit.Glyph(tab.Glyph, 20);
             var label = Kit.Text(tab.Title, 12);
             // Both inherit the button's colour, which changes with the selection.
             label.ClearValue(TextBlock.ForegroundProperty);
             label.HorizontalAlignment = HorizontalAlignment.Center;
             label.Margin = new Thickness(0, 6, 0, 0);
-            icon.ClearValue(TextBlock.ForegroundProperty);
+            if (icon is TextBlock) icon.ClearValue(TextBlock.ForegroundProperty);
             var content = new StackPanel();
             content.Children.Add(icon);
             content.Children.Add(label);

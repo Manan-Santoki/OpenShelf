@@ -19,6 +19,7 @@ public static class Program
         var tab = Arg("--tab") ?? "general";
         var shot = Arg("--shot");
         var install = Arg("--install");
+        var optionsId = Arg("--options");
 
         var temp = Path.Combine(Path.GetTempPath(), "openshelf-settings-demo-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(temp);
@@ -37,11 +38,21 @@ public static class Program
 
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         var commands = new AppCommands();
+        var optionsService = new OutputOptionsService(preferences);
         var service = new SettingsWindowService(preferences, commands) { FixedPosition = new System.Windows.Point(120, 40), ToolInstaller = new FakeInstaller() };
         app.Startup += (_, _) =>
         {
-            service.Show(tab);
-            service.Window!.Topmost = true;   // keep other windows from covering the capture
+            if (optionsId is null)
+            {
+                service.Show(tab);
+                service.Window!.Topmost = true;   // keep other windows from covering the capture
+            }
+            else
+            {
+                _ = optionsService.AskAsync(optionsId, optionsId == "pdf-jpeg" ? "JPG" : optionsId.ToUpperInvariant(), ["clip.mov"], new OpenShelf.Core.ScreenPoint(700, 420),
+                    async (_, ct) => { await Task.Delay(400, ct); return 24_000_000L; });
+                optionsService.Current!.Topmost = true;
+            }
             var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(install is null ? 1100 : 1700) };
             if (install is not null)
             {
@@ -52,7 +63,7 @@ public static class Program
             timer.Tick += (_, _) =>
             {
                 timer.Stop();
-                if (shot is not null) { Capture(service.Window!, shot); app.Shutdown(); }
+                if (shot is not null) { Capture(optionsId is null ? service.Window! : optionsService.Current!, shot); app.Shutdown(); }
             };
             timer.Start();
         };

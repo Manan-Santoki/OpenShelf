@@ -107,10 +107,10 @@ public sealed class PreferencesStore : IPreferences, IDisposable
     /// <summary>Why <paramref name="modifiers"/> can't be <paramref name="wheel"/>'s trigger, or null when it can.</summary>
     public static string? TriggerError(WheelKind wheel, Modifiers modifiers, IReadOnlyDictionary<WheelKind, Modifiers> current)
     {
+        if (modifiers.HasFlag(Modifiers.Win))
+            return "The Windows key can't be used here. Choose from Ctrl, Alt and Shift.";
         if ((modifiers & (Modifiers.Control | Modifiers.Alt | Modifiers.Shift)) == 0)
-            return modifiers.HasFlag(Modifiers.Win)
-                ? "The Windows key can't be a trigger on its own. Add Ctrl, Alt or Shift."
-                : "Choose at least one of Ctrl, Alt or Shift.";
+            return "Choose at least one of Ctrl, Alt or Shift.";
         foreach (var (other, existing) in current)
             if (other != wheel && existing == modifiers)
                 return $"{Describe(modifiers)} already opens the {WheelName(other)} wheel. Choose a different combination.";
@@ -289,7 +289,7 @@ public sealed class PreferencesStore : IPreferences, IDisposable
             {
                 if (hk.ValueKind == JsonValueKind.Null) _hotKey = null;
                 else if (hk.ValueKind == JsonValueKind.Object
-                    && hk.TryGetProperty("modifiers", out var mods) && TryInt(mods, out var m) && (m & ~15) == 0 && m != 0
+                    && hk.TryGetProperty("modifiers", out var mods) && TryInt(mods, out var m) && (m & ~7) == 0 && m != 0
                     && hk.TryGetProperty("virtualKey", out var vk) && TryInt(vk, out var code) && code is > 0 and < 256)
                     _hotKey = new HotKey((Modifiers)m, code);
             }

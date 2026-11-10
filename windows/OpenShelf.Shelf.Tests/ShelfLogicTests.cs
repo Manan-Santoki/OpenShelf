@@ -200,6 +200,16 @@ public class SelectionTests
     }
 
     [Fact]
+    public void SelectOnlyMakesTheItemTheShiftAnchor()
+    {
+        var s = new SelectionState<string>();
+        s.Click(Items, "e", true, false);   // an old anchor elsewhere
+        s.SelectOnly("b");
+        s.Click(Items, "d", false, true);
+        Assert.Equal(new[] { "b", "c", "d" }, s.Selected.OrderBy(x => x));
+    }
+
+    [Fact]
     public void CtrlClickToggles()
     {
         var s = new SelectionState<string>();

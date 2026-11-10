@@ -1,5 +1,9 @@
 using System.Windows;
+using OpenShelf.Convert;
+using OpenShelf.Convert.Documents;
+using OpenShelf.Convert.Markdown;
 using OpenShelf.Core;
+using OpenShelf.Install;
 using OpenShelf.Settings;
 using OpenShelf.Shelf;
 using OpenShelf.Wheel;
@@ -20,6 +24,7 @@ public static class AppHost
 
     private static PreferencesStore? _store;
     private static ITrayService? _tray;
+    private static ToolInstaller? _installer;
 
     public static void Start(Application app)
     {
@@ -32,10 +37,24 @@ public static class AppHost
         Shelves = shelves;
         Progress = new ProgressService(toasts);
 
-        var settings = new SettingsWindowService(_store, Commands);
-        Settings = settings;
+        // Conversion engines beyond the built-in ones (images, archives, sheets, subtitles).
+        MarkdownEngines.Register(EngineRegistry.Default);
+        DocumentEngines.Register(EngineRegistry.Default);
+        MediaEngines.Register(EngineRegistry.Default);
 
-        var catalog = new ConversionWheelCatalog(_store, Progress, toasts, shelves);
+        _installer = new ToolInstaller();
+        var settings = new SettingsWindowService(_store, Commands) { ToolInstaller = _installer };
+        Settings = settings;
+        var options = new OutputOptionsService(_store);
+
+        var catalog = new ConversionWheelCatalog(_store, Progress, toasts, shelves)
+        {
+            OptionsPrompt = async (format, files, pointer) =>
+            {
+                var chosen = await options.AskAsync(format.Id(), format.Title(), files, pointer);
+                return chosen is null ? null : ConversionWheelCatalog.ToOptions(chosen);
+            },
+        };
         Catalog = catalog;
         var wheels = new WheelService(shelves, toasts, _store, catalog);
         Wheels = wheels;
@@ -45,6 +64,14 @@ public static class AppHost
         Commands.TakeTour = () => toasts.Show("The tour arrives in a later build", CursorPoint());
         Commands.CheckForUpdates = () => toasts.Show("Update checks arrive in a later build", CursorPoint());
         Commands.Quit = app.Shutdown;
+
+        // The first catalog call loads the image library and looks for external tools (about 0.7 s).
+        // Do it now, off the UI thread, so the first wheel of the session opens instantly.
+        _ = Task.Run(() =>
+        {
+            try { catalog.Convert([System.IO.Path.Combine(System.IO.Path.GetTempPath(), "warmup.png")]); }
+            catch { /* warm-up only */ }
+        });
 
         _tray = new TrayService(shelves, Commands);
         _tray.Start();
@@ -59,6 +86,7 @@ public static class AppHost
         Shelves?.Flush();
         Wheels?.Dispose();
         _tray?.Dispose();
+        _installer?.Dispose();
         _store?.Flush();
         _store?.Dispose();
     }

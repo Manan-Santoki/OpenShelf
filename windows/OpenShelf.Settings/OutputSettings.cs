@@ -158,6 +158,21 @@ public sealed record OutputOptions(bool VideoCodec = false, bool Video = false, 
     bool ImageQuality = false, bool ImageMetadata = false, bool Gif = false)
 {
     public bool IsEmpty => this == new OutputOptions();
+
+    /// <summary>The rows that apply when files are converted to <paramref name="formatId"/> (lower-case id such as
+    /// "mp4"; "pdf-jpeg" is JPEG from PDF pages). Only lossy outputs have anything to choose (SPEC 2.3.1).</summary>
+    public static OutputOptions For(string formatId) => formatId.ToLowerInvariant() switch
+    {
+        "mp4" or "mov" or "mkv" => new OutputOptions(VideoCodec: true, Video: true, AudioBitRate: true),
+        "webm" or "avi" or "wmv" => new OutputOptions(Video: true, AudioBitRate: true),
+        "m4a" or "mp3" or "ogg" or "opus" or "wma" => new OutputOptions(AudioBitRate: true),
+        "jpg" or "jpeg" => new OutputOptions(ImageQuality: true, ImageMetadata: true),
+        "pdf-jpeg" => new OutputOptions(ImageQuality: true),
+        "heic" or "avif" => new OutputOptions(ImageQuality: true, ImageMetadata: true),
+        "webp" => new OutputOptions(ImageQuality: true),
+        "gif" => new OutputOptions(Gif: true),
+        _ => new OutputOptions(),
+    };
 }
 
 /// <summary>MP4, MOV, MKV, WebM, AVI and WMV.</summary>
