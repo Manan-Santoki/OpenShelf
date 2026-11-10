@@ -1,5 +1,7 @@
 using System.Windows;
 using OpenShelf.Core;
+using OpenShelf.Shelf;
+using OpenShelf.Wheel;
 
 namespace OpenShelf.App;
 
@@ -13,7 +15,16 @@ public static class AppHost
 
     public static void Start(Application app)
     {
-        // Filled in once Shelf/, Toast/, Wheel/ and Tray/ exist.
+        var shelves = new ShelfService();
+        var toasts = new ToastService();
+        Shelves = shelves;
+        Toasts = toasts;
+
+        _tray = new TrayService(shelves, app.Shutdown);
+        _tray.Start();
+
+        _wheels = new WheelService(shelves, toasts);
+        _wheels.Start();
     }
 
     public static void Stop()
