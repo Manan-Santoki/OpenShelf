@@ -12,6 +12,7 @@ public sealed class SettingsWindowService : ISettingsWindow
     private readonly AppCommands _commands;
     private SettingsWindow? _window;
     private IToolInstallerUi? _installer;
+    private readonly SettingsHooks _hooks = new();
 
     public SettingsWindowService(IPreferences preferences, AppCommands commands)
     {
@@ -30,6 +31,12 @@ public sealed class SettingsWindowService : ISettingsWindow
         }
     }
 
+    /// <summary>Whether the Explorer right-click entry is registered. The row is hidden while <see cref="SetExplorerEntry"/> is null.</summary>
+    public Func<bool>? ExplorerEntryEnabled { get => _hooks.ExplorerEntryEnabled; set => _hooks.ExplorerEntryEnabled = value; }
+
+    /// <summary>Registers or removes the Explorer right-click entry. May throw; the toggle then shows the real state.</summary>
+    public Action<bool>? SetExplorerEntry { get => _hooks.SetExplorerEntry; set => _hooks.SetExplorerEntry = value; }
+
     /// <summary>Where to open the window instead of centring it (screenshots and tests).</summary>
     internal Point? FixedPosition { get; set; }
 
@@ -42,7 +49,7 @@ public sealed class SettingsWindowService : ISettingsWindow
         var id = SettingsWindow.Normalize(tab) ?? SettingsWindow.Normalize(_preferences.GetJson(TabKey)) ?? "general";
         if (_window is null)
         {
-            _window = new SettingsWindow(_preferences, _commands, saved => _preferences.SetJson(TabKey, saved))
+            _window = new SettingsWindow(_preferences, _commands, saved => _preferences.SetJson(TabKey, saved), _hooks)
             {
                 FixedPosition = FixedPosition,
             };
@@ -69,4 +76,11 @@ public sealed class SettingsWindowService : ISettingsWindow
         if (dispatcher is null || dispatcher.CheckAccess()) action();
         else dispatcher.Invoke(action);
     }
+}
+
+/// <summary>Things Settings asks the app to do without referencing the project that does them.</summary>
+internal sealed class SettingsHooks
+{
+    public Func<bool>? ExplorerEntryEnabled { get; set; }
+    public Action<bool>? SetExplorerEntry { get; set; }
 }

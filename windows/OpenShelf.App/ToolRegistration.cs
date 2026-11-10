@@ -7,5 +7,6 @@ public static class ToolRegistration
 {
     public static void RegisterAll(ToolsCatalog tools)
     {
+        OpenShelf.Tools.VisionEditors.VisionTools.Register(tools);
     }
 }

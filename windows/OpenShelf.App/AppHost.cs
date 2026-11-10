@@ -31,6 +31,7 @@ public static class AppHost
     private static WheelService? _wheelHost;
     private static CommandCoalescer? _coalescer;
     private static WatchedFolderService? _watched;
+    private static OpenShelf.Tour.TourService? _tour;
 
     public static void Start(Application app)
     {
@@ -81,7 +82,10 @@ public static class AppHost
 
         Commands.OpenSettings = () => settings.Show();
         Commands.OpenWheelForSelection = wheels.OpenForSelection;
-        Commands.TakeTour = () => toasts.Show("The tour arrives in a later build", CursorPoint());
+        _tour = new OpenShelf.Tour.TourService(_store, wheels, shelves, toasts) { OpenSettings = tab => settings.Show(tab) };
+        Commands.TakeTour = _tour.Show;
+        settings.ExplorerEntryEnabled = () => ExplorerIntegration.IsRegistered();
+        settings.SetExplorerEntry = SetExplorerEntry;
         _updates = UpdateWiring.Create(_store, toasts, CursorPoint, beforeRestart: Stop);
         Commands.CheckForUpdates = () => _ = _updates.CheckInteractivelyAsync();
         Commands.Quit = app.Shutdown;
@@ -100,6 +104,7 @@ public static class AppHost
         _updates.Start();
         _watched.Start();
         SyncExplorerEntry();
+        _tour.ShowOnFirstRunIfNeeded();
     }
 
     /// <summary>A second launch asks the running copy to show Settings (SPEC §4).</summary>
@@ -107,6 +112,7 @@ public static class AppHost
 
     public static void Stop()
     {
+        _tour?.Dispose();
         _watched?.Dispose();
         _coalescer?.Dispose();
         Shelves?.Flush();

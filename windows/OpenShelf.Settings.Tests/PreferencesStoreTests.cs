@@ -212,3 +212,40 @@ public sealed class PreferencesStoreTests : IDisposable
         Assert.Equal(["Ctrl", "Shift", "Alt"], KeyNames.ModifierNames(Modifiers.Alt | Modifiers.Shift | Modifiers.Control));
     }
 }
+
+public class TriggerNoteTests
+{
+    private static Dictionary<WheelKind, Modifiers> Set(Modifiers convert, Modifiers tools, Modifiers actions) => new()
+    {
+        [WheelKind.Convert] = convert, [WheelKind.Tools] = tools, [WheelKind.Actions] = actions,
+    };
+
+    [Fact]
+    public void Keys_inside_another_combination_are_allowed_like_on_the_Mac()
+    {
+        // Shift and Shift + Alt are the defaults; Alt and Shift + Alt behave the same way.
+        foreach (var convert in new[] { Modifiers.Shift, Modifiers.Alt })
+        {
+            var d = Set(convert, Modifiers.Shift | Modifiers.Alt, Modifiers.Control);
+            foreach (var kind in Enum.GetValues<WheelKind>()) Assert.Null(PreferencesStore.TriggerNote(kind, d));
+        }
+    }
+
+    [Fact]
+    public void Identical_keys_are_flagged_on_both_wheels()
+    {
+        var d = Set(Modifiers.Alt, Modifiers.Alt, Modifiers.Control);
+        Assert.Equal("Same keys as another wheel", PreferencesStore.TriggerNote(WheelKind.Convert, d));
+        Assert.Equal("Same keys as another wheel", PreferencesStore.TriggerNote(WheelKind.Tools, d));
+        Assert.Null(PreferencesStore.TriggerNote(WheelKind.Actions, d));
+    }
+
+    [Fact]
+    public void SetTrigger_refuses_identical_keys_but_accepts_Alt_with_Shift_Alt()
+    {
+        using var p = new PreferencesStore(Path.Combine(Path.GetTempPath(), "os-trig-" + Guid.NewGuid().ToString("N") + ".json"), new FakeRegistry());
+        p.SetTrigger(WheelKind.Convert, Modifiers.Alt);
+        Assert.Equal(Modifiers.Alt, p.Triggers[WheelKind.Convert]);
+        Assert.Throws<ArgumentException>(() => p.SetTrigger(WheelKind.Actions, Modifiers.Shift | Modifiers.Alt));
+    }
+}

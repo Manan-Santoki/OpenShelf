@@ -45,6 +45,8 @@
     <ProjectReference Include="..\OpenShelf.Update\OpenShelf.Update.csproj" />
     <ProjectReference Include="..\OpenShelf.Automation\OpenShelf.Automation.csproj" />
     <ProjectReference Include="..\OpenShelf.Tools\OpenShelf.Tools.csproj" />
+    <ProjectReference Include="..\OpenShelf.Tools.VisionEditors\OpenShelf.Tools.VisionEditors.csproj" />
+    <ProjectReference Include="..\OpenShelf.Tour\OpenShelf.Tour.csproj" />
   </ItemGroup>
 
 </Project>

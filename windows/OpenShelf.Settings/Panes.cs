@@ -82,7 +82,7 @@ internal abstract class Pane
 
 internal sealed class GeneralPane : Pane
 {
-    public GeneralPane(IPreferences preferences, AppCommands commands) : base(preferences, commands)
+    public GeneralPane(IPreferences preferences, AppCommands commands, SettingsHooks hooks) : base(preferences, commands)
     {
         var login = ToggleRow("Open at login", "Starts OpenShelf quietly when you sign in to Windows.",
             () => preferences.OpenAtLogin, v => preferences.OpenAtLogin = v);
@@ -101,7 +101,18 @@ internal sealed class GeneralPane : Pane
         var tour = new SettingRow("Guided tour", "Practice files for converting, the Tools wheel, PDFs, video, shelves and the keyboard shortcut. Pick up where you left off, or start over.", buttons);
 
         var tip = Kit.Footnote("The OpenShelf icon may be tucked into the notification area's overflow (the ^ next to the clock). If you can't find it, opening OpenShelf again from the Start menu shows Settings.");
-        var startup = Kit.Section("Startup", null, new Card(login));
+        var explorer = ToggleRow("Show “Open with OpenShelf” in the Explorer right-click menu",
+            "On Windows 11 it appears under “Show more options”.",
+            () => hooks.ExplorerEntryEnabled?.Invoke() ?? false,
+            v =>
+            {
+                try { hooks.SetExplorerEntry?.Invoke(v); }
+                catch (Exception) { /* the toggle is re-read below, so it shows what really happened */ }
+                Sync();
+            });
+        OnSync(() => explorer.Visibility = hooks.SetExplorerEntry is null ? Visibility.Collapsed : Visibility.Visible);
+
+        var startup = Kit.Section("Startup", null, new Card(login, explorer));
         startup.Children.Add(tip);
         Stack(startup, Kit.Section("Learn OpenShelf", null, new Card(tour)));
     }
@@ -124,6 +135,8 @@ internal sealed class WheelsPane : Pane
     {
         var rows = new List<Border>();
         foreach (var (kind, title) in Wheels) rows.Add(TriggerRow(kind, title));
+        // Changing one wheel's keys can change what the others should say.
+        preferences.Changed += () => { foreach (var refresh in _notes) refresh(); };
         rows.Add(ShortcutRow());
 
         var triggers = Kit.Section("Trigger keys",
@@ -137,11 +150,21 @@ internal sealed class WheelsPane : Pane
         Stack(triggers, Kit.Section("Without the keyboard", null, new Card(shake, menu)));
     }
 
+    private readonly List<Action> _notes = [];
+
     private SettingRow TriggerRow(WheelKind kind, string title)
     {
         var row = new SettingRow(title);
+        string? error = null;
+        void Note()
+        {
+            if (error is not null) { row.SetNote(error); return; }
+            row.SetNote(PreferencesStore.TriggerNote(kind, Preferences.Triggers));
+        }
+        _notes.Add(Note);
         void Show()
         {
+            Note();
             var change = Kit.Button("Change", (_, _) => Record(), "GhostBtn", $"Change the {title} trigger keys");
             var strip = Kit.Keycaps(KeyNames.ModifierNames(Preferences.Triggers[kind]));
             change.Margin = new Thickness(10, 0, 0, 0);
@@ -149,12 +172,13 @@ internal sealed class WheelsPane : Pane
         }
         void Record()
         {
+            error = null;
             row.SetNote(null);
             var box = new RecorderBox(RecorderMode.Trigger, "Press and release the keys…");
             box.Chosen = chord =>
             {
-                try { Preferences.SetTrigger(kind, chord); row.SetNote(null); }
-                catch (ArgumentException e) { row.SetNote(e.Message); }
+                try { Preferences.SetTrigger(kind, chord); error = null; }
+                catch (ArgumentException e) { error = e.Message; }
                 Show();
             };
             box.Rejected = message => row.SetNote(message);
@@ -666,7 +690,7 @@ internal sealed class UpdatesPane : Pane
     {
         var auto = ToggleRow("Check for updates automatically", "OpenShelf looks for a new version now and then and tells you when one is ready.",
             () => preferences.AutomaticUpdates, v => preferences.AutomaticUpdates = v);
-        var check = Kit.Button("Check Now", (_, _) => commands.CheckForUpdates());
+        var check = Kit.Button("Check for Updates", (_, _) => commands.CheckForUpdates(), "Btn", "Check for Updates");
         var version = new SettingRow("OpenShelf " + VersionText(), "You're using this version.", check);
         Stack(Kit.Section("Updates", null, new Card(auto, version)));
     }

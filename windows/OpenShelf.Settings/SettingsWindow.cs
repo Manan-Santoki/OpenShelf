@@ -35,7 +35,7 @@ internal sealed class SettingsWindow : Window
     private string _tab = Tabs[0].Id;
     private bool _fitted;
 
-    public SettingsWindow(IPreferences preferences, AppCommands commands, Action<string> tabChanged)
+    public SettingsWindow(IPreferences preferences, AppCommands commands, Action<string> tabChanged, SettingsHooks? hooks = null)
     {
         _tabChanged = tabChanged;
         Title = "OpenShelf Settings";
@@ -53,7 +53,7 @@ internal sealed class SettingsWindow : Window
         TextOptions.SetTextFormattingMode(this, TextFormattingMode.Ideal);
         TextOptions.SetTextRenderingMode(this, TextRenderingMode.ClearType);
 
-        _panes["general"] = new GeneralPane(preferences, commands);
+        _panes["general"] = new GeneralPane(preferences, commands, hooks ?? new SettingsHooks());
         _panes["wheels"] = new WheelsPane(preferences, commands);
         _panes["shelves"] = new ShelvesPane(preferences, commands);
         _panes["output"] = new OutputPane(preferences, commands);

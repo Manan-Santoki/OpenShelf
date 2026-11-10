@@ -9,7 +9,7 @@ using OpenShelf.Core;
 namespace OpenShelf.Settings.Demo;
 
 /// <summary>Shows the settings window at a fixed position with scratch preferences and saves a screenshot of it.
-/// Usage: --tab general|wheels|shelves|output|formats|updates  --shot file.png  [--install id]  [--no-exit]</summary>
+/// Usage: --tab general|wheels|shelves|output|formats|updates  --shot file.png  [--install id]  [--explorer on|off|none]  [--no-exit]</summary>
 public static class Program
 {
     [STAThread]
@@ -39,7 +39,13 @@ public static class Program
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         var commands = new AppCommands();
         var optionsService = new OutputOptionsService(preferences);
+        var explorerOn = Arg("--explorer") == "on";
         var service = new SettingsWindowService(preferences, commands) { FixedPosition = new System.Windows.Point(120, 40), ToolInstaller = new FakeInstaller() };
+        if (Arg("--explorer") is not "none")
+        {
+            service.ExplorerEntryEnabled = () => explorerOn;
+            service.SetExplorerEntry = v => explorerOn = v;
+        }
         app.Startup += (_, _) =>
         {
             if (optionsId is null)

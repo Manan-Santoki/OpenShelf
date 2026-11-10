@@ -117,6 +117,19 @@ public sealed class PreferencesStore : IPreferences, IDisposable
         return null;
     }
 
+    /// <summary>
+    /// The Mac app's rule: only identical keys are flagged ("Same keys as another wheel", in red). Keys that are part of
+    /// another wheel's combination (Alt and Shift + Alt, like the default Shift and Shift + Alt) are fine, because the
+    /// combination is chosen when the keys are released. <see cref="SetTrigger"/> refuses identical keys; this catches
+    /// a preferences file edited by hand.
+    /// </summary>
+    public static string? TriggerNote(WheelKind wheel, IReadOnlyDictionary<WheelKind, Modifiers> current)
+    {
+        foreach (var (other, theirs) in current)
+            if (other != wheel && theirs == current[wheel]) return "Same keys as another wheel";
+        return null;
+    }
+
     public static string WheelName(WheelKind kind) => kind switch
     {
         WheelKind.Convert => "Convert", WheelKind.Tools => "Tools", _ => "Actions",
