@@ -293,7 +293,7 @@ internal sealed class WheelVisual
     {
         WheelEntry? item = slot.Kind == SlotKind.Item ? _model.Items[slot.Item] : null;
         var titleText = slot.Kind switch { SlotKind.More => "More", SlotKind.Back => "Back", _ => item!.Title };
-        var glyph = slot.Kind switch { SlotKind.More => "\uE712", SlotKind.Back => "\uE7A7", _ => item!.Glyph };
+        var glyph = slot.Kind switch { SlotKind.More => "ellipsis", SlotKind.Back => "undo-2", _ => item!.Glyph };
         var title = titleText.ToUpperInvariant();
         var width = geo.LabelWidth(LabelRadius);
         var stack = new StackPanel { Width = width, UseLayoutRounding = true };
@@ -304,11 +304,7 @@ internal sealed class WheelVisual
             if (icon is not null)
                 stack.Children.Add(new Image { Source = icon, Width = 22, Height = 22, Margin = new Thickness(0, 0, 0, 3), HorizontalAlignment = HorizontalAlignment.Center });
             else
-                stack.Children.Add(new TextBlock
-                {
-                    Text = glyph, FontFamily = Theme.IconFont, FontSize = 17, Foreground = foreground,
-                    HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 3),
-                });
+                stack.Children.Add(GlyphElement(glyph!, foreground));
             var label = new TextBlock
             {
                 Text = title, FontFamily = Theme.Font, FontSize = 9.5, FontWeight = FontWeights.Bold, Foreground = foreground,
@@ -338,6 +334,23 @@ internal sealed class WheelVisual
         Canvas.SetTop(stack, Snap(cy - stack.DesiredSize.Height / 2));
         parent.Children.Add(stack);
     }
+
+    /// <summary>
+    /// The wedge icon. <see cref="WheelEntry.Glyph"/> carries a Lucide name ("crop"); a value that is not a known name is drawn as text in the
+    /// old icon font, so a registration that still passes a Segoe code point keeps working.
+    /// </summary>
+    internal static FrameworkElement GlyphElement(string glyph, Brush foreground)
+    {
+        if (Icons.Find(glyph) is not null)
+            return new IconView(glyph, IconSize, foreground) { Margin = new Thickness(0, 0, 0, 3) };
+        return new TextBlock
+        {
+            Text = glyph, FontFamily = Theme.IconFont, FontSize = 17, Foreground = foreground,
+            HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 3),
+        };
+    }
+
+    private const double IconSize = 20;
 
     private static ImageSource? LoadIcon(string path)
     {

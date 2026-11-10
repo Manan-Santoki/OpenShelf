@@ -87,8 +87,8 @@ internal sealed class ShelfWindow : Window
     readonly DropTargetHelper _dropHelper = new();
     readonly ScaleTransform _stageScale = new(1, 1);
     readonly TranslateTransform _stageShift = new();
-    readonly TextBlock _modeGlyph = new();
-    readonly TextBlock _expandGlyph = new();
+    readonly IconView _modeGlyph = new();
+    readonly IconView _expandGlyph = new();
     Grid _modeButton = null!;
     Grid _expandButton = null!;
     readonly EdgeTab _edgeTab = new();
@@ -294,12 +294,11 @@ internal sealed class ShelfWindow : Window
         return _stage;
     }
 
-    Grid HeaderButton(string glyph, TextBlock glyphBlock, Action click)
+    Grid HeaderButton(string icon, IconView glyphBlock, Action click)
     {
         var hover = new Border { CornerRadius = new CornerRadius(14), Background = Theme.White(0.10), Opacity = 0 };
-        glyphBlock.Text = glyph;
-        glyphBlock.FontFamily = Theme.IconFont;
-        glyphBlock.FontSize = 11;
+        glyphBlock.Icon = icon;
+        glyphBlock.Size = 16;
         glyphBlock.Foreground = Theme.White(0.62);
         glyphBlock.HorizontalAlignment = HorizontalAlignment.Center;
         glyphBlock.VerticalAlignment = VerticalAlignment.Center;
@@ -331,15 +330,15 @@ internal sealed class ShelfWindow : Window
         _title.IsHitTestVisible = false;
         header.Children.Add(_title);
 
-        var close = HeaderButton("", new TextBlock(), () => Close());
+        var close = HeaderButton("x", new IconView(), () => Close());
         close.HorizontalAlignment = HorizontalAlignment.Left;
         close.VerticalAlignment = VerticalAlignment.Center;
         close.Margin = new Thickness(10, 0, 0, 0);
         header.Children.Add(close);
 
         var right = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
-        _modeButton = HeaderButton("", _modeGlyph, () => SetViewMode(_mode == ShelfViewMode.Grid ? ShelfViewMode.List : ShelfViewMode.Grid));
-        _expandButton = HeaderButton("", _expandGlyph, () => SetExpanded(!_expanded));
+        _modeButton = HeaderButton("list", _modeGlyph, () => SetViewMode(_mode == ShelfViewMode.Grid ? ShelfViewMode.List : ShelfViewMode.Grid));
+        _expandButton = HeaderButton("chevron-down", _expandGlyph, () => SetExpanded(!_expanded));
         right.Children.Add(_modeButton);
         right.Children.Add(_expandButton);
         header.Children.Add(right);
@@ -350,11 +349,7 @@ internal sealed class ShelfWindow : Window
     {
         // Empty.
         var emptyStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 10) };
-        emptyStack.Children.Add(new TextBlock
-        {
-            Text = "", FontFamily = Theme.IconFont, FontSize = 24, Foreground = Theme.White(0.42),
-            HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 8),
-        });
+        emptyStack.Children.Add(new IconView("import", 28, Theme.White(0.42)) { Margin = new Thickness(0, 0, 0, 8) });
         emptyStack.Children.Add(new TextBlock { Text = "Drop files here", FontSize = 13, Foreground = Theme.White(0.5), HorizontalAlignment = HorizontalAlignment.Center });
         _empty.Children.Add(emptyStack);
         _empty.IsHitTestVisible = false;
@@ -682,8 +677,8 @@ internal sealed class ShelfWindow : Window
         _scroll.Visibility = n > 0 && _expanded ? Visibility.Visible : Visibility.Collapsed;
         _modeButton.Visibility = _expanded && n > 0 ? Visibility.Visible : Visibility.Collapsed;
         _expandButton.Visibility = n > 0 ? Visibility.Visible : Visibility.Collapsed;
-        _modeGlyph.Text = _mode == ShelfViewMode.Grid ? "" : "";
-        _expandGlyph.Text = _expanded ? "" : "";
+        _modeGlyph.Icon = _mode == ShelfViewMode.Grid ? "list" : "layout-grid";
+        _expandGlyph.Icon = _expanded ? "chevron-up" : "chevron-down";
         _title.Text = n == 0 ? "Shelf" : n == 1 ? "1 file" : $"{n} files";
         _canvas.Height = Math.Max(ShelfLayout.ContentHeight(n, _mode), bodyH);
         if (!_expanded) _scroll.ScrollToVerticalOffset(0);
@@ -841,8 +836,9 @@ internal sealed class ShelfWindow : Window
             Effect = new DropShadowEffect { BlurRadius = 3, ShadowDepth = 1, Direction = 270, Opacity = 0.25, Color = Colors.Black },
         };
 
-        var hoverFill = new Border { CornerRadius = new CornerRadius(12), Background = HoverBrush, Opacity = 0 };
-        var selectFill = new Border { CornerRadius = new CornerRadius(12), Background = SelectBrush, Opacity = 0 };
+        // The fills are only painted: if they took the pointer, the empty padding around the icon would start a drag instead of a rubber band.
+        var hoverFill = new Border { CornerRadius = new CornerRadius(12), Background = HoverBrush, Opacity = 0, IsHitTestVisible = false };
+        var selectFill = new Border { CornerRadius = new CornerRadius(12), Background = SelectBrush, Opacity = 0, IsHitTestVisible = false };
         var backdrop = new Grid { HorizontalAlignment = HorizontalAlignment.Center };
         backdrop.Children.Add(hoverFill);
         backdrop.Children.Add(selectFill);
@@ -909,7 +905,8 @@ internal sealed class ShelfWindow : Window
         group.Children.Add(shift);
         var root = new Border
         {
-            Width = w, Height = h, Background = Clear, Child = child,
+            // Grid tiles take the pointer only on the icon and the label (they have their own backgrounds); the padding falls through to the canvas.
+            Width = w, Height = h, Background = mode == ShelfViewMode.Grid ? null : Clear, Child = child,
             Padding = mode == ShelfViewMode.Grid ? new Thickness(0, 2, 0, 0) : new Thickness(0),
             RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = group,
         };
@@ -1281,9 +1278,8 @@ internal sealed class ShelfWindow : Window
             if (!IsActive || Native.GetForegroundWindow() != _hwnd)
             {
                 Native.RemoveExStyle(_hwnd, Native.WS_EX_NOACTIVATE);
-                bool ok = Native.SetForegroundWindow(_hwnd);
+                Native.SetForegroundWindow(_hwnd);
                 Activate();
-                Log.Info($"Shelf focus: IsActive={IsActive} foreground={(Native.GetForegroundWindow() == _hwnd)} setForeground={ok}");
             }
             Keyboard.Focus(this);
         }
@@ -1365,15 +1361,15 @@ internal sealed class ShelfWindow : Window
         var near = at ?? Native.CursorPosition();
         DarkMenu.Open(new[]
         {
-            new MenuEntry("Open", () => FileActions.Open(paths), "", "Enter"),
-            new MenuEntry("Preview", () => _env.Preview.Open(paths, 0, near, () => EnsureFocus()), "", "Space"),
-            new MenuEntry("Show in Explorer", () => FileActions.Reveal(paths), ""),
+            new MenuEntry("Open", () => FileActions.Open(paths), "external-link", "Enter"),
+            new MenuEntry("Preview", () => _env.Preview.Open(paths, 0, near, () => EnsureFocus()), "eye", "Space"),
+            new MenuEntry("Show in Explorer", () => FileActions.Reveal(paths), "folder-open"),
             MenuEntry.Line(),
-            new MenuEntry("Copy", () => FileActions.CopyFiles(paths), "", "Ctrl+C"),
-            new MenuEntry("Copy Path", () => { if (FileActions.CopyPaths(paths)) _env.Toast(paths.Count == 1 ? "Copied path" : "Copied paths", near); }, ""),
-            new MenuEntry("Share…", () => { if (!FileActions.Share(_hwnd, paths)) _env.Toast("Sharing isn't available", near); }, ""),
+            new MenuEntry("Copy", () => FileActions.CopyFiles(paths), "copy", "Ctrl+C"),
+            new MenuEntry("Copy Path", () => { if (FileActions.CopyPaths(paths)) _env.Toast(paths.Count == 1 ? "Copied path" : "Copied paths", near); }, "link"),
+            new MenuEntry("Share…", () => { if (!FileActions.Share(_hwnd, paths)) _env.Toast("Sharing isn't available", near); }, "share"),
             MenuEntry.Line(),
-            new MenuEntry("Remove from Shelf", () => _model.Remove(targets), "", "Del"),
+            new MenuEntry("Remove from Shelf", () => _model.Remove(targets), "x", "Del"),
         }, near);
     }
 

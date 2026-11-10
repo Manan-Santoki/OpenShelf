@@ -55,7 +55,7 @@ internal sealed class RotateEditor : MediaEditorWindow, IMediaEditorDemo
         {
             var value = rotation;
             var content = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-            var glyph = ToolKit.Glyph(glyphs[index++], 16, "Text");
+            var glyph = ToolKit.Icon(glyphs[index++], 16, "Text");
             glyph.ClearValue(TextBlock.ForegroundProperty);
             glyph.Margin = new Thickness(0, 0, 0, 4);
             var title = new TextBlock { Text = rotation.Title(), FontSize = 11, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center };

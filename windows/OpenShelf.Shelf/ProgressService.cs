@@ -108,7 +108,7 @@ internal sealed class ProgressWindow : Window
     readonly Grid _host = new();
     readonly TranslateTransform _rise = new(0, 6);
     readonly Border _cancelBack = new();
-    readonly TextBlock _cancelGlyph = new();
+    readonly IconView _cancelGlyph = new("x", 12, Theme.White(0.72));
     IntPtr _hwnd;
     bool _cancelled;
     bool _closed;
@@ -148,12 +148,6 @@ internal sealed class ProgressWindow : Window
         _cancelBack.Width = _cancelBack.Height = 26;
         _cancelBack.CornerRadius = new CornerRadius(13);
         _cancelBack.Background = Theme.White(0.12);
-        _cancelGlyph.Text = "";
-        _cancelGlyph.FontFamily = Theme.IconFont;
-        _cancelGlyph.FontSize = 10;
-        _cancelGlyph.Foreground = Theme.White(0.72);
-        _cancelGlyph.HorizontalAlignment = HorizontalAlignment.Center;
-        _cancelGlyph.VerticalAlignment = VerticalAlignment.Center;
         var cancel = new Grid
         {
             Width = 26, Height = 26, Margin = new Thickness(14, 14, 0, 0),

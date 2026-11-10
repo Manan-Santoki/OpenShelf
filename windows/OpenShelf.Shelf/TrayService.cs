@@ -1,3 +1,4 @@
+using OpenShelf.Ui;
 using OpenShelf.Core;
 using SD = System.Drawing;
 using WF = System.Windows.Forms;
@@ -60,32 +61,14 @@ public sealed class TrayService : ITrayService
         catch (Exception ex) { Log.Error("Tray menu " + what, ex); }
     }
 
-    /// <summary>White ring with a centre dot on a transparent canvas.</summary>
+    /// <summary>The OpenShelf logo from the app's .ico: the frame for the notification area's icon size at the system scaling (16, 20, 24, 32).</summary>
     static SD.Icon DrawIcon()
     {
         int size = 16;
-        try
-        {
-            size = Native.GetSystemMetricsForDpi(49 /* SM_CXSMICON */, Native.GetDpiForSystem());
-            if (size < 16) size = 16;
-        }
+        try { size = AppIcons.SmallIconSize(Native.GetDpiForSystem()); }
         catch (Exception) { }
-
-        using var bmp = new SD.Bitmap(size, size, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-        using (var g = SD.Graphics.FromImage(bmp))
-        {
-            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
-            g.Clear(SD.Color.Transparent);
-            float stroke = Math.Max(2f, size / 12f);
-            float inset = 0.5f + stroke / 2f;
-            float d = size - 2 * inset;
-            using var pen = new SD.Pen(SD.Color.White, stroke);
-            g.DrawEllipse(pen, inset, inset, d, d);
-            float dot = size * 0.28f;
-            g.FillEllipse(SD.Brushes.White, (size - dot) / 2f, (size - dot) / 2f, dot, dot);
-        }
-        var hIcon = bmp.GetHicon();
+        var hIcon = AppIcons.Create(size);
+        if (hIcon == IntPtr.Zero) throw new InvalidOperationException("The tray icon could not be created");
         try
         {
             using var temp = SD.Icon.FromHandle(hIcon);

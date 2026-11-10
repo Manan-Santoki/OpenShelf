@@ -27,6 +27,11 @@ internal static class Qa
     [DllImport("user32.dll")] private static extern bool EnumWindows(EnumProc p, nint lp);
     [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
     [DllImport("user32.dll")] private static extern bool IsWindowVisible(nint h);
+    [DllImport("user32.dll")] private static extern bool ShowWindow(nint h, int cmd);
+    [DllImport("user32.dll")] private static extern bool SetForegroundWindow(nint h);
+    [DllImport("user32.dll")] private static extern bool BringWindowToTop(nint h);
+    [DllImport("user32.dll")] private static extern bool AttachThreadInput(uint a, uint b, bool attach);
+    [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
     [DllImport("user32.dll")] private static extern bool GetWindowRect(nint h, out RECT r);
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(nint h, out uint pid);
     [DllImport("user32.dll")] private static extern int GetWindowLong(nint h, int idx);
@@ -154,6 +159,14 @@ internal static class Qa
                 string name; try { name = Process.GetProcessById((int)gpid).ProcessName; } catch { name = "?"; }
                 if (!a[2].Split(',').Contains(name, StringComparer.OrdinalIgnoreCase))
                     throw new InvalidOperationException($"GUARD FAILED at {pt.X},{pt.Y}: window belongs to '{name}', wanted {a[2]}");
+                if (a.Length > 3)
+                {
+                    // guard X Y proc title words...: the window's title must also contain the given text (case-insensitive).
+                    var tb = new StringBuilder(256); GetWindowText(root, tb, 256);
+                    var want = string.Join(" ", a.Skip(3));
+                    if (!tb.ToString().Contains(want, StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidOperationException($"GUARD FAILED at {pt.X},{pt.Y}: window title '{tb}' lacks '{want}'");
+                }
                 break;
             }
             case "fg":
@@ -162,6 +175,28 @@ internal static class Qa
                 var t = new StringBuilder(128); GetWindowText(h, t, 128);
                 string n; try { n = Process.GetProcessById((int)fpid).ProcessName; } catch { n = "?"; }
                 Console.WriteLine($"foreground 0x{h:X} {n} '{t}'");
+                break;
+            }
+            case "raise":
+            {
+                // raise PROC title words...: brings a top-level window of that process whose title contains the text to the front.
+                var want = string.Join(" ", a.Skip(1)); nint found = 0;
+                EnumWindows((h, _) =>
+                {
+                    if (!IsWindowVisible(h)) return true;
+                    var tb = new StringBuilder(256); GetWindowText(h, tb, 256);
+                    if (!tb.ToString().Contains(want, StringComparison.OrdinalIgnoreCase)) return true;
+                    GetWindowThreadProcessId(h, out var rp);
+                    string n; try { n = Process.GetProcessById((int)rp).ProcessName; } catch { return true; }
+                    if (!n.Equals(a[0], StringComparison.OrdinalIgnoreCase)) return true;
+                    found = h; return false;
+                }, 0);
+                if (found == 0) throw new InvalidOperationException("raise: no window " + rest);
+                var fgw = GetForegroundWindow(); var fgt = GetWindowThreadProcessId(fgw, out _); var me = GetCurrentThreadId();
+                AttachThreadInput(me, fgt, true);
+                ShowWindow(found, 9); BringWindowToTop(found); SetForegroundWindow(found);
+                AttachThreadInput(me, fgt, false);
+                Thread.Sleep(300);
                 break;
             }
             case "echo": Console.WriteLine(rest); break;

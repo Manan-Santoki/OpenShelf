@@ -13,8 +13,22 @@ public sealed class VelopackBackend : IUpdateBackend
     private readonly UpdateManager? _manager;
 
     public VelopackBackend(string repositoryUrl = DefaultRepository)
-        : this(new GithubSource(repositoryUrl, accessToken: null, prerelease: false))
+        : this(new GithubSource(repositoryUrl, accessToken: null, prerelease: RunningPrerelease()))
     {
+    }
+
+    /// <summary>A beta copy ("0.1.0-beta.1") follows pre-releases, so it sees the next beta and the final release;
+    /// a released copy only ever sees released versions.</summary>
+    public static bool RunningPrerelease() => IsPrerelease(
+        System.Reflection.Assembly.GetEntryAssembly()?
+            .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+            .OfType<System.Reflection.AssemblyInformationalVersionAttribute>().FirstOrDefault()?.InformationalVersion);
+
+    public static bool IsPrerelease(string? version)
+    {
+        if (string.IsNullOrEmpty(version)) return false;
+        var core = version.Split('+')[0];   // drop build metadata such as the commit id
+        return core.Contains('-');
     }
 
     public VelopackBackend(IUpdateSource source, IVelopackLocator? locator = null)

@@ -16,17 +16,17 @@ internal static class BuiltInTools
         void Editor(string id, string title, string glyph, int order, Func<EditorHost, IReadOnlyList<EditableImage>, EditorWindow> make) =>
             catalog.Register(new ToolDefinition(id, title, glyph, AllImages, order, run => ImageEditors.OpenAsync(run, services, make)));
 
-        Editor(ToolIds.Compress, "Compress", "\uE73F", 10, (h, i) => new CompressEditor(h, i));
-        Editor(ToolIds.Crop, "Crop", "\uE7A8", 20, (h, i) => new CropEditor(h, i));
-        Editor(ToolIds.Resize, "Resize", "\uE740", 30, (h, i) => new ResizeEditor(h, i));
-        Editor(ToolIds.Annotate, "Annotate", "\uE70F", 40, (h, i) => new AnnotateEditor(h, i));
-        Editor(ToolIds.Edit, "Edit", "\uE9E9", 60, (h, i) => new AdjustEditor(h, i));
-        Editor(ToolIds.Metadata, "Metadata", "\uE8EC", 70, (h, i) => new MetadataEditor(h, i));
-        Editor(ToolIds.Redact, "Redact", "\uE7B3", 80, (h, i) => new RedactEditor(h, i));
-        Editor(ToolIds.AddBackground, "Add BG", "\uEB9F", 90, (h, i) => new AddBackgroundEditor(h, i));
+        Editor(ToolIds.Compress, "Compress", "minimize-2", 10, (h, i) => new CompressEditor(h, i));
+        Editor(ToolIds.Crop, "Crop", "crop", 20, (h, i) => new CropEditor(h, i));
+        Editor(ToolIds.Resize, "Resize", "maximize-2", 30, (h, i) => new ResizeEditor(h, i));
+        Editor(ToolIds.Annotate, "Annotate", "pencil", 40, (h, i) => new AnnotateEditor(h, i));
+        Editor(ToolIds.Edit, "Edit", "sliders-horizontal", 60, (h, i) => new AdjustEditor(h, i));
+        Editor(ToolIds.Metadata, "Metadata", "tag", 70, (h, i) => new MetadataEditor(h, i));
+        Editor(ToolIds.Redact, "Redact", "eye-off", 80, (h, i) => new RedactEditor(h, i));
+        Editor(ToolIds.AddBackground, "Add BG", "images", 90, (h, i) => new AddBackgroundEditor(h, i));
 
         // Combine: several images, one click, one PDF. Replace this registration to take mixed selections of PDFs and images as well.
-        catalog.Register(new ToolDefinition(ToolIds.Combine, "Combine", "\uE8C8", CombineOperation.Applies, 120, run => CombineAsync(run, services)));
+        catalog.Register(new ToolDefinition(ToolIds.Combine, "Combine", "files", CombineOperation.Applies, 120, run => CombineAsync(run, services)));
     }
 
     private static async Task CombineAsync(WheelRun run, ToolServices services)

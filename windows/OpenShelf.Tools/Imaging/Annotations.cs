@@ -24,12 +24,12 @@ public static class AnnotationTools
     /// <summary>Segoe MDL2 glyph.</summary>
     public static string Glyph(this AnnotationTool tool) => tool switch
     {
-        AnnotationTool.Draw => "",
-        AnnotationTool.Arrow => "",
-        AnnotationTool.Box => "",
-        AnnotationTool.Highlight => "",
-        AnnotationTool.Text => "",
-        _ => "",
+        AnnotationTool.Draw => "pencil-line",
+        AnnotationTool.Arrow => "arrow-up-right",
+        AnnotationTool.Box => "square",
+        AnnotationTool.Highlight => "highlighter",
+        AnnotationTool.Text => "type",
+        _ => "mouse-pointer-2",
     };
 
     public static string Hint(this AnnotationTool tool) => tool switch

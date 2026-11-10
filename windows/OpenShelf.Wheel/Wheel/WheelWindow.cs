@@ -27,6 +27,7 @@ internal sealed partial class WheelWindow : Window
     private readonly Canvas _host;
     private readonly ScaleTransform _scale = new(1, 1);
     private readonly DispatcherTimer _probeTimer;
+    private readonly ProbeRetryPolicy _probeRetry = new();
     private readonly DispatcherTimer _graceTimer;
     private readonly DispatcherTimer _tick;
     private readonly DispatcherTimer _hintTimer;
@@ -100,12 +101,8 @@ internal sealed partial class WheelWindow : Window
         _root.Children.Add(_host);
         Content = _root;
 
-        _probeTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
-        _probeTimer.Tick += (_, _) =>
-        {
-            _probeTimer.Stop();
-            if (_phase == Phase.Probing) { Log.Write("probe gave up: no DragEnter"); HideNow(); }
-        };
+        _probeTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+        _probeTimer.Tick += (_, _) => OnProbeTick();
         _graceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         _graceTimer.Tick += (_, _) =>
         {
@@ -179,8 +176,8 @@ internal sealed partial class WheelWindow : Window
             Task Noop(WheelRun _) => Task.CompletedTask;
             var model = new WheelModel(WheelKind.Actions,
             [
-                new WheelEntry("w.1", "Shelf", Noop, ""), new WheelEntry("w.2", "Copy", Noop, ""),
-                new WheelEntry("w.3", "Copy path", Noop, ""), new WheelEntry("w.4", "Terminal", Noop, ""),
+                new WheelEntry("w.1", "Shelf", Noop, "import"), new WheelEntry("w.2", "Copy", Noop, "copy"),
+                new WheelEntry("w.3", "Copy path", Noop, "link"), new WheelEntry("w.4", "Terminal", Noop, "terminal"),
             ]);
             var dpi = VisualTreeHelper.GetDpi(this).DpiScaleX;
             var visual = new WheelVisual(model, WheelPaging.Slots(4, 0), 0, "0 B", Glass.Capture(0, 0, 64, 64), dpi, animateIn: false);
@@ -258,9 +255,34 @@ internal sealed partial class WheelWindow : Window
         _kind = kind;
         Prepare(pointer, room: false);
         _phase = Phase.Probing;
+        _probeRetry.Begin(_clock.Elapsed);
         _probeTimer.Stop();
         _probeTimer.Start();
         Log.Write($"probe shown ({kind}) at {pointer.X},{pointer.Y}, centre {_centrePx.X},{_centrePx.Y}, backdrop {(_backdrop is null ? "none" : "ok")}");
+    }
+
+    /// <summary>No DragEnter yet: with the button down and the trigger keys held, show the probe again under the pointer; otherwise give up in time.</summary>
+    private void OnProbeTick()
+    {
+        try
+        {
+            if (_phase != Phase.Probing) { _probeTimer.Stop(); return; }
+            var step = _probeRetry.Next(_clock.Elapsed, Native.IsDown(Native.VK_LBUTTON), Native.HeldModifiers() != Modifiers.None);
+            switch (step)
+            {
+                case ProbeStep.Retry:
+                    var pointer = Native.CursorPos();
+                    Prepare(pointer, room: false);   // moves the invisible window to the pointer, keeps the phase
+                    Log.Write($"probe shown again (retry {_probeRetry.Retries}) at {pointer.X},{pointer.Y}");
+                    break;
+                case ProbeStep.GiveUp:
+                    _probeTimer.Stop();
+                    Log.Write("probe gave up: no DragEnter");
+                    HideNow();
+                    break;
+            }
+        }
+        catch (Exception e) { Log.Error("OnProbeTick", e); }
     }
 
     /// <summary>Switches a mid-drag wheel to another kind, keeping the old one when the new has nothing to offer.</summary>

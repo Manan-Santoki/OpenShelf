@@ -8,4 +8,9 @@
     <UseWPF>true</UseWPF>
   </PropertyGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="..\OpenShelf.App\Assets\OpenShelf.ico" LogicalName="OpenShelf.ico" />
+    <None Include="LICENSE-lucide.txt" />
+  </ItemGroup>
+
 </Project>

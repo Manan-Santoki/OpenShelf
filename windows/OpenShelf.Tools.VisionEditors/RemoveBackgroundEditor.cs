@@ -1,3 +1,4 @@
+using OpenShelf.Ui;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -19,7 +20,7 @@ public sealed class RemoveBackgroundEditor : EditorWindow, IEditorDemo
     public static Size ContentSize(int count) => new(520, count > 1 ? 640 + FilmstripView.StripHeight : 640);
 
     /// <summary>Segoe MDL2 glyph over the "no clear subject" explanation.</summary>
-    internal const string NoSubjectGlyph = "";
+    internal const string NoSubjectGlyph = "user-round-x";
 
     private const int PreviewLongSide = 1600;
 
@@ -27,7 +28,7 @@ public sealed class RemoveBackgroundEditor : EditorWindow, IEditorDemo
     private readonly RemoveBackgroundSession _session;
     private readonly ImageSurface _surface = new() { Inset = 8 };
     private readonly Border _overlay = new();
-    private readonly TextBlock _overlayGlyph = ToolKit.Glyph("", 28, "Text2");
+    private readonly IconView _overlayGlyph = ToolKit.Icon("", 28, "Text2");
     private readonly TextBlock _overlayText = ToolKit.Text("", 13, "Text", wrap: true);
     private readonly TextBlock _overlayHint = ToolKit.Text("", 11, "Text3", wrap: true);
     private readonly ThinProgress _overlayBar = new() { Width = 220, Margin = new Thickness(0, 12, 0, 0) };
@@ -152,7 +153,7 @@ public sealed class RemoveBackgroundEditor : EditorWindow, IEditorDemo
             case CutoutPhase.NoSubject:
             case CutoutPhase.Failed:
                 _overlayText.Text = _session.Message ?? RemoveBackgroundSession.FailedText;
-                _overlayGlyph.Text = phase == CutoutPhase.NoSubject ? NoSubjectGlyph : "";
+                _overlayGlyph.Icon = phase == CutoutPhase.NoSubject ? NoSubjectGlyph : "circle-x";
                 _overlayGlyph.Visibility = Visibility.Visible;
                 _overlayBar.Indeterminate = false;
                 break;

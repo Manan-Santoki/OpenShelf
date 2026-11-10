@@ -221,6 +221,7 @@ public static class Program
     /// <summary>Renders the window's own visual tree, so another window on top of it (other demos run at the same time) cannot get into the picture.</summary>
     private static void Capture(Window window, string file)
     {
+        if (OpenShelf.Ui.OffscreenShot.TryCapture(window, file)) return;
         var visual = (FrameworkElement)VisualTreeHelper.GetChild(window, 0);
         var scale = VisualTreeHelper.GetDpi(visual).DpiScaleX;
         var width = (int)Math.Ceiling(visual.ActualWidth * scale);

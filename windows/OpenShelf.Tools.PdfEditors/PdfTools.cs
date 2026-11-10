@@ -24,14 +24,14 @@ public static class PdfTools
     {
         ArgumentNullException.ThrowIfNull(tools);
         var services = tools.Services;
-        tools.Register(new ToolDefinition(PdfToolIds.Combine, "Combine", "", CanCombine, 120, run => CombineAsync(run, services)));
-        tools.Register(new ToolDefinition(PdfToolIds.Pages, "Pages", "", AllPdfs, 300,
+        tools.Register(new ToolDefinition(PdfToolIds.Combine, "Combine", "files", CanCombine, 120, run => CombineAsync(run, services)));
+        tools.Register(new ToolDefinition(PdfToolIds.Pages, "Pages", "layout-grid", AllPdfs, 300,
             run => OpenAsync(run, services, (host, files) => new PdfPagesWindow(host, files))));
-        tools.Register(new ToolDefinition(PdfToolIds.Split, "Split", "", AllPdfs, 310,
+        tools.Register(new ToolDefinition(PdfToolIds.Split, "Split", "scissors", AllPdfs, 310,
             run => OpenAsync(run, services, (host, files) => new PdfSplitWindow(host, files))));
-        tools.Register(new ToolDefinition(PdfToolIds.Compress, "Compress", "", AllPdfs, 320,
+        tools.Register(new ToolDefinition(PdfToolIds.Compress, "Compress", "minimize-2", AllPdfs, 320,
             run => OpenAsync(run, services, (host, files) => new PdfCompressWindow(host, files))));
-        tools.Register(new ToolDefinition(PdfToolIds.Metadata, "Metadata", "", AllPdfs, 330,
+        tools.Register(new ToolDefinition(PdfToolIds.Metadata, "Metadata", "tag", AllPdfs, 330,
             run => OpenAsync(run, services, (host, files) => new PdfMetadataWindow(host, files))));
     }
 

@@ -1,3 +1,4 @@
+using OpenShelf.Ui;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -15,7 +16,7 @@ public interface IPdfEditorDemo
 /// <summary>Small pieces the PDF editors share.</summary>
 internal static class Parts
 {
-    public const string PageGlyph = "";
+    public const string PageGlyph = "file-text";
 
     /// <summary>A rendered page as a frozen picture.</summary>
     public static BitmapSource ToBitmap(PdfThumbnail thumbnail)
@@ -29,7 +30,7 @@ internal static class Parts
     public static Border Thumb(ImageSource? source, double size = 52, int? badge = null)
     {
         UIElement face = source is null
-            ? new Border { Background = ToolKit.Brush("Fill"), Child = ToolKit.Glyph(PageGlyph, size * 0.4, "Text3") }
+            ? new Border { Background = ToolKit.Brush("Fill"), Child = ToolKit.Icon(PageGlyph, size * 0.4, "Text3") }
             : new Border
             {
                 Background = Brushes.White,
@@ -107,9 +108,9 @@ internal static class Parts
     public static void SetPicture(ContentControl holder, ImageSource source, int? badge) => holder.Content = Thumb(source, 52, badge);
 
     /// <summary>A line with an icon, in a rounded card: the summary under Split and Compress.</summary>
-    public static (Border Card, TextBlock Text, TextBlock Detail, TextBlock Glyph) SummaryCard(string glyph)
+    public static (Border Card, TextBlock Text, TextBlock Detail, IconView Glyph) SummaryCard(string glyph)
     {
-        var icon = ToolKit.Glyph(glyph, 13, "Accent");
+        var icon = ToolKit.Icon(glyph, 13, "Accent");
         icon.VerticalAlignment = VerticalAlignment.Center;
         var text = ToolKit.Text("", 12, "Text");
         text.VerticalAlignment = VerticalAlignment.Center;

@@ -192,7 +192,7 @@ internal sealed class OptionsWindow : Window
 
         _debounce.Tick += (_, _) => { _debounce.Stop(); RunEstimate(); };
         SourceInitialized += (_, _) => DarkTitle();
-        Loaded += (_, _) => { Place(); AppIcon.Apply(this); };
+        Loaded += (_, _) => { Place(); AppIcons.Apply(this); };
         Closed += (_, _) => { _debounce.Stop(); _estimating?.Cancel(); };
         if (options.Video && estimate is not null) ScheduleEstimate();
     }

@@ -34,7 +34,7 @@ public sealed class FilmstripView : StackPanel
     /// <param name="withSameForAll">Whether to show the "Same for all" switch.</param>
     /// <param name="itemName">What the files are called in the switch's help, e.g. "image" or "video".</param>
     /// <param name="placeholderGlyph">Icon shown for a file without a picture.</param>
-    public FilmstripView(IReadOnlyList<ImageSource?> thumbnails, IReadOnlyList<string> names, bool withSameForAll, string itemName = "image", string placeholderGlyph = "")
+    public FilmstripView(IReadOnlyList<ImageSource?> thumbnails, IReadOnlyList<string> names, bool withSameForAll, string itemName = "image", string placeholderGlyph = "image")
     {
         _thumbnails = thumbnails;
         _names = names;
@@ -59,8 +59,8 @@ public sealed class FilmstripView : StackPanel
         }
         Children.Add(header);
 
-        _previous = Step("", "Previous", -1);
-        _next = Step("", "Next", 1);
+        _previous = Step("chevron-left", "Previous", -1);
+        _next = Step("chevron-right", "Next", 1);
         for (var i = 0; i < thumbnails.Count; i++) _items.Children.Add(MakeThumbnail(i));
         _scroll.Content = _items;
         var strip = new Grid { Height = 56 };
@@ -172,7 +172,7 @@ public sealed class FilmstripView : StackPanel
     {
         if (source is not null)
             return new Image { Source = source, Stretch = Stretch.UniformToFill, SnapsToDevicePixels = true };
-        return new Border { Background = ToolKit.Brush("Fill"), Child = ToolKit.Glyph(_placeholder, 18, "Text3") };
+        return new Border { Background = ToolKit.Brush("Fill"), Child = ToolKit.Icon(_placeholder, 18, "Text3") };
     }
 
     private UIElement MakeThumbnail(int index)

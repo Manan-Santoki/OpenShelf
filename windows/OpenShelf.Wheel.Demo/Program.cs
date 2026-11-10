@@ -21,6 +21,20 @@ internal static class Program
     private static void Main(string[] args)
     {
         File.WriteAllText(LogPath, "");
+        if (Array.IndexOf(args, "--icons") is var ic and >= 0 && ic + 1 < args.Length)
+        {
+            var sc2 = Array.IndexOf(args, "--scale") is var si2 and >= 0 && si2 + 1 < args.Length ? double.Parse(args[si2 + 1], System.Globalization.CultureInfo.InvariantCulture) : 1.0;
+            var sheetApp = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+            Shots.IconSheet(args[ic + 1], sc2);
+            return;
+        }
+        if (Array.IndexOf(args, "--shots") is var sh and >= 0 && sh + 1 < args.Length)
+        {
+            var sc = Array.IndexOf(args, "--scale") is var si and >= 0 && si + 1 < args.Length ? double.Parse(args[si + 1], System.Globalization.CultureInfo.InvariantCulture) : 1.0;
+            var shotApp = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+            Shots.Run(args[sh + 1], sc);
+            return;
+        }
         var many = args.Contains("--many");
         string? openSelection = null;
         var i = Array.IndexOf(args, "--open-selection");

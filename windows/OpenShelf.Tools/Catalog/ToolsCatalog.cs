@@ -25,7 +25,7 @@ public sealed record ToolServices(IToastService Toasts, IProgressService Progres
 /// and Remove BG tools are registered by their own projects through <see cref="Register"/>.
 /// <code>
 /// var tools = new ToolsCatalog(toasts, progress, shelves);
-/// tools.Register(new ToolDefinition("tool.ocr", "OCR", "",
+/// tools.Register(new ToolDefinition("tool.ocr", "OCR", "type",
 ///     paths =&gt; paths.All(p =&gt; FileKinds.Of(p) == FileKind.Image), order: 110, run: run =&gt; Ocr.OpenAsync(run)));
 /// catalog.ToolsProvider = tools.For;   // ConversionWheelCatalog.ToolsProvider
 /// </code>

@@ -49,16 +49,16 @@ public static class TourSteps
     /// <summary>A Segoe Fluent / MDL2 glyph for the step's badge.</summary>
     public static string Glyph(this TourStep step) => step switch
     {
-        TourStep.Welcome => "",    // home
-        TourStep.Convert => "",    // sync
-        TourStep.Markdown => "",   // document
-        TourStep.Tools => "",      // crop
-        TourStep.Pdf => "",
-        TourStep.Video => "",      // video
-        TourStep.Shelf => "",      // library
-        TourStep.Keyboard => "",   // keyboard
-        TourStep.Options => "",    // settings
-        _ => "",                   // check
+        TourStep.Welcome => "hand",    // home
+        TourStep.Convert => "refresh-cw",    // sync
+        TourStep.Markdown => "file-text",   // document
+        TourStep.Tools => "crop",      // crop
+        TourStep.Pdf => "file-text",
+        TourStep.Video => "film",      // video
+        TourStep.Shelf => "inbox",      // library
+        TourStep.Keyboard => "keyboard",   // keyboard
+        TourStep.Options => "settings",    // settings
+        _ => "check",                   // check
     };
 
     /// <summary>The practice file the step is done with.</summary>

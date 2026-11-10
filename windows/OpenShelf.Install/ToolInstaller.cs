@@ -18,6 +18,9 @@ public sealed class ToolInstallerOptions
     public ISignatureVerifier? Signatures { get; init; }
     /// <summary>Full path of winget.exe, or null when it is not installed.</summary>
     public Func<string?>? FindWinget { get; init; }
+    /// <summary>Asked (with the tool's name) when every download source is down and winget exists; true runs winget. The default, null,
+    /// never runs winget by itself: Settings offers a "Try winget" button instead.</summary>
+    public Func<string, Task<bool>>? ConfirmWinget { get; init; }
     public IReadOnlyList<ToolDefinition>? Definitions { get; init; }
     /// <summary>Called after an install, removal or change in what is installed (the app refreshes its tool detection here).</summary>
     public Action? OnToolsChanged { get; init; }
@@ -49,6 +52,8 @@ public sealed class ToolInstaller : IToolInstallerUi, IDisposable
     private readonly SourceHttp _http;
     private readonly bool _ownsClient;
     private readonly ConcurrentDictionary<string, bool> _active = new();
+    private readonly ConcurrentDictionary<string, bool> _wingetOffers = new();
+    private readonly ConcurrentDictionary<string, InstallPhase> _phases = new();
     private readonly Timer? _poll;
     private readonly object _lock = new();
     private string _snapshot;
@@ -61,6 +66,7 @@ public sealed class ToolInstaller : IToolInstallerUi, IDisposable
         {
             Locations = ToolLocations.Standard,
             OnToolsChanged = () => ExternalToolsProvider.Default.Refresh(),
+            FindWinget = FindWingetOnPath,
             PollInterval = TimeSpan.FromSeconds(20),
         }, disposeHandler: true)
     {
@@ -179,6 +185,7 @@ public sealed class ToolInstaller : IToolInstallerUi, IDisposable
         try
         {
             ct.ThrowIfCancellationRequested();
+            _wingetOffers.TryRemove(id, out _);
             Directory.CreateDirectory(_root);
             ClearLeftovers();
             var staging = Path.Combine(_root, ".staging-" + Guid.NewGuid().ToString("N"));
@@ -192,6 +199,13 @@ public sealed class ToolInstaller : IToolInstallerUi, IDisposable
                 }
                 catch (ToolInstallException e) when (e.Kind == InstallFailureKind.SourcesUnavailable && _options.FindWinget?.Invoke() is { Length: > 0 } winget)
                 {
+                    // winget never starts by itself: the UI is asked, and without an answer of yes the person can choose "Try winget" later.
+                    var confirm = _options.ConfirmWinget;
+                    if (confirm is null || !await confirm(tool.Name))
+                    {
+                        _wingetOffers[id] = true;
+                        throw;
+                    }
                     await InstallWithWingetAsync(tool, winget, e, ct);
                 }
                 progress.Report(1);
@@ -204,6 +218,7 @@ public sealed class ToolInstaller : IToolInstallerUi, IDisposable
         finally
         {
             _active.TryRemove(id, out _);
+            _phases.TryRemove(id, out _);
             NotifyChanged();
         }
     }
@@ -242,21 +257,25 @@ public sealed class ToolInstaller : IToolInstallerUi, IDisposable
     private async Task InstallFromAsync(ToolDefinition tool, DownloadSource source, ResolvedDownload resolved, string staging, IProgress<double> progress, CancellationToken ct)
     {
         var package = Path.Combine(staging, tool.Package == PackageKind.Zip ? "download.zip" : "download.msi");
+        SetPhase(tool.Id, InstallPhase.Downloading);
         await DownloadAsync(resolved, package, value => progress.Report(value * 0.8), ct);
 
         progress.Report(0.82);
+        SetPhase(tool.Id, InstallPhase.Verifying);
         var actual = await HashAsync(package, ct);
         if (!string.Equals(actual, resolved.Sha256, StringComparison.OrdinalIgnoreCase))
             throw new ToolInstallException($"The download of {tool.Name} was damaged or altered, so it was deleted.", InstallFailureKind.Verification,
                 $"Expected {resolved.Sha256}, got {actual}.");
 
         progress.Report(0.85);
+        SetPhase(tool.Id, InstallPhase.Unpacking);
         var unpacked = Path.Combine(staging, "unpacked");
         Directory.CreateDirectory(unpacked);
         await UnpackAsync(tool, package, unpacked, ct);
         File.Delete(package);
 
         progress.Report(0.93);
+        SetPhase(tool.Id, InstallPhase.Finishing);
         var (folder, mainExe) = Prepare(tool, unpacked, staging);
 
         var signature = "Not applicable: the publisher doesn’t sign this program; the SHA-256 was checked.";
@@ -476,6 +495,57 @@ public sealed class ToolInstaller : IToolInstallerUi, IDisposable
         NotifyChanged();
         if (Find(tool) is null)
             throw new ToolInstallException($"winget installed {tool.Name}, but OpenShelf can’t find it yet. Restart OpenShelf, or sign out and back in.", InstallFailureKind.Winget);
+    }
+
+    public InstallPhase? PhaseOf(string id) => _phases.TryGetValue(id, out var phase) ? phase : null;
+
+    private void SetPhase(string id, InstallPhase phase)
+    {
+        if (_phases.TryGetValue(id, out var old) && old == phase) return;
+        _phases[id] = phase;
+        Changed?.Invoke();
+    }
+
+    /// <summary>True when the last install of <paramref name="id"/> failed because every download source was down and winget is available.</summary>
+    public bool OffersWinget(string id) => _wingetOffers.ContainsKey(id) && _options.FindWinget?.Invoke() is { Length: > 0 };
+
+    /// <summary>The person chose "Try winget" after the sources failed: installs through winget (user scope).</summary>
+    public async Task InstallWithWingetAsync(string id, IProgress<double> progress, CancellationToken ct)
+    {
+        var tool = Definition(id);
+        if (_options.FindWinget?.Invoke() is not { Length: > 0 } winget)
+            throw new ToolInstallException("winget isn’t available on this PC.", InstallFailureKind.Other);
+        if (!_active.TryAdd(id, true))
+            throw new ToolInstallException($"{tool.Name} is already being installed.", InstallFailureKind.Other);
+        try
+        {
+            ct.ThrowIfCancellationRequested();
+            progress.Report(0);
+            SetPhase(id, InstallPhase.Winget);
+            await InstallWithWingetAsync(tool, winget, new ToolInstallException($"The {tool.Name} download server isn’t responding right now.", InstallFailureKind.SourcesUnavailable), ct);
+            _wingetOffers.TryRemove(id, out _);
+            progress.Report(1);
+        }
+        finally
+        {
+            _active.TryRemove(id, out _);
+            _phases.TryRemove(id, out _);
+            NotifyChanged();
+        }
+    }
+
+    private static string? FindWingetOnPath()
+    {
+        try
+        {
+            var candidates = new List<string>();
+            var local = Environment.GetEnvironmentVariable("LOCALAPPDATA");
+            if (!string.IsNullOrEmpty(local)) candidates.Add(Path.Combine(local, "Microsoft", "WindowsApps", "winget.exe"));
+            foreach (var dir in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+                candidates.Add(Path.Combine(dir.Trim('"'), "winget.exe"));
+            return candidates.FirstOrDefault(File.Exists);
+        }
+        catch (Exception) { return null; }
     }
 
     // ---- Remove ----------------------------------------------------------------------------------------------

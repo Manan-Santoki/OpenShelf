@@ -55,8 +55,8 @@ internal sealed class SplitEditor : MediaEditorWindow, IMediaEditorDemo
         Grid.SetRow(_modePicker, 1);
         stack.Children.Add(_modePicker);
 
-        _fewer = ToolKit.IconButton("", "Fewer parts", (_, _) => Edit(s => s with { Parts = Math.Max(s.Parts - 1, SplitPlan.MinimumEqualParts) }), 28);
-        _more = ToolKit.IconButton("", "More parts", (_, _) => Edit(s => s with { Parts = Math.Min(s.Parts + 1, SplitPlan.MaximumEqualParts) }), 28);
+        _fewer = ToolKit.IconButton("minus", "Fewer parts", (_, _) => Edit(s => s with { Parts = Math.Max(s.Parts - 1, SplitPlan.MinimumEqualParts) }), 28);
+        _more = ToolKit.IconButton("plus", "More parts", (_, _) => Edit(s => s with { Parts = Math.Min(s.Parts + 1, SplitPlan.MaximumEqualParts) }), 28);
         var stepper = new StackPanel { Orientation = Orientation.Horizontal };
         _partsValue.Width = 36;
         _partsValue.TextAlignment = TextAlignment.Center;

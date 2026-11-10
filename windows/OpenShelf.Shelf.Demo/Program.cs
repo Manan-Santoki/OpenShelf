@@ -83,6 +83,7 @@ public static class Program
         {
             case "collapsed": w = Open(shelves, files, false, ShelfViewMode.Grid, at); break;
             case "expanded-grid": w = Open(shelves, files, true, ShelfViewMode.Grid, at); break;
+            case "hittest": w = Open(shelves, files, true, ShelfViewMode.Grid, at); break;
             case "expanded-list": w = Open(shelves, files, true, ShelfViewMode.List, at); break;
             case "selected": w = Open(shelves, files, true, ShelfViewMode.Grid, at); w.SelectIndices(1, 3); break;
             case "docked-left":
@@ -122,6 +123,7 @@ public static class Program
             delay.Stop();
             try
             {
+                if (state == "hittest") { var later = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1000) }; later.Tick += (_, _) => { later.Stop(); File.WriteAllText(shot + ".txt", HitReport(w!)); }; later.Start(); }
                 if (state == "hidden-tab") w!.TuckAway();
                 if (state == "context-menu") w!.ShowMenu(w.Model.Selected, w.TileCentre(1));
                 if (state == "preview") shelves.Preview.Open(files, 0, new ScreenPoint(400, 300));
@@ -148,6 +150,31 @@ public static class Program
             app.Shutdown();
         };
         done.Start();
+    }
+
+    /// <summary>What the pointer would land on at the tile's icon, its label and its padding corners (no mouse is used).</summary>
+    static string HitReport(ShelfWindow w)
+    {
+        FrameworkElement? tile = null;
+        void Find(DependencyObject d)
+        {
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(d) && tile is null; i++)
+            {
+                var c = VisualTreeHelper.GetChild(d, i);
+                if (c is Border { Width: 96, Height: 112 } b) { tile = b; return; }
+                Find(c);
+            }
+        }
+        Find(w);
+        if (tile is null) return "no tile found";
+        var lines = new List<string>();
+        foreach (var (name, x, y) in new (string, double, double)[]
+        {
+            ("icon centre", 48, 34), ("label", 48, 88), ("top-left padding", 4, 4), ("top-right padding", 92, 4),
+            ("left of icon", 6, 34), ("bottom edge", 48, 108),
+        })
+            lines.Add($"{name}: {(VisualTreeHelper.HitTest(tile, new Point(x, y))?.VisualHit.GetType().Name ?? "nothing (falls through to the canvas)")}");
+        return string.Join(Environment.NewLine, lines);
     }
 
     static ShelfWindow Open(ShelfService shelves, List<string> files, bool expanded, ShelfViewMode mode, ScreenPoint at)

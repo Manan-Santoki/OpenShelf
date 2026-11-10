@@ -25,6 +25,7 @@ internal sealed class VideoCompressEditor : MediaEditorWindow, IMediaEditorDemo
         _state = new CompressState(paths, paths.Sum(p => File.Exists(p) ? new FileInfo(p).Length : 0));
         CanvasWell = false;
         SetCanvasPadding(0);
+        FitHeightToContent();
 
         var stack = new StackPanel();
         stack.Children.Add(MediaParts.IconHeader(Glyphs.Film, _state.Title, out _subtitle));
@@ -45,7 +46,7 @@ internal sealed class VideoCompressEditor : MediaEditorWindow, IMediaEditorDemo
         line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         line.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var icon = ToolKit.Glyph(Glyphs.Compress, 13, "Accent");
+        var icon = ToolKit.Icon(Glyphs.Compress, 13, "Accent");
         icon.Margin = new Thickness(0, 0, 8, 0);
         var text = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         text.Children.Add(_estimate);

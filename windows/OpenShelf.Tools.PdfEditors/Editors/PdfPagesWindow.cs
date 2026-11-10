@@ -73,13 +73,13 @@ public sealed class PdfPagesWindow : PdfEditorWindow
         _overlay.MaxWidth = 380;
         _overlay.IsHitTestVisible = false;
 
-        _undo = ToolKit.IconButton("", "Undo (Ctrl+Z)", (_, _) => Undo());
-        _redo = ToolKit.IconButton("", "Redo (Ctrl+Shift+Z)", (_, _) => Redo());
-        _left = ToolKit.IconButton("", "Rotate selected pages left", (_, _) => RotateSelection(-90));
+        _undo = ToolKit.IconButton("undo-2", "Undo (Ctrl+Z)", (_, _) => Undo());
+        _redo = ToolKit.IconButton("redo-2", "Redo (Ctrl+Shift+Z)", (_, _) => Redo());
+        _left = ToolKit.IconButton("rotate-ccw", "Rotate selected pages left", (_, _) => RotateSelection(-90));
         _left.LayoutTransform = new ScaleTransform(-1, 1);
         _left.RenderTransformOrigin = new Point(0.5, 0.5);
-        _right = ToolKit.IconButton("", "Rotate selected pages right", (_, _) => RotateSelection(90));
-        _delete = ToolKit.IconButton("", "Delete selected pages (Delete)", (_, _) => DeleteSelection());
+        _right = ToolKit.IconButton("rotate-cw", "Rotate selected pages right", (_, _) => RotateSelection(90));
+        _delete = ToolKit.IconButton("trash", "Delete selected pages (Delete)", (_, _) => DeleteSelection());
         var gap = new Border { Width = 1, Height = 18, Background = ToolKit.Brush("Hairline"), Margin = new Thickness(6, 0, 6, 0) };
         foreach (var element in new UIElement[] { _undo, _redo, gap, _left, _right, _delete }) _toolbarButtons.Children.Add(element);
 

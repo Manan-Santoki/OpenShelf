@@ -56,7 +56,9 @@ internal static class GlassCard
                 Canvas.SetTop(backdrop, -m / scale - 1);
                 layer.Children.Add(backdrop);
                 inner.Children.Add(layer);
-                inner.Children.Add(new Border { Background = Theme.Brush(Theme.Surface, 0.60), IsHitTestVisible = false });
+                // Mostly the surface colour, with only a hint of what is behind: a card must look the same
+                // over a bright photo as over a dark desktop, and the photo under it may be gone a moment later.
+                inner.Children.Add(new Border { Background = Theme.Brush(Theme.Surface, 0.86), IsHitTestVisible = false });
                 captured = true;
             }
         }

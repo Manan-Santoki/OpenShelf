@@ -90,12 +90,7 @@ internal sealed class DarkMenu : Window
         int c = 0;
         if (anyGlyph)
         {
-            grid.Children.Add(new TextBlock
-            {
-                Text = entry.Glyph ?? "", FontFamily = Theme.IconFont, FontSize = 14,
-                Foreground = entry.Enabled ? Soft : Dim,
-                HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-            });
+            grid.Children.Add(new IconView(entry.Glyph, 16, entry.Enabled ? Soft : Dim));
             c = 1;
         }
         var text = new TextBlock

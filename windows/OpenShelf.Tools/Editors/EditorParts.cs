@@ -80,8 +80,8 @@ internal static class EditorParts
     public static (StackPanel Panel, Button Undo, Button Redo) UndoRedo(Action undo, Action redo)
     {
         var panel = new StackPanel { Orientation = Orientation.Horizontal };
-        var u = ToolKit.IconButton("", "Undo (Ctrl+Z)", (_, _) => undo(), 28);
-        var r = ToolKit.IconButton("", "Redo (Ctrl+Shift+Z)", (_, _) => redo(), 28);
+        var u = ToolKit.IconButton("undo-2", "Undo (Ctrl+Z)", (_, _) => undo(), 28);
+        var r = ToolKit.IconButton("redo-2", "Redo (Ctrl+Shift+Z)", (_, _) => redo(), 28);
         panel.Children.Add(u);
         panel.Children.Add(r);
         return (panel, u, r);

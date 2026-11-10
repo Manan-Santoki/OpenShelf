@@ -115,7 +115,7 @@ public class VisionToolsTests
         Assert.Equal("Remove BG", tools["tool.removebg"].Title);
         Assert.Equal("Read QR", tools["tool.readqr"].Title);
         Assert.Equal("OCR", tools["tool.ocr"].Title);
-        Assert.All(tools.Values, t => Assert.Single(t.Glyph));
+        Assert.All(tools.Values, t => Assert.NotNull(OpenShelf.Ui.Icons.Find(t.Glyph)));
         Assert.All(tools.Values, t => Assert.False(t.HasOptions));
     }
 

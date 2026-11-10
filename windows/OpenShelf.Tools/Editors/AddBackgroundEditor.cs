@@ -83,7 +83,7 @@ public sealed class AddBackgroundEditor : EditorWindow, IEditorDemo
             gradientRow.Children.Add(button);
         }
         _picture = new SwatchButton(ToolKit.Brush("Fill"), "Choose a background image…");
-        _picture.Face = ToolKit.Glyph("", 12, "Text2");
+        _picture.Face = ToolKit.Icon("image", 12, "Text2");
         _picture.Click += (_, _) => ChoosePicture();
         gradientRow.Children.Add(_picture);
 

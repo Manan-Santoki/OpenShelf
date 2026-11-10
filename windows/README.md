@@ -57,6 +57,14 @@ A copy run from a build folder is "not installed" as far as the updater is conce
 restart, and the automatic check. It has no UI; the app supplies prompts as delegates (`OpenShelf.App/UpdateWiring.cs`).
 `OpenShelf.App/Program.cs` is the entry point and runs Velopack's install and update hooks before WPF starts.
 
+## Icons
+
+Every icon in the app comes from [Lucide](https://lucide.dev) (ISC licence; some icons derived from Feather are MIT), pinned to
+`lucide-static` 1.71.0. The path data is embedded in `OpenShelf.Ui/Lucide.g.cs` and drawn by `IconView`, so there is no network or SVG
+parsing at run time. The licence text is `OpenShelf.Ui/LICENSE-lucide.txt` and must ship with the app. To add an icon, add its name to
+`scripts/gen-lucide.mjs` and run it against an unpacked `lucide-static` package (the header of that script has the commands). Wheel
+entries carry the icon name in `WheelEntry.Glyph` ("crop"); a value that is not a Lucide name is drawn in the old Segoe icon font.
+
 ## Make a release
 
 Local test pack (any version number):
@@ -78,7 +86,7 @@ This publishes self-contained builds and writes to `windows\.artifacts\release`:
 
 The version is stamped into the executable and the update packages. The package id is `OpenShelfApp` on purpose: Velopack owns
 `%LOCALAPPDATA%\<id>` and deletes it on uninstall, while OpenShelf keeps logs, models and tools in `%LOCALAPPDATA%\OpenShelf`.
-The app icon is `OpenShelf.App/Assets/OpenShelf.ico`, generated from `Support/AppIcon.png` by `scripts/make-icon.ps1`.
+The app icon is `OpenShelf.App/Assets/OpenShelf.ico`, generated from `Support/AppIcon.png` by `scripts/make_icon.py` (frames from 40 px up are the real artwork; the 16, 20, 24 and 32 px frames are a simplified redraw of the same mark so it stays legible in the taskbar and tray). The same file is embedded in `OpenShelf.Ui` and gives every window, and the tray, its icon.
 
 To publish a release:
 

@@ -31,15 +31,8 @@ internal static class Kit
         TextWrapping = wrap ? TextWrapping.Wrap : TextWrapping.NoWrap,
     };
 
-    public static TextBlock Glyph(string glyph, double size, string brush = "Text2") => new()
-    {
-        Text = glyph,
-        FontFamily = Theme.IconFont,
-        FontSize = size,
-        Foreground = Brush(brush),
-        HorizontalAlignment = HorizontalAlignment.Center,
-        VerticalAlignment = VerticalAlignment.Center,
-    };
+    /// <summary>A Lucide icon of <paramref name="size"/> pixels in one of the palette colours.</summary>
+    public static IconView Icon(string icon, double size, string brush = "Text2") => new(icon, size, Brush(brush));
 
     public static void Name(DependencyObject element, string name) => AutomationProperties.SetName(element, name);
 
@@ -103,9 +96,9 @@ internal static class Kit
         return button;
     }
 
-    public static Button IconButton(string glyph, string tip, RoutedEventHandler click)
+    public static Button IconButton(string icon, string tip, RoutedEventHandler click)
     {
-        var button = new Button { Content = glyph, Style = Style("IconBtn"), ToolTip = tip };
+        var button = new Button { Content = new IconView(icon, 16), Style = Style("IconBtn"), ToolTip = tip };
         button.Click += click;
         Name(button, tip);
         return button;

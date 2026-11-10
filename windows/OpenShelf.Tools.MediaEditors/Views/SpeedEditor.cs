@@ -25,6 +25,7 @@ internal sealed class SpeedEditor : MediaEditorWindow, IMediaEditorDemo
         _paths = paths;
         CanvasWell = false;
         SetCanvasPadding(0);
+        FitHeightToContent();
 
         var stack = new StackPanel();
         var title = paths.Count == 1 ? Path.GetFileName(paths[0]) : $"{paths.Count} files";

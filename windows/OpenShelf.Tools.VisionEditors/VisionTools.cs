@@ -16,9 +16,9 @@ namespace OpenShelf.Tools.VisionEditors;
 /// </summary>
 public static class VisionTools
 {
-    public const string RemoveBackgroundGlyph = "";
-    public const string ReadQrGlyph = "";
-    public const string OcrGlyph = "";
+    public const string RemoveBackgroundGlyph = "square-user-round";
+    public const string ReadQrGlyph = "scan-qr-code";
+    public const string OcrGlyph = "scan-text";
 
     public const int RemoveBackgroundOrder = 50;
     public const int ReadQrOrder = 100;

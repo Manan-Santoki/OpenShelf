@@ -27,7 +27,7 @@ public class CatalogTests
         Assert.Equal(["Compress", "Crop", "Resize", "Annotate", "Edit", "Metadata", "Redact", "Add BG"], Titles(content));
         Assert.Equal(["tool.compress", "tool.crop", "tool.resize", "tool.annotate", "tool.edit", "tool.metadata", "tool.redact", "tool.addbg"],
             content.Entries.Select(e => e.Id).ToList());
-        Assert.All(content.Entries, e => Assert.False(string.IsNullOrEmpty(e.Glyph)));
+        Assert.All(content.Entries, e => Assert.NotNull(OpenShelf.Ui.Icons.Find(e.Glyph)));
         Assert.Null(content.EmptyMessage);
     }
 
@@ -81,8 +81,8 @@ public class CatalogTests
     {
         var catalog = Make(out _, out _, out _);
         var ran = new List<string>();
-        catalog.Register(new ToolDefinition("tool.ocr", "OCR", "", p => ToolsCatalog.AllOfKind(p, FileKind.Image), 110, run => { ran.Add("ocr"); return Task.CompletedTask; }));
-        catalog.Register(new ToolDefinition("tool.removebg", "Remove BG", "", p => ToolsCatalog.AllOfKind(p, FileKind.Image), 50, _ => Task.CompletedTask));
+        catalog.Register(new ToolDefinition("tool.ocr", "OCR", "scan-text", p => ToolsCatalog.AllOfKind(p, FileKind.Image), 110, run => { ran.Add("ocr"); return Task.CompletedTask; }));
+        catalog.Register(new ToolDefinition("tool.removebg", "Remove BG", "square-user-round", p => ToolsCatalog.AllOfKind(p, FileKind.Image), 50, _ => Task.CompletedTask));
         using var temp = new TempFolder();
         var one = catalog.For([temp.Image("a.png", 20, 20)]);
         Assert.Equal(["Compress", "Crop", "Resize", "Annotate", "Remove BG", "Edit", "Metadata", "Redact", "Add BG", "OCR"], Titles(one));

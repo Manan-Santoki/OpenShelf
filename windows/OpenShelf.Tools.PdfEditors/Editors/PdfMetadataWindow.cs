@@ -33,7 +33,7 @@ public sealed class PdfMetadataWindow : PdfEditorWindow
         if (_model.Warning is { } warning)
         {
             var line = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 12) };
-            var glyph = ToolKit.Glyph("", 12, "Danger");
+            var glyph = ToolKit.Icon("lock", 12, "Danger");
             glyph.Margin = new Thickness(0, 0, 8, 0);
             line.Children.Add(glyph);
             line.Children.Add(ToolKit.Text(warning, 12, "Danger"));

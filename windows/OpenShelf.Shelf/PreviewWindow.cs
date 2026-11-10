@@ -48,6 +48,7 @@ internal sealed class PreviewWindow : Window
 
     public PreviewWindow(IReadOnlyList<string> paths, int index)
     {
+        AppIcons.Apply(this);
         _paths = paths;
         _index = Math.Clamp(index, 0, Math.Max(0, paths.Count - 1));
 

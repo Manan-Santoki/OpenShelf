@@ -27,6 +27,7 @@ public sealed class PdfCompressWindow : PdfEditorWindow
         _model = new CompressModel(files);
         CanvasWell = false;
         SetCanvasPadding(0);
+        FitHeightToContent();
 
         var stack = new StackPanel();
         stack.Children.Add(Parts.Header(_model.Title, _model.Subtitle, files.Count > 1 ? files.Count : null, out _picture));
@@ -41,7 +42,7 @@ public sealed class PdfCompressWindow : PdfEditorWindow
         stack.Children.Add(_levels);
 
         var info = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 12, 0, 0) };
-        var infoGlyph = ToolKit.Glyph("", 12, "Text3");
+        var infoGlyph = ToolKit.Icon("info", 12, "Text3");
         infoGlyph.VerticalAlignment = VerticalAlignment.Top;
         infoGlyph.Margin = new Thickness(0, 2, 8, 0);
         _summary.MaxWidth = ContentSize.Width - 32 - 24;
@@ -49,7 +50,7 @@ public sealed class PdfCompressWindow : PdfEditorWindow
         info.Children.Add(_summary);
         stack.Children.Add(info);
 
-        var (card, text, detail, _) = Parts.SummaryCard("");
+        var (card, text, detail, _) = Parts.SummaryCard("minimize-2");
         _estimateText = text;
         _savingText = detail;
         card.Margin = new Thickness(0, 14, 0, 0);

@@ -18,6 +18,7 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        OpenShelf.Ui.AppIcons.RegisterForAllWindows();   // the logo in every window's title bar, taskbar button and Alt+Tab entry
 
         // --help and bad arguments never need the running copy or a mutex.
         var parsed = CommandLine.Parse(e.Args, Environment.CurrentDirectory);

@@ -1,3 +1,4 @@
+using OpenShelf.Ui;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -108,7 +109,7 @@ internal sealed class MergeEditor : MediaEditorWindow, IMediaEditorDemo
         number.Name = "Number";
         number.HorizontalAlignment = HorizontalAlignment.Center;
         number.VerticalAlignment = VerticalAlignment.Center;
-        var icon = ToolKit.Glyph(_state.IsVideo ? Glyphs.Film : Glyphs.Waveform, 14, "Accent");
+        var icon = ToolKit.Icon(_state.IsVideo ? Glyphs.Film : Glyphs.Waveform, 14, "Accent");
         icon.Margin = new Thickness(0, 0, 10, 0);
         var name = ToolKit.Text(item.Name, 12, "Text");
         name.TextTrimming = TextTrimming.CharacterEllipsis;
@@ -225,7 +226,7 @@ internal sealed class MergeEditor : MediaEditorWindow, IMediaEditorDemo
             var grid = (Grid)row.Child;
             ((TextBlock)grid.Children[0]).Text = (i + 1).ToString();
             ((Button)grid.Children[4]).IsEnabled = _state.CanRemove;
-            ((TextBlock)grid.Children[1]).Text = _state.IsVideo ? Glyphs.Film : Glyphs.Waveform;
+            ((IconView)grid.Children[1]).Icon = _state.IsVideo ? Glyphs.Film : Glyphs.Waveform;
             ((TextBlock)grid.Children[3]).Text = _state.Items[i].Duration is { } d ? MediaTime.Format(d) : "";
         }
         _total.Text = "Total " + MediaTime.Format(_state.TotalDuration);

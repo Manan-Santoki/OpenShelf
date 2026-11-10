@@ -39,15 +39,15 @@ internal sealed class WheelBuilder(IShelfService shelves, IToastService toasts, 
     {
         var items = new List<WheelEntry>
         {
-            new("action.shelf", "Shelf", run => { shelves.NewShelf(run.Paths, run.Pointer); return Task.CompletedTask; }, ""),
+            new("action.shelf", "Shelf", run => { shelves.NewShelf(run.Paths, run.Pointer); return Task.CompletedTask; }, "import"),
         };
         if (shelves.HasOpenShelf)
             items.Add(new("action.addtoshelf", "Add to shelf", run =>
             {
                 if (!shelves.AddToRecentShelf(run.Paths)) toasts.Show("No shelf is open", run.Pointer);
                 return Task.CompletedTask;
-            }, ""));
-        items.Add(new("action.share", "Share", ShareAsync, ""));
+            }, "inbox"));
+        items.Add(new("action.share", "Share", ShareAsync, "share"));
         items.Add(new("action.copy", "Copy", run =>
         {
             var list = new StringCollection();
@@ -55,15 +55,15 @@ internal sealed class WheelBuilder(IShelfService shelves, IToastService toasts, 
             WithClipboard(() => Clipboard.SetFileDropList(list));
             toasts.Show(run.Paths.Count == 1 ? "Copied" : $"Copied {run.Paths.Count} files", run.Pointer);
             return Task.CompletedTask;
-        }, ""));
-        items.Add(new("action.move", "Move", MoveAsync, ""));
+        }, "copy"));
+        items.Add(new("action.move", "Move", MoveAsync, "folder"));
         items.Add(new("action.copypath", "Copy path", run =>
         {
             WithClipboard(() => Clipboard.SetText(string.Join(Environment.NewLine, run.Paths)));
             toasts.Show(run.Paths.Count == 1 ? "Copied path" : $"Copied {run.Paths.Count} paths", run.Pointer);
             return Task.CompletedTask;
-        }, ""));
-        items.Add(new("action.terminal", "Terminal", run => { OpenTerminal(run.Paths[0]); return Task.CompletedTask; }, ""));
+        }, "link"));
+        items.Add(new("action.terminal", "Terminal", run => { OpenTerminal(run.Paths[0]); return Task.CompletedTask; }, "terminal"));
         return items;
     }
 

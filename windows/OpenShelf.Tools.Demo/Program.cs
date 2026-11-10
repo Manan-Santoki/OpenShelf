@@ -58,7 +58,7 @@ public static class Program
                 foreach (var tool in catalog.Tools.OrderBy(t => t.Order))
                 {
                     var cell = new System.Windows.Controls.StackPanel { Width = 84, Margin = new Thickness(6) };
-                    cell.Children.Add(new System.Windows.Controls.TextBlock { Text = tool.Glyph, FontFamily = OpenShelf.Ui.Theme.IconFont, FontSize = 28, Foreground = System.Windows.Media.Brushes.White, HorizontalAlignment = HorizontalAlignment.Center });
+                    cell.Children.Add(new OpenShelf.Ui.IconView(tool.Glyph, 28, System.Windows.Media.Brushes.White));
                     cell.Children.Add(new System.Windows.Controls.TextBlock { Text = tool.Title.ToUpperInvariant(), FontSize = 11, Foreground = System.Windows.Media.Brushes.Gray, HorizontalAlignment = HorizontalAlignment.Center });
                     panel.Children.Add(cell);
                 }
@@ -160,6 +160,7 @@ public static class Program
 
     private static void Capture(Window window, string file)
     {
+        if (OpenShelf.Ui.OffscreenShot.TryCapture(window, file)) return;
         var handle = new System.Windows.Interop.WindowInteropHelper(window).Handle;
         SetForegroundWindow(handle);
         DwmGetWindowAttribute(handle, 9, out var r, Marshal.SizeOf<Rect>());   // DWMWA_EXTENDED_FRAME_BOUNDS

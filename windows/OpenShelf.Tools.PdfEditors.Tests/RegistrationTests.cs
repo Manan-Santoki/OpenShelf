@@ -32,7 +32,7 @@ public class RegistrationTests
         var (catalog, _, _, _) = NewCatalog();
         var one = catalog.For([dir.MakePdf("a.pdf", 2)]);
         Assert.Equal(["tool.pdf.pages=Pages", "tool.pdf.split=Split", "tool.pdf.compress=Compress", "tool.pdf.metadata=Metadata"], one.Entries.Select(e => $"{e.Id}={e.Title}"));
-        Assert.All(one.Entries, e => Assert.False(string.IsNullOrEmpty(e.Glyph)));
+        Assert.All(one.Entries, e => Assert.NotNull(OpenShelf.Ui.Icons.Find(e.Glyph)));
     }
 
     [Fact]

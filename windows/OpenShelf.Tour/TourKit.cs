@@ -58,15 +58,9 @@ internal static class TourKit
         return block;
     }
 
-    public static TextBlock Glyph(string glyph, double size, Brush? brush = null) => new()
-    {
-        Text = glyph,
-        FontFamily = Theme.IconFont,
-        FontSize = size,
-        Foreground = brush ?? Text2,
-        HorizontalAlignment = HorizontalAlignment.Center,
-        VerticalAlignment = VerticalAlignment.Center,
-    };
+    /// <summary>A Lucide icon. <paramref name="size"/> is the size the old font glyph had; outline icons need a little more room to read.</summary>
+    public static IconView Glyph(string icon, double size, Brush? brush = null) =>
+        new(icon, size switch { <= 10 => 12, <= 13 => 14, <= 14 => 16, _ => size }, brush ?? Text2);
 
     public static void Name(DependencyObject element, string name) => AutomationProperties.SetName(element, name);
 

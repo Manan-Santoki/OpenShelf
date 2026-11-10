@@ -16,25 +16,25 @@ internal interface IMediaEditorDemo
 /// <summary>Glyphs the media tools use (Segoe Fluent Icons / MDL2 code points).</summary>
 internal static class Glyphs
 {
-    public const string Trim = "";
-    public const string Speed = "";
-    public const string Crop = "";
-    public const string Rotate = "";
-    public const string Split = "";
-    public const string Merge = "";
-    public const string Compress = "";
-    public const string Mute = "";
-    public const string Film = "";
-    public const string Waveform = "";
-    public const string Play = "";
-    public const string Pause = "";
-    public const string Warning = "";
-    public const string RotateLeft = "";
-    public const string RotateRight = "";
-    public const string Upside = "";
-    public const string Flip = "";
-    public const string Remove = "";
-    public const string Grip = "";
+    public const string Trim = "brackets";
+    public const string Speed = "gauge";
+    public const string Crop = "crop";
+    public const string Rotate = "rotate-cw";
+    public const string Split = "scissors";
+    public const string Merge = "merge";
+    public const string Compress = "minimize-2";
+    public const string Mute = "volume-x";
+    public const string Film = "film";
+    public const string Waveform = "audio-lines";
+    public const string Play = "play";
+    public const string Pause = "pause";
+    public const string Warning = "triangle-exclamation-point";
+    public const string RotateLeft = "rotate-ccw";
+    public const string RotateRight = "rotate-cw";
+    public const string Upside = "refresh-cw";
+    public const string Flip = "triangles-centerline-dashed-vertical";
+    public const string Remove = "minus";
+    public const string Grip = "grip-vertical";
 }
 
 /// <summary>Pictures and small controls the media editors share.</summary>
@@ -58,7 +58,7 @@ internal static class MediaParts
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        var icon = ToolKit.Glyph(glyph, 20, "Accent");
+        var icon = ToolKit.Icon(glyph, 20, "Accent");
         var tile = new Border
         {
             Width = 40,
@@ -81,7 +81,7 @@ internal static class MediaParts
     public static UIElement Notice(string message, string glyph = Glyphs.Warning)
     {
         var panel = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(24) };
-        var icon = ToolKit.Glyph(glyph, 22, "Text3");
+        var icon = ToolKit.Icon(glyph, 22, "Text3");
         icon.Margin = new Thickness(0, 0, 0, 8);
         panel.Children.Add(icon);
         var text = ToolKit.Text(message, 12, "Text2", wrap: true);

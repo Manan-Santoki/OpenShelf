@@ -74,6 +74,7 @@ internal sealed class TourWindow : Window
         TextOptions.SetTextFormattingMode(this, TextFormattingMode.Ideal);
 
         Content = BuildFrame();
+        AppIcons.Apply(this);
         SourceInitialized += (_, _) => DarkTitleBar();
         Loaded += (_, _) => { _built = true; };
         PreviewKeyDown += OnKey;
@@ -208,7 +209,7 @@ internal sealed class TourWindow : Window
         if (done)
         {
             disc.Children.Add(new Ellipse { Fill = TourKit.Success });
-            disc.Children.Add(TourKit.Glyph("", 10, B(0x12, 0x2A, 0x1E)));
+            disc.Children.Add(TourKit.Glyph("check", 10, B(0x12, 0x2A, 0x1E)));
         }
         else
         {
@@ -437,17 +438,17 @@ internal sealed class TourWindow : Window
         var ready = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 0) };
         if (_session.IsReady)
         {
-            ready.Children.Add(TourKit.Glyph("", 13, TourKit.Success));
+            ready.Children.Add(TourKit.Glyph("check", 13, TourKit.Success));
             ready.Children.Add(Padded(TourKit.Text_("Practice files are ready. Nothing of yours is touched, and it takes about three minutes.", 12, TourKit.Text2)));
         }
         else if (_session.Failure is { } failure)
         {
-            ready.Children.Add(TourKit.Glyph("", 13, TourKit.Danger));
+            ready.Children.Add(TourKit.Glyph("triangle-exclamation-point", 13, TourKit.Danger));
             ready.Children.Add(Padded(TourKit.Text_(failure, 12, TourKit.Text2)));
         }
         else
         {
-            ready.Children.Add(TourKit.Glyph("", 13, TourKit.Text3));
+            ready.Children.Add(TourKit.Glyph("refresh-cw", 13, TourKit.Text3));
             ready.Children.Add(Padded(TourKit.Text_("Making practice files…", 12, TourKit.Text2)));
         }
         body.Children.Add(ready);
@@ -460,7 +461,7 @@ internal sealed class TourWindow : Window
     {
         var body = new StackPanel();
         var top = new StackPanel { Orientation = Orientation.Horizontal };
-        var seal = TourKit.Glyph("", 40, TourKit.Success);   // completed
+        var seal = TourKit.Glyph("circle-check", 40, TourKit.Success);   // completed
         top.Children.Add(seal);
         var summary = TourKit.Text_(TourInstructions.FinishSummary(_progress.PracticeDoneCount, TourSteps.Practice.Count), 13, wrap: true);
         summary.Width = 440;
@@ -475,7 +476,7 @@ internal sealed class TourWindow : Window
         {
             var done = _progress.Completed.Contains(step);
             var item = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 4), Cursor = Cursors.Hand, Background = Brushes.Transparent };
-            item.Children.Add(TourKit.Glyph(done ? "" : "", 14, done ? TourKit.Success : TourKit.Text3));
+            item.Children.Add(TourKit.Glyph(done ? "check" : "circle-dashed", 14, done ? TourKit.Success : TourKit.Text3));
             var label = TourKit.Text_(step.Title(), 13, done ? TourKit.Text : TourKit.Text2);
             label.Margin = new Thickness(8, 0, 0, 0);
             item.Children.Add(label);
@@ -571,7 +572,7 @@ internal sealed class TourWindow : Window
                 var line = new Grid();
                 line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 line.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                line.Children.Add(TourKit.Glyph("", 14, B(0xF5, 0xC8, 0x42)));
+                line.Children.Add(TourKit.Glyph("lightbulb", 14, B(0xF5, 0xC8, 0x42)));
                 var text = TourKit.Rich(tip, 12, TourKit.Text2);
                 text.Margin = new Thickness(8, 0, 0, 0);
                 Grid.SetColumn(text, 1);
@@ -649,12 +650,12 @@ internal sealed class TourWindow : Window
             _bannerIcon.Children.Clear();
             if (done)
             {
-                _bannerIcon.Children.Add(TourKit.Glyph("", 20, TourKit.Success));
+                _bannerIcon.Children.Add(TourKit.Glyph("circle-check", 20, TourKit.Success));
                 _banner.Background = TourKit.SuccessSoft;
             }
             else if (underWay)
             {
-                _bannerIcon.Children.Add(TourKit.Glyph("", 20, TourKit.Accent));   // down arrow
+                _bannerIcon.Children.Add(TourKit.Glyph("circle-arrow-down", 20, TourKit.Accent));   // down arrow
                 _banner.Background = TourKit.AccentSoft;
             }
             else
@@ -808,7 +809,7 @@ internal sealed class TourWindow : Window
                 BorderThickness = new Thickness(1.5),
             };
             var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-            var glyph = TourKit.Glyph(file switch { PracticeFile.Clip => "", PracticeFile.Report => "", _ => "" }, 26, Theme.Brush(color));
+            var glyph = TourKit.Glyph(file switch { PracticeFile.Clip => "film", PracticeFile.Report => "file-text", _ => "file-text" }, 26, Theme.Brush(color));
             stack.Children.Add(glyph);
             var tag = TourKit.Text_(label, 12, Theme.Brush(color), FontWeights.Bold);
             tag.HorizontalAlignment = HorizontalAlignment.Center;
@@ -855,11 +856,11 @@ internal sealed class TourWindow : Window
 
     private static string GlyphFor(string path) => FileKinds.Of(path) switch
     {
-        FileKind.Image => "",
-        FileKind.Video => "",
-        FileKind.Audio => "",
-        FileKind.Pdf => "",
-        _ => "",
+        FileKind.Image => "image",
+        FileKind.Video => "film",
+        FileKind.Audio => "audio-lines",
+        FileKind.Pdf => "file-text",
+        _ => "file-text",
     };
 
     /// <summary>A spinner for "making practice files".</summary>

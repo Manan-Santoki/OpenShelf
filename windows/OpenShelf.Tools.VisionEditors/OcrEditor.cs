@@ -27,8 +27,8 @@ public sealed class OcrEditor : EditorWindow, IEditorDemo
     private readonly TextBlock _detail = ToolKit.Text("", 11, "Text3");
     private readonly TextBlock _notice = ToolKit.Text("", 12, "Text", wrap: true);
     private readonly Border _noticeCard;
-    private readonly Grid _status = new() { Height = 150, Margin = new Thickness(0, 12, 0, 0) };
-    private readonly StackPanel _progressPanel = new() { VerticalAlignment = VerticalAlignment.Top, Visibility = Visibility.Hidden };
+    private readonly Grid _status = new() { Margin = new Thickness(0, 12, 0, 0) };
+    private readonly StackPanel _progressPanel = new() { VerticalAlignment = VerticalAlignment.Top, Visibility = Visibility.Collapsed };
     private Button _settingsButton = null!;
     private OcrOutput _output = OcrOutput.SearchablePdf;
     private bool _noLanguage;
@@ -43,6 +43,7 @@ public sealed class OcrEditor : EditorWindow, IEditorDemo
 
         CanvasWell = false;
         SetCanvasPadding(0);
+        FitHeightToContent();
         var stack = new StackPanel();
         var name = ToolKit.Text(OcrRunner.Title(paths), 13, "Text", FontWeights.SemiBold);
         name.TextTrimming = TextTrimming.CharacterEllipsis;
@@ -77,7 +78,7 @@ public sealed class OcrEditor : EditorWindow, IEditorDemo
         var noticeRow = new Grid();
         noticeRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         noticeRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        var warning = ToolKit.Glyph("", 16, "Danger");
+        var warning = ToolKit.Icon("triangle-exclamation-point", 16, "Danger");
         warning.VerticalAlignment = VerticalAlignment.Top;
         warning.Margin = new Thickness(0, 1, 10, 0);
         Grid.SetColumn(noticeBody, 1);
@@ -113,7 +114,7 @@ public sealed class OcrEditor : EditorWindow, IEditorDemo
         _notice.Text = message;
         _noticeCard.Visibility = Visibility.Visible;
         _settingsButton.Visibility = offerSettings ? Visibility.Visible : Visibility.Collapsed;
-        _progressPanel.Visibility = Visibility.Hidden;
+        _progressPanel.Visibility = Visibility.Collapsed;
     }
 
     private void ShowProgress(OcrProgress progress)

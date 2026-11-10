@@ -74,7 +74,7 @@ public sealed class MetadataEditor : EditorWindow, IEditorDemo
         subtitle.Children.Add(ToolKit.Text($"{image.Width} × {image.Height}", 11, "Text3"));
         if (hasLocation)
         {
-            var chip = Chip("Has location", "", "Orange");
+            var chip = Chip("Has location", "map-pin", "Orange");
             chip.Margin = new Thickness(8, 0, 0, 0);
             subtitle.Children.Add(chip);
         }
@@ -167,10 +167,10 @@ public sealed class MetadataEditor : EditorWindow, IEditorDemo
             name.VerticalAlignment = VerticalAlignment.Center;
             Grid.SetColumn(name, 1);
             var chips = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-            if (MetadataReader.HasCameraInfo(_details[i])) chips.Children.Add(Chip("Camera", "", "Text3"));
+            if (MetadataReader.HasCameraInfo(_details[i])) chips.Children.Add(Chip("Camera", "camera", "Text3"));
             if (MetadataReader.HasLocation(_details[i]))
             {
-                var chip = Chip("Has location", "", "Orange");
+                var chip = Chip("Has location", "map-pin", "Orange");
                 chip.Margin = new Thickness(6, 0, 0, 0);
                 chips.Children.Add(chip);
             }
@@ -195,7 +195,7 @@ public sealed class MetadataEditor : EditorWindow, IEditorDemo
     {
         var tint = brush == "Orange" ? Color.FromRgb(0xFF, 0xA0, 0x30) : Color.FromArgb(0xB0, 0xFF, 0xFF, 0xFF);
         var content = new StackPanel { Orientation = Orientation.Horizontal };
-        var icon = ToolKit.Glyph(glyph, 9, "Text");
+        var icon = ToolKit.Icon(glyph, 12, "Text");
         icon.Foreground = new SolidColorBrush(tint);
         icon.Margin = new Thickness(0, 0, 4, 0);
         var label = ToolKit.Text(text, 10, "Text", FontWeights.SemiBold);

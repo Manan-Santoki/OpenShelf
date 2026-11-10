@@ -31,18 +31,22 @@ for behaviour, constants and copy. C# on .NET 10, WPF, Windows 10 22H2+ and 11.
 ### Known issues
 
 - HEIC can be read but not written (the bundled ImageMagick has no HEIC encoder), so the HEIC wedge is hidden.
-- A trigger tap during a non-file drag leaves the invisible probe window under the pointer until mouse-up.
-- Shelf tiles start a drag from their empty padding, so a rubber band cannot start there.
 - Settings accepts "Convert = Alt" while "Tools = Shift+Alt" with no warning.
-- The winget fallback in the tool installer starts by itself when every download source is down; it should ask first.
-- `ShelfWindow.EnsureFocus` still writes a diagnostic "Shelf focus" log line.
 - The drag harness's own window occasionally misses the first mouse press after a pause; rerun once.
+
+- Probe retry, grid-tile hit-testing, winget opt-in and the install phase text are fixed in code and unit/demo-tested; they still need a real-mouse check.
 
 ### Test tooling
 
 - `OpenShelf.DragHarness.exe` drags a PNG from its own window onto a wheel (`--keys`, `--wedges`, `--wedge`, `--press`, `--shake`, `--expect`).
 - `OpenShelf.DragHarness.exe qa "<script>"` scripts real mouse and keyboard input (move, click, drag, keys, shot, windows, guard).
 - `OpenShelf.Shelf.Demo`, `OpenShelf.Settings.Demo` and `OpenShelf.Wheel.Demo` put UI into fixed states for screenshots without the mouse.
+
+## Icons
+
+One set everywhere: Lucide, embedded as geometries in `OpenShelf.Ui` (`Icons`, `IconView`; licence in `LICENSE-lucide.txt`; regenerate with
+`scripts/gen-lucide.mjs`). `WheelEntry.Glyph` carries the Lucide name. Window, taskbar and tray icons come from `OpenShelf.ico` through
+`AppIcons`. Never add a Segoe glyph.
 
 ## Projects
 

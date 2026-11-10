@@ -105,13 +105,34 @@
         </Setter>
     </Style>
 
+    <!-- A colour or picture swatch: no chrome of its own, so nothing clips the face or its selection ring. The focus ring follows Tag (a CornerRadius). -->
+    <Style x:Key="SwatchBtn" TargetType="Button">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid Background="Transparent" SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Border x:Name="Focus" IsHitTestVisible="False" BorderThickness="0" BorderBrush="#CCFFFFFF"
+                                CornerRadius="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Focus" Property="BorderThickness" Value="1.5"/></Trigger>
+                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Focus" Property="BorderThickness" Value="1"/></Trigger>
+                        <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.4"/></Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="IconBtn" TargetType="Button" BasedOn="{StaticResource GhostBtn}">
         <Setter Property="Width" Value="28"/>
         <Setter Property="Height" Value="28"/>
         <Setter Property="MinHeight" Value="28"/>
         <Setter Property="Padding" Value="0"/>
-        <Setter Property="FontFamily" Value="{x:Static ui:Theme.IconFont}"/>
-        <Setter Property="FontSize" Value="12"/>
     </Style>
 
     <!-- Toggle switch -->
@@ -245,8 +266,7 @@
                             <ToggleButton.Template>
                                 <ControlTemplate TargetType="ToggleButton">
                                     <Border x:Name="Bd" CornerRadius="6" Background="{StaticResource Fill}" BorderBrush="{StaticResource Hairline}" BorderThickness="1">
-                                        <TextBlock Text="&#xE70D;" FontFamily="{x:Static ui:Theme.IconFont}" FontSize="9"
-                                                   HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{StaticResource Text2}"/>
+                                        <ui:IconView Icon="chevron-down" Size="12" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{StaticResource Text2}"/>
                                     </Border>
                                     <ControlTemplate.Triggers>
                                         <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Background" Value="{StaticResource FillHover}"/></Trigger>
@@ -385,19 +405,19 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RepeatButton">
-                    <Grid Background="Transparent" Height="22"><Border Height="4" CornerRadius="2,0,0,2" Background="{StaticResource Accent}" VerticalAlignment="Center"/></Grid>
+                    <Grid Background="Transparent" Height="28"><Border Height="4" CornerRadius="2,0,0,2" Background="{StaticResource Accent}" VerticalAlignment="Center"/></Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
     </Style>
     <Style x:Key="SliderRest" TargetType="RepeatButton">
         <Setter Property="Focusable" Value="False"/>
-        <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RepeatButton"><Border Background="Transparent" Height="22"/></ControlTemplate></Setter.Value></Setter>
+        <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RepeatButton"><Border Background="Transparent" Height="28"/></ControlTemplate></Setter.Value></Setter>
     </Style>
 
     <Style TargetType="Slider">
         <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-        <Setter Property="Height" Value="22"/>
+        <Setter Property="Height" Value="28"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Slider">
@@ -418,7 +438,7 @@
                                 </Thumb>
                             </Track.Thumb>
                         </Track>
-                        <Border x:Name="Ring" IsHitTestVisible="False" Height="24" CornerRadius="12" Margin="-4,0" BorderThickness="0" BorderBrush="{StaticResource Accent}"/>
+                        <Border x:Name="Ring" IsHitTestVisible="False" Height="26" CornerRadius="13" Margin="-4,0" BorderThickness="0" BorderBrush="{StaticResource Accent}"/>
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Ring" Property="BorderThickness" Value="2"/></Trigger>

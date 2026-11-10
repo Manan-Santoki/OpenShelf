@@ -78,7 +78,7 @@ public sealed class ResizeEditor : EditorWindow, IEditorDemo
         exact.Children.Add(_width);
         exact.Children.Add(Unit("H", 10));
         exact.Children.Add(_height);
-        _lock = ToolKit.IconButton("", "Proportions are kept — height follows width", (_, _) => ToggleLock(), 28);
+        _lock = ToolKit.IconButton("lock", "Proportions are kept — height follows width", (_, _) => ToggleLock(), 28);
         _lock.Margin = new Thickness(8, 0, 0, 0);
         exact.Children.Add(_lock);
         _width.ValueCommitted += v => { _rule = _rule with { Width = Math.Max(1, v) }; Sync(); };
@@ -149,7 +149,7 @@ public sealed class ResizeEditor : EditorWindow, IEditorDemo
         _width.Value = _rule.Width;
         _height.Value = _keepsProportions ? (int)EffectiveRule.TargetSize(first).Height : _rule.Height;
         _height.IsEnabled = !_keepsProportions;
-        _lock.Content = _keepsProportions ? "" : "";
+        ToolKit.SetIcon(_lock, _keepsProportions ? "lock" : "lock-open");
         _lock.ToolTip = _keepsProportions ? "Proportions are kept — height follows width" : "Set width and height freely";
         _enlarge.SetSilently(_rule.AllowsEnlarging);
 

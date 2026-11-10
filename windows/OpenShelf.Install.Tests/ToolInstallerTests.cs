@@ -44,6 +44,7 @@ internal sealed class Env : IDisposable
     public Func<ToolInvocation, CancellationToken, Task> OnRun { get; set; } = (_, _) => Task.CompletedTask;
     public FakeSignatures Signatures { get; set; } = new(new SignatureResult(SignatureState.Valid, "The Document Foundation"));
     public string? Winget { get; set; }
+    public Func<string, Task<bool>>? ConfirmWinget { get; set; } = _ => Task.FromResult(true);
     public static readonly DateTimeOffset Now = new(2026, 11, 9, 12, 0, 0, TimeSpan.Zero);
 
     public Env() { Directory.CreateDirectory(External); }
@@ -59,6 +60,7 @@ internal sealed class Env : IDisposable
                 Locations = locations,
                 Signatures = Signatures,
                 FindWinget = () => Winget,
+                ConfirmWinget = ConfirmWinget,
                 MsiExecPath = @"C:\Windows\System32\msiexec.exe",
                 StallTimeout = TimeSpan.FromSeconds(5),
             });
@@ -391,6 +393,77 @@ public class ToolInstallerTests
         var row = installer.Tools[0];
         Assert.True(row.Installed);
         Assert.False(row.CanRemove);
+    }
+
+    [Fact]
+    public async Task ThePhaseFollowsDownloadVerifyUnpackAndClearsAtTheEnd()
+    {
+        using var env = new Env();
+        env.ServeGyan();
+        using var installer = env.Create();
+        var seen = new List<OpenShelf.Settings.InstallPhase>();
+        installer.Changed += () => { if (installer.PhaseOf("ffmpeg") is { } p && (seen.Count == 0 || seen[^1] != p)) seen.Add(p); };
+        await installer.InstallAsync("ffmpeg", new Reports(), CancellationToken.None);
+        Assert.Equal([OpenShelf.Settings.InstallPhase.Downloading, OpenShelf.Settings.InstallPhase.Verifying, OpenShelf.Settings.InstallPhase.Unpacking, OpenShelf.Settings.InstallPhase.Finishing], seen);
+        Assert.Null(installer.PhaseOf("ffmpeg"));
+    }
+
+    [Fact]
+    public async Task WingetDoesNotStartWithoutAnAnswerOfYes()
+    {
+        using var env = new Env();
+        env.Winget = @"C:ake\winget.exe";
+        env.ConfirmWinget = null;   // the default: nobody was asked
+        using var installer = env.Create();
+        var e = await Assert.ThrowsAsync<ToolInstallException>(() => installer.InstallAsync("ffmpeg", new Reports(), CancellationToken.None));
+        Assert.Equal(InstallFailureKind.SourcesUnavailable, e.Kind);
+        Assert.Empty(env.Invocations);
+        Assert.True(installer.OffersWinget("ffmpeg"));
+    }
+
+    [Fact]
+    public async Task SayingNoWhenAskedLeavesWingetUnrun()
+    {
+        using var env = new Env();
+        env.Winget = @"C:ake\winget.exe";
+        var asked = new List<string>();
+        env.ConfirmWinget = name => { asked.Add(name); return Task.FromResult(false); };
+        using var installer = env.Create();
+        await Assert.ThrowsAsync<ToolInstallException>(() => installer.InstallAsync("pandoc", new Reports(), CancellationToken.None));
+        Assert.Equal(["Pandoc"], asked);
+        Assert.Empty(env.Invocations);
+    }
+
+    [Fact]
+    public async Task NoWingetMeansNoOffer()
+    {
+        using var env = new Env();
+        env.ConfirmWinget = null;
+        using var installer = env.Create();
+        await Assert.ThrowsAsync<ToolInstallException>(() => installer.InstallAsync("pandoc", new Reports(), CancellationToken.None));
+        Assert.False(installer.OffersWinget("pandoc"));
+    }
+
+    [Fact]
+    public async Task TryWingetRunsItAfterTheSourcesFailed()
+    {
+        using var env = new Env();
+        env.Winget = @"C:ake\winget.exe";
+        env.ConfirmWinget = null;
+        env.OnRun = (invocation, _) =>
+        {
+            if (invocation.Executable == env.Winget) File.WriteAllText(Path.Combine(env.External, "ffmpeg.exe"), "x");
+            return Task.CompletedTask;
+        };
+        using var installer = env.Create();
+        await Assert.ThrowsAsync<ToolInstallException>(() => installer.InstallAsync("ffmpeg", new Reports(), CancellationToken.None));
+        Assert.Empty(env.Invocations);
+
+        await installer.InstallWithWingetAsync("ffmpeg", new Reports(), CancellationToken.None);
+        var winget = Assert.Single(env.Invocations);
+        Assert.Equal("Gyan.FFmpeg", winget.Arguments[2]);
+        Assert.True(installer.Tools[0].Installed);
+        Assert.False(installer.OffersWinget("ffmpeg"));
     }
 
     [Fact]

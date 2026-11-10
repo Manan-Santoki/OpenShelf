@@ -399,3 +399,69 @@ public class ShakeDetectorTests
         Assert.True(Run(new ShakeDetector(), (500, 0), (505, 10), (560, 90), (500, 170), (560, 250), (500, 330)));
     }
 }
+
+public class ProbeRetryPolicyTests
+{
+    private static TimeSpan Ms(int ms) => TimeSpan.FromMilliseconds(ms);
+
+    private static ProbeRetryPolicy Started()
+    {
+        var policy = new ProbeRetryPolicy();
+        policy.Begin(Ms(0));
+        return policy;
+    }
+
+    [Fact]
+    public void WaitsBeforeTheFirstRetry()
+    {
+        var policy = Started();
+        Assert.Equal(ProbeStep.Wait, policy.Next(Ms(100), buttonDown: true, triggerHeld: true));
+        Assert.Equal(ProbeStep.Wait, policy.Next(Ms(399), buttonDown: true, triggerHeld: true));
+    }
+
+    [Fact]
+    public void RetriesForTheRestOfTheDragWhileKeysAndButtonAreHeld()
+    {
+        var policy = Started();
+        for (var i = 1; i <= 10; i++)
+            Assert.Equal(ProbeStep.Retry, policy.Next(Ms(i * 400), buttonDown: true, triggerHeld: true));
+        Assert.Equal(10, policy.Retries);
+    }
+
+    [Fact]
+    public void EachRetryRestartsTheWait()
+    {
+        var policy = Started();
+        Assert.Equal(ProbeStep.Retry, policy.Next(Ms(400), true, true));
+        Assert.Equal(ProbeStep.Wait, policy.Next(Ms(500), true, true));
+        Assert.Equal(ProbeStep.Retry, policy.Next(Ms(800), true, true));
+    }
+
+    [Fact]
+    public void ReleasedButtonGivesUpAtOnce()
+    {
+        var policy = Started();
+        Assert.Equal(ProbeStep.GiveUp, policy.Next(Ms(10), buttonDown: false, triggerHeld: true));
+        Assert.Equal(ProbeStep.GiveUp, policy.Next(Ms(10), buttonDown: false, triggerHeld: false));
+    }
+
+    [Fact]
+    public void ReleasedKeysGiveUpTwoSecondsAfterTheLastShowing()
+    {
+        var policy = Started();
+        Assert.Equal(ProbeStep.Retry, policy.Next(Ms(400), true, true));      // shown again at 400
+        Assert.Equal(ProbeStep.Wait, policy.Next(Ms(1000), true, false));     // keys let go: no more retries
+        Assert.Equal(ProbeStep.Wait, policy.Next(Ms(2399), true, false));
+        Assert.Equal(ProbeStep.GiveUp, policy.Next(Ms(2400), true, false));
+    }
+
+    [Fact]
+    public void ATapOrShakeNeverRetries()
+    {
+        var policy = Started();
+        for (var t = 100; t < 2000; t += 100)
+            Assert.Equal(ProbeStep.Wait, policy.Next(Ms(t), true, false));
+        Assert.Equal(ProbeStep.GiveUp, policy.Next(Ms(2000), true, false));
+        Assert.Equal(0, policy.Retries);
+    }
+}

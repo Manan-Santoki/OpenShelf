@@ -1,3 +1,4 @@
+using OpenShelf.Ui;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -22,7 +23,7 @@ public sealed class PdfSplitWindow : PdfEditorWindow
     private readonly StackPanel _chunkRow = new() { Orientation = Orientation.Horizontal };
     private readonly Grid _rangesRow;
     private readonly TextBox _ranges = new() { Style = ToolKit.Style("Field") };
-    private readonly TextBlock _summaryGlyph;
+    private readonly IconView _summaryGlyph;
     private readonly TextBlock _summaryText;
     private readonly TextBlock _total = ToolKit.Text("", 12, "Text2");
     private readonly StackPanel _parts = new();
@@ -68,8 +69,8 @@ public sealed class PdfSplitWindow : PdfEditorWindow
         top.Children.Add(_modes);
 
         // "pages each" stepper
-        _less = ToolKit.IconButton("", "Fewer pages", (_, _) => StepChunk(-1), 26);
-        _more = ToolKit.IconButton("", "More pages", (_, _) => StepChunk(1), 26);
+        _less = ToolKit.IconButton("minus", "Fewer pages", (_, _) => StepChunk(-1), 26);
+        _more = ToolKit.IconButton("plus", "More pages", (_, _) => StepChunk(1), 26);
         _chunk.ValueCommitted += value => SetChunk(value);
         ToolKit.Name(_chunk, "Pages each");
         var stepper = new StackPanel { Orientation = Orientation.Horizontal };
@@ -94,7 +95,7 @@ public sealed class PdfSplitWindow : PdfEditorWindow
         modeArea.Children.Add(_rangesRow);
         top.Children.Add(modeArea);
 
-        var (card, text, _, glyph) = Parts.SummaryCard("");
+        var (card, text, _, glyph) = Parts.SummaryCard("files");
         _summaryText = text;
         _summaryGlyph = glyph;
         var cardRow = (StackPanel)card.Child;
@@ -177,12 +178,12 @@ public sealed class PdfSplitWindow : PdfEditorWindow
         var summary = _model.Summary();
         _summaryText.Text = summary.Text;
         Parts.Tint(_summaryText, summary.Tone);
-        _summaryGlyph.Text = summary.Tone switch
+        _summaryGlyph.Icon = summary.Tone switch
         {
-            Tone.Warning => "",
-            Tone.Muted => "",
-            Tone.Info => "",
-            _ => "",
+            Tone.Warning => "triangle-exclamation-point",
+            Tone.Muted => "check",
+            Tone.Info => "info",
+            _ => "files",
         };
         _summaryGlyph.Foreground = summary.Tone == Tone.Warning ? ToolKit.Brush("Danger") : ToolKit.Brush("Accent");
         _total.Text = _model.TotalText ?? "";

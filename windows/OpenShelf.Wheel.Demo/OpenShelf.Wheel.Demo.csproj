@@ -16,6 +16,10 @@
     <ProjectReference Include="..\OpenShelf.Core\OpenShelf.Core.csproj" />
     <ProjectReference Include="..\OpenShelf.Ui\OpenShelf.Ui.csproj" />
     <ProjectReference Include="..\OpenShelf.Wheel\OpenShelf.Wheel.csproj" />
+    <ProjectReference Include="..\OpenShelf.Tools\OpenShelf.Tools.csproj" />
+    <ProjectReference Include="..\OpenShelf.Tools.PdfEditors\OpenShelf.Tools.PdfEditors.csproj" />
+    <ProjectReference Include="..\OpenShelf.Tools.MediaEditors\OpenShelf.Tools.MediaEditors.csproj" />
+    <ProjectReference Include="..\OpenShelf.Tools.VisionEditors\OpenShelf.Tools.VisionEditors.csproj" />
   </ItemGroup>
 
 </Project>

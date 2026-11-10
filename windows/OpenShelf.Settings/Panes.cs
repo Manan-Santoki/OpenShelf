@@ -424,13 +424,13 @@ internal sealed class ShelvesPane : Pane
         if (string.IsNullOrEmpty(name)) name = folder.Path;
         var missing = !Directory.Exists(folder.Path);
 
-        var icon = Kit.Glyph("", 16);
+        var icon = Kit.Icon("folder", 18);
         var action = new Dropdown<string?>(ActionOptions(folder.Action), id => Replace(folder, folder with { Action = id }), "New files in " + name, 170)
         { Selected = folder.Action, IsEnabled = folder.Enabled };
         var toggle = Kit.Switch("Watch " + name);
         toggle.IsChecked = folder.Enabled;
         toggle.Click += (_, _) => Replace(folder, folder with { Enabled = toggle.IsChecked == true });
-        var remove = Kit.IconButton("", "Stop watching " + name, (_, _) => Save(_folders.Where(f => f != folder)));
+        var remove = Kit.IconButton("x", "Stop watching " + name, (_, _) => Save(_folders.Where(f => f != folder)));
         remove.ToolTip = "Stop watching";
 
         var trailing = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
@@ -591,7 +591,10 @@ internal sealed class ToolsPane : Pane
 
         if (job is { Busy: true, Removing: false })
         {
-            var bar = new ProgressBar { Width = 120, Minimum = 0, Maximum = 100, Value = job.Progress * 100, VerticalAlignment = VerticalAlignment.Center };
+            // Verifying and unpacking report no progress of their own: the bar slides instead of sitting still at 85%.
+            var phase = _installer.PhaseOf(tool.Id) ?? InstallPhase.Downloading;
+            var waiting = phase is InstallPhase.Verifying or InstallPhase.Unpacking or InstallPhase.Finishing or InstallPhase.Winget;
+            var bar = new ProgressBar { Width = 120, Minimum = 0, Maximum = 100, Value = job.Progress * 100, IsIndeterminate = waiting, VerticalAlignment = VerticalAlignment.Center };
             var pct = Kit.Text($"{Math.Round(job.Progress * 100)}%", 12, "Text2");
             pct.Width = 40;
             pct.TextAlignment = TextAlignment.Right;
@@ -601,9 +604,16 @@ internal sealed class ToolsPane : Pane
             var cancel = Kit.Button("Cancel", (_, _) => job.Cts.Cancel(), "GhostBtn", $"Cancel installing {tool.Name}");
             cancel.Margin = new Thickness(6, 0, 0, 0);
             trailing.Children.Add(bar);
-            trailing.Children.Add(pct);
+            if (!waiting) trailing.Children.Add(pct);
             trailing.Children.Add(cancel);
-            note = "Downloading…";
+            note = phase switch
+            {
+                InstallPhase.Verifying => "Verifying…",
+                InstallPhase.Unpacking => "Unpacking…",
+                InstallPhase.Finishing => "Installing…",
+                InstallPhase.Winget => "Installing with winget…",
+                _ => "Downloading…",
+            };
         }
         else if (job is { Busy: true })
         {
@@ -621,6 +631,12 @@ internal sealed class ToolsPane : Pane
             else
             {
                 note = "Not installed";
+                if (job?.Error is not null && _installer.OffersWinget(tool.Id))
+                {
+                    var winget = Kit.Button("Try winget", (_, _) => Install(tool, viaWinget: true), "Btn", $"Install {tool.Name} with winget");
+                    winget.Margin = new Thickness(0, 0, 6, 0);
+                    trailing.Children.Add(winget);
+                }
                 trailing.Children.Add(Kit.Button(job?.Error is null ? "Install" : "Try Again", (_, _) => Install(tool), "AccentBtn", $"Install {tool.Name}"));
             }
         }
@@ -636,7 +652,7 @@ internal sealed class ToolsPane : Pane
         return row;
     }
 
-    internal async void Install(ToolRow tool)
+    internal async void Install(ToolRow tool, bool viaWinget = false)
     {
         if (_installer is not { } installer) return;
         var job = new Job();
@@ -650,7 +666,8 @@ internal sealed class ToolsPane : Pane
         });
         try
         {
-            await installer.InstallAsync(tool.Id, progress, job.Cts.Token);
+            if (viaWinget) await installer.InstallWithWingetAsync(tool.Id, progress, job.Cts.Token);
+            else await installer.InstallAsync(tool.Id, progress, job.Cts.Token);
             _jobs.Remove(tool.Id);
         }
         catch (OperationCanceledException) { _jobs.Remove(tool.Id); }

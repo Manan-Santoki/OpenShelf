@@ -34,15 +34,8 @@ public static class ToolKit
         TextTrimming = wrap ? TextTrimming.None : TextTrimming.CharacterEllipsis,
     };
 
-    public static TextBlock Glyph(string glyph, double size, string brush = "Text2") => new()
-    {
-        Text = glyph,
-        FontFamily = Theme.IconFont,
-        FontSize = size,
-        Foreground = Brush(brush),
-        HorizontalAlignment = HorizontalAlignment.Center,
-        VerticalAlignment = VerticalAlignment.Center,
-    };
+    /// <summary>A Lucide icon of <paramref name="size"/> pixels in one of the palette colours.</summary>
+    public static IconView Icon(string icon, double size, string brush = "Text2") => new(icon, size, Brush(brush));
 
     /// <summary>A rounded translucent panel, the "well" behind canvases and summaries.</summary>
     public static Border Card(UIElement child, double padding = 10, double radius = 10) => new()
@@ -75,13 +68,23 @@ public static class ToolKit
         return button;
     }
 
-    /// <summary>A small button showing an icon glyph.</summary>
-    public static Button IconButton(string glyph, string tip, RoutedEventHandler click, double size = 28)
+    /// <summary>The icon size inside an <see cref="IconButton"/> of the given side: one size per button size class.</summary>
+    public static double IconSizeFor(double buttonSize) => buttonSize >= 28 ? 16 : 14;
+
+    /// <summary>A small button showing a Lucide icon. Change it later with <see cref="SetIcon"/>.</summary>
+    public static Button IconButton(string icon, string tip, RoutedEventHandler click, double size = 28)
     {
-        var button = new Button { Content = glyph, Style = Style("IconBtn"), ToolTip = tip, Width = size, Height = size };
+        var button = new Button { Content = new IconView(icon, IconSizeFor(size)), Style = Style("IconBtn"), ToolTip = tip, Width = size, Height = size };
         button.Click += click;
         Name(button, tip);
         return button;
+    }
+
+    /// <summary>Swaps the icon of a button made by <see cref="IconButton"/>.</summary>
+    public static void SetIcon(Button button, string icon)
+    {
+        if (button.Content is IconView view) view.Icon = icon;
+        else button.Content = new IconView(icon, 16);
     }
 
     /// <summary>A full-width preset button ("1080 px").</summary>
@@ -152,7 +155,7 @@ public sealed class SwitchRow : Grid
 /// <summary>A slider with a label and a live value readout, e.g. "Padding ——o—— 160 px".</summary>
 public sealed class LabeledSlider : Grid
 {
-    private readonly Slider _slider = new() { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0), Focusable = true };
+    private readonly Slider _slider = new() { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 12, 0), Focusable = true };
     private readonly TextBlock _readout = ToolKit.Text("", 11, "Text2");
     private readonly string _unit;
     private readonly TextBlock _label;
@@ -163,7 +166,7 @@ public sealed class LabeledSlider : Grid
     {
         _unit = unit;
         _display = display ?? (v => v);
-        MinHeight = 28;
+        MinHeight = 32;
         ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(labelWidth) });
         ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(58) });
@@ -255,7 +258,7 @@ public sealed class Segmented : Border
     private bool _silent;
     private int _selected = -1;
 
-    public Segmented(IReadOnlyList<string> titles, int selected = 0, double itemPadding = 10, IReadOnlyList<string>? glyphs = null)
+    public Segmented(IReadOnlyList<string> titles, int selected = 0, double itemPadding = 10, IReadOnlyList<string>? icons = null)
     {
         Background = ToolKit.Brush("Well");
         BorderBrush = ToolKit.Brush("Hairline");
@@ -267,12 +270,7 @@ public sealed class Segmented : Border
         {
             var index = i;
             object content = titles[i];
-            if (glyphs is not null)
-            {
-                var g = ToolKit.Glyph(glyphs[i], 14, "Text2");
-                g.ClearValue(TextBlock.ForegroundProperty);
-                content = g;
-            }
+            if (icons is not null) content = new IconView(icons[i], 16);   // takes the segment's colour
             var button = new RadioButton { Content = content, GroupName = _group, Style = ToolKit.Style("Seg"), Margin = new Thickness(1, 0, 1, 0), ToolTip = titles[i], Padding = new Thickness(itemPadding, 0, itemPadding, 0) };
             ToolKit.Name(button, titles[i]);
             button.Checked += (_, _) =>
@@ -355,26 +353,30 @@ public sealed class NumberBox : TextBox
     public event Action<int>? ValueCommitted;
 }
 
-/// <summary>A round or square colour/picture swatch with a selection ring.</summary>
+/// <summary>
+/// A colour or picture swatch with a selection ring: a circle when <c>radius</c> is half the size, a rounded square otherwise. The button is
+/// exactly <c>size + 8</c> wide and high, the ring sits inside that, and the button has no chrome of its own that could clip either.
+/// </summary>
 public sealed class SwatchButton : Button
 {
-    private readonly Border _ring = new() { BorderThickness = new Thickness(2), BorderBrush = Brushes.Transparent, CornerRadius = new CornerRadius(9), Padding = new Thickness(2) };
-    private readonly Border _face = new() { CornerRadius = new CornerRadius(7), BorderBrush = ToolKit.Brush("Hairline"), BorderThickness = new Thickness(1), SnapsToDevicePixels = true };
+    private readonly Border _ring = new() { BorderThickness = new Thickness(2), BorderBrush = Brushes.Transparent, Padding = new Thickness(2), SnapsToDevicePixels = true };
+    private readonly Border _face = new() { BorderBrush = ToolKit.Brush("Hairline"), BorderThickness = new Thickness(1), SnapsToDevicePixels = true };
     private bool _selected;
 
     public SwatchButton(Brush? fill, string tip, double size = 26, double radius = 7)
     {
-        Style = ToolKit.Style("GhostBtn");
-        Padding = new Thickness(0);
-        MinHeight = 0;
+        Style = ToolKit.Style("SwatchBtn");
         Width = size + 8;
         Height = size + 8;
+        Margin = new Thickness(1);
         _face.Width = size;
         _face.Height = size;
         _face.CornerRadius = new CornerRadius(radius);
         _face.Background = fill;
-        _ring.CornerRadius = new CornerRadius(radius + 2);
+        _face.ClipToBounds = true;
+        _ring.CornerRadius = new CornerRadius(radius + 4);
         _ring.Child = _face;
+        Tag = new CornerRadius(radius + 4);
         Content = _ring;
         ToolTip = tip;
         ToolKit.Name(this, tip);

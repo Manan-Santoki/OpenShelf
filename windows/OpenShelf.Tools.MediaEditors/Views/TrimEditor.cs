@@ -65,7 +65,7 @@ internal sealed class TrimEditor : MediaEditorWindow, IMediaEditorDemo
             _player.Visual.Width = 1;
             _player.Visual.Height = 1;
             _player.Visual.Opacity = 0;
-            var icon = ToolKit.Glyph(Glyphs.Waveform, 34, "Text3");
+            var icon = ToolKit.Icon(Glyphs.Waveform, 34, "Text3");
             var name = ToolKit.Text(paths[0] is { } p ? Path.GetFileName(p) : "", 12, "Text2");
             name.Name = "FileName";
             name.MaxWidth = 420;
@@ -132,7 +132,7 @@ internal sealed class TrimEditor : MediaEditorWindow, IMediaEditorDemo
         }
 
         _player.PositionChanged += OnPosition;
-        _player.PlayingChanged += () => _play.Content = _player.IsPlaying ? Glyphs.Pause : Glyphs.Play;
+        _player.PlayingChanged += () => ToolKit.SetIcon(_play, _player.IsPlaying ? Glyphs.Pause : Glyphs.Play);
         _player.Opened += () =>
         {
             _still.Visibility = Visibility.Collapsed;

@@ -67,8 +67,9 @@ public abstract class EditorWindow : Window
     private readonly Button _reset;
     private readonly Button _cancel;
     private readonly Button _primary;
+    private Button? _closeButton;
     private readonly ScaleTransform _scale = new(1, 1);
-    private readonly Size _size;
+    private Size _size;
     private CancellationTokenSource? _saving;
     private bool _closing;
     private Point _anchor = new(0.5, 0.5);
@@ -101,8 +102,9 @@ public abstract class EditorWindow : Window
         _title.HorizontalAlignment = HorizontalAlignment.Center;
         _title.VerticalAlignment = VerticalAlignment.Center;
         _title.IsHitTestVisible = false;
-        var close = ToolKit.IconButton("", "Close without saving (Esc)", (_, _) => CancelEditing(), 24);
+        var close = ToolKit.IconButton("x", "Close without saving (Esc)", (_, _) => CancelEditing(), 24);
         close.FontSize = 10;
+        _closeButton = close;
         close.HorizontalAlignment = HorizontalAlignment.Left;
         close.VerticalAlignment = VerticalAlignment.Center;
         close.Margin = new Thickness(10, 0, 0, 0);
@@ -169,6 +171,7 @@ public abstract class EditorWindow : Window
         _chrome.Clip = null;
         Content = _chrome;
 
+        AppIcons.Apply(this);
         SourceInitialized += (_, _) => Place();
         Loaded += (_, _) => { Refresh(); ZoomIn(); };
         PreviewKeyDown += OnPreviewKeyDown;
@@ -195,6 +198,9 @@ public abstract class EditorWindow : Window
             _canvasWell.BorderBrush = value ? ToolKit.Brush("Hairline") : Brushes.Transparent;
         }
     }
+
+    /// <summary>Sizes the window's height to its content instead of the fixed content size (small editors made of plain controls).</summary>
+    protected void FitHeightToContent() => SizeToContent = SizeToContent.Height;
 
     /// <summary>Lets a canvas fill the well edge to edge.</summary>
     protected void SetCanvasPadding(double padding) => _canvasWell.Padding = new Thickness(padding);
@@ -244,13 +250,16 @@ public abstract class EditorWindow : Window
     /// <summary>Re-reads the primary button's text and enabled state, and the Reset button.</summary>
     protected void Refresh()
     {
-        _primary.Content = IsBusy ? "Saving…" : PrimaryTitle;
+        _primary.Content = IsBusy
+            ? (_progress is > 0 and < 1 ? $"Saving… {(int)(_progress * 100)}%" : "Saving…")
+            : PrimaryTitle;
         _primary.IsEnabled = !IsBusy && CanApply;
         _reset.Visibility = HasReset ? Visibility.Visible : Visibility.Collapsed;
         _reset.IsEnabled = !IsBusy;
     }
 
     protected bool IsBusy { get; private set; }
+    private double _progress;
 
     /// <summary>Changes the window's title (shown in the bar).</summary>
     protected void SetTitle(string title)
@@ -266,6 +275,7 @@ public abstract class EditorWindow : Window
         if (e.Key == Key.Escape)
         {
             if (EscapeIsHandledByEditor) return;
+            if (Keyboard.FocusedElement is ComboBox { IsDropDownOpen: true }) return;   // Esc closes the list first
             e.Handled = true;
             CancelEditing();
         }
@@ -273,7 +283,8 @@ public abstract class EditorWindow : Window
         {
             if (EscapeIsHandledByEditor) return;                                  // the editor is taking text: Enter ends it
             var focused = Keyboard.FocusedElement;
-            if (focused is Button b && b != _primary) return;                     // Enter presses the focused button
+            if (focused is Button b && (b == _cancel || b == _reset || b == _closeButton)) return;  // Enter presses these footer/title buttons
+            // Any other focused button (a swatch, a tool button) must not swallow Enter: it still applies.
             if (focused is TextBox { AcceptsReturn: true }) return;
             if (focused is ComboBox { IsDropDownOpen: true }) return;
             if (focused is TextBox box)
@@ -297,7 +308,8 @@ public abstract class EditorWindow : Window
         IsBusy = true;
         Refresh();
         var cancel = _saving = new CancellationTokenSource();
-        var progress = new Progress<double>(_ => { });
+        var progress = new Progress<double>(v => { _progress = v; if (IsBusy) Refresh(); });
+        _progress = 0;
         try
         {
             var outcome = await RunAsync(() => Save(progress, cancel.Token));
@@ -347,16 +359,45 @@ public abstract class EditorWindow : Window
 
     // ---------------------------------------------------------------- appearing and going
 
+    /// <summary>
+    /// Makes the window wide enough for its controls. Rows of fixed-size controls (swatches, segmented buttons, readouts) cannot shrink; if
+    /// they do not fit the width the editor asked for, the window grows by the missing amount instead of cutting them off. Fonts and
+    /// scaling differ between machines, so this is measured, not assumed.
+    /// </summary>
+    private void FitWidth()
+    {
+        const double SideMargins = 2 * 16 + 2;   // the body's margins plus the chrome's border
+        var available = Width - 2 * Gutter - SideMargins;
+        var need = available;
+        foreach (var part in new[] { _controls.Content as UIElement, _filmstrip.Content as UIElement })
+        {
+            if (part is null) continue;
+            part.Measure(new Size(available, double.PositiveInfinity));
+            need = Math.Max(need, part.DesiredSize.Width);
+        }
+        var missing = Math.Ceiling(need - available);
+        if (missing <= 0) return;
+        Width += missing;
+        _size = new Size(_size.Width + missing, _size.Height);
+    }
+
     private void Place()
     {
+        FitWidth();
         var handle = new WindowInteropHelper(this).Handle;
         var (work, dpi) = WindowPlacement.MonitorAt(_host.Pointer);
-        var frame = WindowPlacement.Frame(_host.Pointer, Width * dpi, Height * dpi, work);
+        var height = Height;
+        if (SizeToContent == SizeToContent.Height && Content is UIElement root)
+        {
+            root.Measure(new Size(Width, double.PositiveInfinity));
+            height = Height = root.DesiredSize.Height;
+        }
+        var frame = WindowPlacement.Frame(_host.Pointer, Width * dpi, height * dpi, work);
         SetWindowPos(handle, new IntPtr(-1), (int)frame.X, (int)frame.Y, (int)frame.Width, (int)frame.Height, 0x0010 /* NOACTIVATE */);
         // The scale grows out of the drop point, in the chrome's own units.
         var x = (_host.Pointer.X - frame.X) / dpi - Gutter;
         var y = (_host.Pointer.Y - frame.Y) / dpi - Gutter;
-        _anchor = new Point(Math.Clamp(x / _size.Width, -0.2, 1.2), Math.Clamp(y / _size.Height, -0.2, 1.2));
+        _anchor = new Point(Math.Clamp(x / _size.Width, -0.2, 1.2), Math.Clamp(y / (height - 2 * Gutter), -0.2, 1.2));
         _chrome.RenderTransformOrigin = _anchor;
     }
 

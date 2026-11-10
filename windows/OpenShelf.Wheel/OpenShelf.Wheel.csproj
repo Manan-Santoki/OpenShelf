@@ -17,6 +17,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="OpenShelf.Wheel.Demo" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\OpenShelf.Core\OpenShelf.Core.csproj" />
     <ProjectReference Include="..\OpenShelf.Ui\OpenShelf.Ui.csproj" />
   </ItemGroup>

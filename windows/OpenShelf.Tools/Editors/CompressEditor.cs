@@ -38,6 +38,7 @@ public sealed class CompressEditor : EditorWindow, IEditorDemo
 
         CanvasWell = false;
         SetCanvasPadding(0);
+        FitHeightToContent();
         var stack = new StackPanel();
         stack.Children.Add(EditorParts.Header(first.Preview, images.Count == 1 ? first.Name : $"{images.Count} images",
             images.Count == 1 ? $"{first.Width} × {first.Height} · {EditorParts.Bytes(_totalBytes)}" : $"{EditorParts.Bytes(_totalBytes)} in total",
@@ -81,7 +82,7 @@ public sealed class CompressEditor : EditorWindow, IEditorDemo
 
         var summary = new StackPanel();
         var line = new StackPanel { Orientation = Orientation.Horizontal };
-        line.Children.Add(ToolKit.Glyph("", 13, "Accent"));
+        line.Children.Add(ToolKit.Icon("minimize-2", 13, "Accent"));
         _estimateText.Margin = new Thickness(8, 0, 0, 0);
         line.Children.Add(_estimateText);
         _savingText.Margin = new Thickness(0);
