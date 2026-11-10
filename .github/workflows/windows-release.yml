@@ -1,0 +1,115 @@
+name: Windows Release
+
+# Push a tag like win-v0.1.0 to build, pack and publish OpenShelf for Windows.
+# The release gets the installer, the portable zip and the Velopack update feed,
+# which the installed app reads through GitHub Releases.
+#
+# Code signing is optional and happens only when a signing secret exists:
+#   WINDOWS_CERT_PFX_BASE64 + WINDOWS_CERT_PASSWORD   a code signing certificate (.pfx, base64)
+#   AZURE_TRUSTED_SIGNING_METADATA                    contents of an Azure Trusted Signing metadata.json,
+#     with AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET for the service principal
+on:
+  push:
+    tags: ['win-v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      TAG: ${{ github.ref_name }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Read the version from the tag
+        id: version
+        shell: pwsh
+        run: |
+          $version = $env:TAG -replace '^win-v', ''
+          if ($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') { throw "Tag '$env:TAG' is not win-vMAJOR.MINOR.PATCH" }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "prerelease=$($version.Contains('-').ToString().ToLower())" >> $env:GITHUB_OUTPUT
+
+      - name: Test
+        run: dotnet test windows/OpenShelf.sln -c Release --artifacts-path windows/.artifacts/ci
+
+      - name: Install vpk
+        shell: pwsh
+        run: |
+          $velo = ([xml](Get-Content windows/OpenShelf.Update/OpenShelf.Update.csproj)).Project.ItemGroup.PackageReference |
+            Where-Object { $_.Include -eq 'Velopack' } | ForEach-Object { $_.Version } | Select-Object -First 1
+          dotnet tool install -g vpk --version $velo
+
+      - name: Fetch the previous release (for delta updates)
+        # Optional: the first Windows release has nothing to fetch, and deltas only make updates smaller.
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          foreach ($channel in 'win', 'win-arm64') {
+            vpk download github --repoUrl "https://github.com/${{ github.repository }}" --token $env:GH_TOKEN --channel $channel --outputDir windows/.artifacts/release
+          }
+
+      - name: Prepare code signing
+        id: signing
+        shell: pwsh
+        env:
+          PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          PFX_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+          AZURE_METADATA: ${{ secrets.AZURE_TRUSTED_SIGNING_METADATA }}
+        run: |
+          if ($env:PFX_BASE64) {
+            $pfx = Join-Path $env:RUNNER_TEMP 'signing.pfx'
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:PFX_BASE64))
+            "OPENSHELF_SIGN_PARAMS=/f `"$pfx`" /p `"$env:PFX_PASSWORD`" /fd sha256 /tr http://timestamp.digicert.com /td sha256" >> $env:GITHUB_ENV
+            'mode=pfx' >> $env:GITHUB_OUTPUT
+          } elseif ($env:AZURE_METADATA) {
+            $meta = Join-Path $env:RUNNER_TEMP 'metadata.json'
+            [IO.File]::WriteAllText($meta, $env:AZURE_METADATA)
+            "OPENSHELF_AZURE_SIGN_FILE=$meta" >> $env:GITHUB_ENV
+            'mode=azure' >> $env:GITHUB_OUTPUT
+          } else {
+            'mode=none' >> $env:GITHUB_OUTPUT
+            Write-Host 'No signing secret set; the installer will be unsigned.'
+          }
+
+      - name: Pack (x64 and arm64)
+        shell: pwsh
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+        run: ./windows/scripts/package.ps1 -Version ${{ steps.version.outputs.version }} -Arch both
+
+      - name: Upload to GitHub Releases
+        shell: pwsh
+        run: |
+          # Uploaded as a draft, then published below without the "Latest" flag: the Mac
+          # updater reads releases/latest/download/appcast.xml, which a Windows release must not take over.
+          $pre = if ('${{ steps.version.outputs.prerelease }}' -eq 'true') { '--pre' } else { $null }
+          foreach ($channel in 'win', 'win-arm64') {
+            $uploadArgs = @('upload', 'github',
+              '--repoUrl', "https://github.com/${{ github.repository }}",
+              '--token', $env:GH_TOKEN,
+              '--outputDir', 'windows/.artifacts/release',
+              '--channel', $channel,
+              '--tag', $env:TAG,
+              '--releaseName', "OpenShelf for Windows ${{ steps.version.outputs.version }}",
+              '--targetCommitish', '${{ github.sha }}',
+              '--merge')
+            if ($pre) { $uploadArgs += $pre }
+            vpk @uploadArgs
+            if ($LASTEXITCODE -ne 0) { throw "vpk upload ($channel) failed" }
+          }
+          gh release edit $env:TAG --repo ${{ github.repository }} --draft=false --latest=false
+          if ($LASTEXITCODE -ne 0) { throw 'Could not publish the release' }

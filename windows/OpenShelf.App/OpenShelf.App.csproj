@@ -12,7 +12,19 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>OpenShelf</AssemblyName>
     <RootNamespace>OpenShelf.App</RootNamespace>
+    <ApplicationIcon>Assets\OpenShelf.ico</ApplicationIcon>
+    <!-- A custom Main (Program.cs) runs Velopack's install/update hooks before WPF starts. -->
+    <StartupObject>OpenShelf.App.Program</StartupObject>
+    <!-- package.ps1 passes -p:Version=x.y.z; a plain build is a development build. -->
+    <Version Condition="'$(Version)' == ''">0.0.0-dev</Version>
+    <Product>OpenShelf</Product>
+    <Company>OpenShelf</Company>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ApplicationDefinition Remove="App.xaml" />
+    <Page Include="App.xaml" />
+  </ItemGroup>
 
   <ItemGroup>
     <!-- WinForms is referenced only for NotifyIcon; keep its namespaces out of scope so WPF names stay unambiguous. -->
@@ -30,6 +42,9 @@
     <ProjectReference Include="..\OpenShelf.Convert.Documents\OpenShelf.Convert.Documents.csproj" />
     <ProjectReference Include="..\OpenShelf.Convert.Media\OpenShelf.Convert.Media.csproj" />
     <ProjectReference Include="..\OpenShelf.Install\OpenShelf.Install.csproj" />
+    <ProjectReference Include="..\OpenShelf.Update\OpenShelf.Update.csproj" />
+    <ProjectReference Include="..\OpenShelf.Automation\OpenShelf.Automation.csproj" />
+    <ProjectReference Include="..\OpenShelf.Tools\OpenShelf.Tools.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,0 +1,65 @@
+name: Windows CI
+
+# Builds and tests the Windows app, and checks that it still packs into an installer.
+# Tests that need ffmpeg, LibreOffice or the network skip themselves when the tool or
+# OPENSHELF_NETWORK_TESTS=1 is missing, so a bare runner is enough.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'windows/**'
+      - '.github/workflows/windows-ci.yml'
+  pull_request:
+    paths:
+      - 'windows/**'
+      - '.github/workflows/windows-ci.yml'
+
+concurrency:
+  group: windows-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build
+        run: dotnet build windows/OpenShelf.sln -c Release --artifacts-path windows/.artifacts/ci
+
+      - name: Test
+        run: dotnet test windows/OpenShelf.sln -c Release --no-build --artifacts-path windows/.artifacts/ci --logger "trx;LogFileName=results.trx" --results-directory windows/.artifacts/ci-results
+
+      - name: Keep the test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-test-results
+          path: windows/.artifacts/ci-results
+          retention-days: 7
+
+  package:
+    # A smoke test of scripts/package.ps1: the installer builds from a clean checkout.
+    runs-on: windows-latest
+    needs: build-and-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Pack (unsigned)
+        shell: pwsh
+        run: ./windows/scripts/package.ps1 -Version 0.0.0-ci
+
+      - name: Keep the installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenShelf-win-Setup-ci
+          path: windows/.artifacts/release/OpenShelf-win-Setup.exe
+          retention-days: 3

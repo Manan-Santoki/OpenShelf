@@ -1,6 +1,7 @@
 using System.IO;
 using System.IO.Pipes;
 using System.Windows;
+using OpenShelf.Automation;
 
 namespace OpenShelf.App;
 
@@ -11,7 +12,6 @@ namespace OpenShelf.App;
 public partial class App : Application
 {
     private const string InstanceName = "OpenShelf.SingleInstance";
-    private const string PipeName = "OpenShelf.Activate";
     private Mutex? _mutex;
     private CancellationTokenSource? _pipeCancel;
 
@@ -19,10 +19,19 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // --help and bad arguments never need the running copy or a mutex.
+        var parsed = CommandLine.Parse(e.Args, Environment.CurrentDirectory);
+        if (parsed.Outcome is ParseOutcome.Help or ParseOutcome.Error)
+        {
+            CliConsole.TryWrite(parsed.Message ?? "", parsed.Outcome == ParseOutcome.Error);
+            Shutdown(parsed.ExitCode);
+            return;
+        }
+
         _mutex = new Mutex(initiallyOwned: true, InstanceName, out var first);
         if (!first)
         {
-            SignalRunningCopy();
+            SignalRunningCopy(parsed.Command);
             Shutdown();
             return;
         }
@@ -35,6 +44,7 @@ public partial class App : Application
 
         AppHost.Start(this);
         ListenForSecondLaunch();
+        if (parsed.Command is { } command) AppHost.Execute(command);
     }
 
     protected override void OnExit(ExitEventArgs e)
@@ -45,17 +55,21 @@ public partial class App : Application
         base.OnExit(e);
     }
 
-    private static void SignalRunningCopy()
+    private static void SignalRunningCopy(AutomationCommand? command)
     {
         try
         {
-            using var client = new NamedPipeClientStream(".", PipeName, PipeDirection.Out);
-            client.Connect(800);
-            client.WriteByte(1);
+            // A copy that is still starting has not opened the pipe yet; commands are worth a few retries.
+            var attempts = command is null ? 1 : 10;
+            for (var i = 0; i < attempts; i++)
+            {
+                if (PipeProtocol.SendAsync(command, 800, PipeProtocol.PipeName).GetAwaiter().GetResult()) return;
+                Thread.Sleep(300);
+            }
         }
         catch
         {
-            // The first copy is still starting or shutting down; nothing to do.
+            // The first copy is shutting down; nothing to do.
         }
     }
 
@@ -69,9 +83,12 @@ public partial class App : Application
             {
                 try
                 {
-                    using var server = new NamedPipeServerStream(PipeName, PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
-                    await server.WaitForConnectionAsync(token);
-                    _ = Dispatcher.BeginInvoke(AppHost.ShowSettingsFromSecondLaunch);
+                    var request = await PipeProtocol.AcceptAsync(PipeProtocol.PipeName, TimeSpan.FromSeconds(2), token);
+                    switch (request)
+                    {
+                        case ShowSettingsRequest: _ = Dispatcher.BeginInvoke(AppHost.ShowSettingsFromSecondLaunch); break;
+                        case CommandRequest c: AppHost.Execute(c.Command); break;
+                    }
                 }
                 catch (OperationCanceledException)
                 {
