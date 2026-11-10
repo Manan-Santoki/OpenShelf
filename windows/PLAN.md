@@ -11,19 +11,21 @@ for behaviour, constants and copy. C# on .NET 10, WPF, Windows 10 22H2+ and 11.
 | M0 Spike | Mid-drag detection, wheels, basic shelf, tray, toast, drag harness | done |
 | M1 Wheels and shelves | Paging, keyboard control, keyboard wheel and hotkey, Explorer selection, shake, all Actions; full shelves (stack, grid/list, selection, docking, hiding, restore, preview); settings window; progress card | done, QA pass run |
 | M2 Convert | Images, archives, subtitles, spreadsheets, Markdown, PDF, documents, office, e-books, audio, video, GIF; output settings and the Alt options window; tool installer | done, see "Not yet verified" |
-| M3 Tools | Tools wheel: image editors (Crop, Resize, Compress, Metadata, Edit, Annotate, Add BG, Remove BG, Redact, Read QR, OCR, Combine), PDF tools (Combine, Pages, Split, Compress, Metadata, OCR), media tools (Trim, Speed, Crop, Rotate, Split, Merge, Compress, Mute) | not started |
-| M4 Rest | Tour, watched folders (UI and storage exist; watching does not), Explorer right-click entry, command line, installer, updater (WinSparkle), CI, README/SPEC annex | not started |
+| M3 Tools | Tools wheel: image editors (Crop, Resize, Compress, Metadata, Edit, Annotate, Add BG, Remove BG, Redact, Read QR, OCR, Combine), PDF tools (Combine, Pages, Split, Compress, Metadata, OCR), media tools (Trim, Speed, Crop, Rotate, Split, Merge, Compress, Mute) | done, partial real-mouse QA |
+| M4 Rest | Tour, watched folders, Explorer right-click entry, command line, installer and updater (Velopack), CI and release workflows, Lucide icons | done, see "Not yet verified" |
 
-## Checkpoint (2026-11-09)
+## Checkpoint (2026-11-10, 0.1.0-beta.1)
 
-681 unit tests pass across nine test projects. Real synthetic drags pass for Convert, Copy Path, Shelf and hub-drop.
-`ConversionWheelCatalog.ToolsProvider` in `OpenShelf.App` is the hook for the Tools wheel; `Commands.TakeTour` and
-`Commands.CheckForUpdates` are placeholders that only toast.
+1,337 unit tests pass across 19 test projects. Real-mouse QA passed for every image editor, the PDF editors,
+video Trim, Merge, Mute, Rotate and Speed, and the tour's first run. Releases are tagged `win-v*` from `feat/windows`
+and published as GitHub pre-releases, never as "Latest" (the Mac updater reads the latest release).
 
 ### Not yet verified
 
-- LibreOffice and calibre installs from Settings, Extra Formats (`msiexec /a` unpack was only tested with a fake runner).
-- LibreOffice and calibre conversions with the real tools (neither is installed on the dev machine); transcription (no whisper).
+- Real mouse: video Compress, Split, Crop and Rotate with several files; the audio wheel; results landing back on a shelf; tour step completion and reopening from the tray; Read QR with a real code.
+- Command line, the Explorer right-click entry, and watched folders (convert and tool actions) in the running app.
+- LibreOffice conversions with the real tool (the install itself worked on the dev machine); calibre install and conversions; transcription (no whisper).
+- The update path of an installed copy from one GitHub release to the next; arm64 on real hardware.
 - The Alt output-options window end to end from a wheel; Share; Move's overwrite protection in a real run.
 - Shelf: Delete, type-to-select, Ctrl+W, list/grid toggle, the right-click menu items, auto-hide on the left edge.
 - Settings: toggles surviving a restart; the keyboard wheel on a desktop-icon selection; a real OLE text drag.
