@@ -49,6 +49,13 @@ internal static class Native
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool DestroyIcon(IntPtr hIcon);
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool GetWindowRect(IntPtr hWnd, out NativeRect rect);
+    [DllImport("user32.dll")]
+    public static extern int GetSystemMetricsForDpi(int index, uint dpi);
+    [DllImport("user32.dll")]
+    public static extern uint GetDpiForSystem();
 
     [StructLayout(LayoutKind.Sequential)]
     struct POINT { public int X, Y; }

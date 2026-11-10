@@ -27,6 +27,7 @@ public sealed class WheelService : IWheelService
             Unavailable = kind => _wheels.Unavailable(kind, _lastPointer),
             Dropped = (item, files, at) => item.Run(files, at),
         };
+        _window.Warmup();
         _monitor = new DragMonitor();
         _monitor.DragStarted += p => { _lastPointer = p; _window?.HideNow(); };
         _monitor.DragEnded += () => _window?.DragEnded();

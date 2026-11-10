@@ -2,17 +2,19 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Threading;
 using OpenShelf.Core;
+using OpenShelf.Ui;
 
 namespace OpenShelf.Shelf;
 
 /// <summary>Small click-through confirmation card. Used on the WPF UI thread.</summary>
 public sealed class ToastService : IToastService
 {
-    const double Pad = 14;
+    const double Pad = 28;          // transparent margin for the shadow
+    const double CardRadius = 12;
+    const int CaptureMargin = 24;   // extra physical pixels captured so the blur has no faded edge
     ToastWindow? _current;
 
     public void Show(string message, ScreenPoint near)
@@ -31,11 +33,15 @@ public sealed class ToastService : IToastService
     sealed class ToastWindow : Window
     {
         readonly DispatcherTimer _hold = new() { Interval = TimeSpan.FromMilliseconds(1600) };
+        readonly string _message;
+        readonly Grid _host = new();
+        readonly TranslateTransform _rise = new(0, 6);
         IntPtr _hwnd;
         bool _dismissed;
 
         public ToastWindow(string message)
         {
+            _message = message;
             WindowStyle = WindowStyle.None;
             AllowsTransparency = true;
             Background = Brushes.Transparent;
@@ -44,28 +50,12 @@ public sealed class ToastService : IToastService
             ShowActivated = false;
             ResizeMode = ResizeMode.NoResize;
             SizeToContent = SizeToContent.WidthAndHeight;
-            FontFamily = new FontFamily("Segoe UI");
+            FontFamily = Theme.TextFont;
             Focusable = false;
             IsHitTestVisible = false;
-            Opacity = 0;
-
-            Content = new Border
-            {
-                Margin = new Thickness(Pad),
-                CornerRadius = new CornerRadius(12),
-                Padding = new Thickness(14, 8, 14, 8),
-                Background = new SolidColorBrush(Color.FromArgb(0xF7, 0x26, 0x26, 0x29)),
-                BorderBrush = new SolidColorBrush(Color.FromArgb(0x29, 255, 255, 255)),
-                BorderThickness = new Thickness(1),
-                Effect = new DropShadowEffect
-                {
-                    BlurRadius = 14, ShadowDepth = 4, Direction = 270, Opacity = 0.4, Color = Colors.Black
-                },
-                Child = new TextBlock
-                {
-                    Text = message, FontSize = 13, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White,
-                },
-            };
+            UseLayoutRounding = true;
+            TextOptions.SetTextFormattingMode(this, TextFormattingMode.Ideal);
+            TextOptions.SetTextRenderingMode(this, TextRenderingMode.Grayscale);
 
             SourceInitialized += (_, _) =>
             {
@@ -80,41 +70,117 @@ public sealed class ToastService : IToastService
             _hold.Tick += (_, _) => { _hold.Stop(); FadeOutAndClose(); };
         }
 
+        static Border Shadow(double w, double h, double blur, double opacity, double depth) => new()
+        {
+            Width = w, Height = h, Margin = new Thickness(Pad),
+            CornerRadius = new CornerRadius(CardRadius),
+            Background = Theme.Brush(Theme.Surface),
+            Effect = new DropShadowEffect
+            {
+                BlurRadius = blur, ShadowDepth = depth, Direction = 270, Opacity = opacity, Color = Colors.Black,
+                RenderingBias = RenderingBias.Quality,
+            },
+        };
+
         public void ShowNear(ScreenPoint near)
         {
-            Show();
+            double scale = 1;
             try
             {
-                UpdateLayout();
-                var (scale, work) = Native.MonitorAt(near);
-                int w = (int)Math.Round(ActualWidth * scale);
-                int h = (int)Math.Round(ActualHeight * scale);
+                var text = new TextBlock
+                {
+                    Text = _message, FontSize = 13, FontWeight = FontWeights.SemiBold, Foreground = Theme.White(0.95),
+                    Margin = new Thickness(14, 8, 14, 8),
+                };
+                text.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                double cardW = Math.Ceiling(text.DesiredSize.Width) + 2;
+                double cardH = Math.Ceiling(text.DesiredSize.Height) + 2;
+
+                var (s, work) = Native.MonitorAt(near);
+                scale = s;
+                int winW = (int)Math.Round((cardW + 2 * Pad) * scale);
+                int winH = (int)Math.Round((cardH + 2 * Pad) * scale);
                 int x = near.X + (int)Math.Round((14 - Pad) * scale);
                 int y = near.Y + (int)Math.Round((18 - Pad) * scale);
-                (x, y) = Native.Clamp(x, y, w, h, work);
-                Native.SetWindowPos(_hwnd, IntPtr.Zero, x, y, w, h, Native.SWP_NOZORDER | Native.SWP_NOACTIVATE);
+                (x, y) = Native.Clamp(x, y, winW, winH, work);
+
+                BuildContent(text, cardW, cardH, x, y, scale);
+
+                Show();
+                Native.SetWindowPos(_hwnd, IntPtr.Zero, x, y, winW, winH, Native.SWP_NOZORDER | Native.SWP_NOACTIVATE);
                 Native.BringToTop(_hwnd);
             }
-            catch (Exception ex) { Log.Error("Toast placement", ex); }
+            catch (Exception ex)
+            {
+                Log.Error("Toast placement", ex);
+                if (!IsVisible) { try { Show(); } catch (Exception) { } }
+            }
 
-            if (SystemParameters.ClientAreaAnimation)
-            {
-                BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(120)));
-            }
-            else
-            {
-                Opacity = 1;
-            }
+            Motion.Animate(_host, OpacityProperty, 1, Motion.Enabled ? 160 : 0, Motion.EaseOut, from: 0);
+            Motion.Animate(_rise, TranslateTransform.YProperty, 0, 260, Motion.Spring, from: 6);
             _hold.Start();
         }
+
+        void BuildContent(TextBlock text, double cardW, double cardH, int winX, int winY, double scale)
+        {
+            _host.Opacity = 0;
+            _host.RenderTransform = _rise;
+            if (!Motion.Enabled) _rise.Y = 0;
+
+            _host.Children.Add(Shadow(cardW, cardH, 28, 0.35, 8));
+            _host.Children.Add(Shadow(cardW, cardH, 3, 0.25, 1));
+
+            var inner = new Grid { Width = cardW - 2, Height = cardH - 2, IsHitTestVisible = false };
+            inner.Clip = new RectangleGeometry(new Rect(0, 0, cardW - 2, cardH - 2), CardRadius - 1, CardRadius - 1);
+
+            // Photograph the screen under the card just before it appears (physical pixels).
+            bool captured = false;
+            try
+            {
+                int m = CaptureMargin;
+                int px = winX + (int)Math.Round(Pad * scale);
+                int py = winY + (int)Math.Round(Pad * scale);
+                int pw = (int)Math.Round(cardW * scale);
+                int ph = (int)Math.Round(cardH * scale);
+                var snap = Glass.Capture(px - m, py - m, pw + 2 * m, ph + 2 * m);
+                if (snap != null)
+                {
+                    var backdrop = Glass.Backdrop(snap, (pw + 2 * m) / scale, (ph + 2 * m) / scale, 22);
+                    var layer = new Canvas { Width = cardW - 2, Height = cardH - 2, IsHitTestVisible = false };
+                    Canvas.SetLeft(backdrop, -m / scale - 1);
+                    Canvas.SetTop(backdrop, -m / scale - 1);
+                    layer.Children.Add(backdrop);
+                    inner.Children.Add(layer);
+                    inner.Children.Add(new Border { Background = Theme.Brush(Theme.Surface, 0.60) });
+                    captured = true;
+                }
+            }
+            catch (Exception ex) { Log.Info("Toast capture failed: " + ex.Message); }
+
+            if (!captured)
+                inner.Children.Add(new Border { Background = Theme.Brush(Theme.Surface, 0.97) });
+            inner.Children.Add(text);
+            text.HorizontalAlignment = HorizontalAlignment.Center;
+            text.VerticalAlignment = VerticalAlignment.Center;
+            text.Margin = new Thickness(14, 8, 14, 8);
+
+            var card = new Border
+            {
+                Width = cardW, Height = cardH, Margin = new Thickness(Pad),
+                CornerRadius = new CornerRadius(CardRadius),
+                BorderBrush = Theme.White(0.14), BorderThickness = new Thickness(1),
+                Child = inner,
+            };
+            _host.Children.Add(card);
+            Content = _host;
+        }
+
 
         void FadeOutAndClose()
         {
             if (_dismissed) return;
-            if (!SystemParameters.ClientAreaAnimation) { SafeClose(); return; }
-            var fade = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(200));
-            fade.Completed += (_, _) => SafeClose();
-            BeginAnimation(OpacityProperty, fade);
+            if (!Motion.Enabled) { SafeClose(); return; }
+            Motion.Animate(_host, OpacityProperty, 0, 180, Motion.EaseOut, completed: SafeClose);
         }
 
         /// <summary>Closes immediately (a newer toast replaces this one).</summary>
@@ -128,7 +194,7 @@ public sealed class ToastService : IToastService
         {
             if (_dismissed) return;
             _dismissed = true;
-            try { _hold.Stop(); BeginAnimation(OpacityProperty, null); Close(); }
+            try { _hold.Stop(); _host.BeginAnimation(OpacityProperty, null); Close(); }
             catch (Exception ex) { Log.Error("Toast close", ex); }
         }
     }

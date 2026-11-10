@@ -40,6 +40,10 @@ public sealed class TrayService : ITrayService
                 ContextMenuStrip = _menu,
                 Visible = true,
             };
+            _notify.MouseClick += (_, e) =>
+            {
+                if (e.Button == System.Windows.Forms.MouseButtons.Left) Run("Show Shelves", _shelves.ShowAll);
+            };
             Log.Info("Tray icon started");
         }
         catch (Exception ex) { Log.Error("Tray start", ex); }
@@ -54,14 +58,27 @@ public sealed class TrayService : ITrayService
     /// <summary>White ring with a centre dot on a transparent 32x32 canvas.</summary>
     static SD.Icon DrawIcon()
     {
-        using var bmp = new SD.Bitmap(32, 32, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        int size = 16;
+        try
+        {
+            size = Native.GetSystemMetricsForDpi(49 /* SM_CXSMICON */, Native.GetDpiForSystem());
+            if (size < 16) size = 16;
+        }
+        catch (Exception) { }
+
+        using var bmp = new SD.Bitmap(size, size, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
         using (var g = SD.Graphics.FromImage(bmp))
         {
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
             g.Clear(SD.Color.Transparent);
-            using var pen = new SD.Pen(SD.Color.White, 3f);
-            g.DrawEllipse(pen, 4f, 4f, 24f, 24f);
-            g.FillEllipse(SD.Brushes.White, 12f, 12f, 8f, 8f);
+            float stroke = Math.Max(2f, size / 12f);
+            float inset = 0.5f + stroke / 2f;
+            float d = size - 2 * inset;
+            using var pen = new SD.Pen(SD.Color.White, stroke);
+            g.DrawEllipse(pen, inset, inset, d, d);
+            float dot = size * 0.28f;
+            g.FillEllipse(SD.Brushes.White, (size - dot) / 2f, (size - dot) / 2f, dot, dot);
         }
         var hIcon = bmp.GetHicon();
         try

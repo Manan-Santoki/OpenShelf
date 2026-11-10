@@ -31,9 +31,9 @@ internal sealed class ActionWheels(IShelfService shelves, IToastService toasts)
 
     private WheelModel BuildActions()
     {
-        var items = new List<WheelItem> { new("Shelf", (paths, at) => { shelves.NewShelf(paths, at); return Task.CompletedTask; }) };
+        var items = new List<WheelItem> { new("Shelf", (paths, at) => { shelves.NewShelf(paths, at); return Task.CompletedTask; }, "\uE896") };
         if (shelves.HasOpenShelf)
-            items.Add(new WheelItem("Add to shelf", (paths, _) => { shelves.AddToRecentShelf(paths); return Task.CompletedTask; }));
+            items.Add(new WheelItem("Add to shelf", (paths, _) => { shelves.AddToRecentShelf(paths); return Task.CompletedTask; }, "\uE710"));
         items.Add(new WheelItem("Copy", (paths, at) =>
         {
             var list = new StringCollection();
@@ -41,14 +41,14 @@ internal sealed class ActionWheels(IShelfService shelves, IToastService toasts)
             WithClipboard(() => Clipboard.SetFileDropList(list));
             toasts.Show(paths.Count == 1 ? "Copied" : $"Copied {paths.Count} files", at);
             return Task.CompletedTask;
-        }));
+        }, "\uE8C8"));
         items.Add(new WheelItem("Copy path", (paths, at) =>
         {
             WithClipboard(() => Clipboard.SetText(string.Join(Environment.NewLine, paths)));
             toasts.Show(paths.Count == 1 ? "Copied path" : $"Copied {paths.Count} paths", at);
             return Task.CompletedTask;
-        }));
-        items.Add(new WheelItem("Terminal", (paths, _) => { OpenTerminal(paths[0]); return Task.CompletedTask; }));
+        }, "\uE71B"));
+        items.Add(new WheelItem("Terminal", (paths, _) => { OpenTerminal(paths[0]); return Task.CompletedTask; }, "\uE756"));
         return new WheelModel("Actions", items);
     }
 
