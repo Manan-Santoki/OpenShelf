@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- WinForms is referenced for NotifyIcon/System.Drawing only; keep WPF names unambiguous. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenShelf.Core\OpenShelf.Core.csproj" />
+    <ProjectReference Include="..\OpenShelf.Ui\OpenShelf.Ui.csproj" />
+    <ProjectReference Include="..\OpenShelf.Settings\OpenShelf.Settings.csproj" />
+    <ProjectReference Include="..\OpenShelf.Convert\OpenShelf.Convert.csproj" />
+  </ItemGroup>
+
+</Project>

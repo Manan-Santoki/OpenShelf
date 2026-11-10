@@ -26,6 +26,10 @@
     <ProjectReference Include="..\OpenShelf.Shelf\OpenShelf.Shelf.csproj" />
     <ProjectReference Include="..\OpenShelf.Settings\OpenShelf.Settings.csproj" />
     <ProjectReference Include="..\OpenShelf.Convert\OpenShelf.Convert.csproj" />
+    <ProjectReference Include="..\OpenShelf.Convert.Markdown\OpenShelf.Convert.Markdown.csproj" />
+    <ProjectReference Include="..\OpenShelf.Convert.Documents\OpenShelf.Convert.Documents.csproj" />
+    <ProjectReference Include="..\OpenShelf.Convert.Media\OpenShelf.Convert.Media.csproj" />
+    <ProjectReference Include="..\OpenShelf.Install\OpenShelf.Install.csproj" />
   </ItemGroup>
 
 </Project>
