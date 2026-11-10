@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <StartupObject>OpenShelf.Tools.PdfEditors.Demo.Program</StartupObject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenShelf.Core\OpenShelf.Core.csproj" />
+    <ProjectReference Include="..\OpenShelf.Tools\OpenShelf.Tools.csproj" />
+    <ProjectReference Include="..\OpenShelf.Tools.Pdf\OpenShelf.Tools.Pdf.csproj" />
+    <ProjectReference Include="..\OpenShelf.Tools.PdfEditors\OpenShelf.Tools.PdfEditors.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -317,7 +317,7 @@ public static class PdfThumbnails
             try
             {
                 using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-                var sizes = Conversion.GetPageSizes(stream);
+                var sizes = Conversion.GetPageSizes(stream, leaveOpen: true);
                 if (sizes.Count > 0 && sizes[0].Width > 0 && sizes[0].Height > 0)
                 {
                     var scale = maxPixelSize / Math.Max(sizes[0].Width, sizes[0].Height);

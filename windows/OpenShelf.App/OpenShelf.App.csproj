@@ -47,6 +47,8 @@
     <ProjectReference Include="..\OpenShelf.Tools\OpenShelf.Tools.csproj" />
     <ProjectReference Include="..\OpenShelf.Tools.VisionEditors\OpenShelf.Tools.VisionEditors.csproj" />
     <ProjectReference Include="..\OpenShelf.Tour\OpenShelf.Tour.csproj" />
+    <ProjectReference Include="..\OpenShelf.Tools.PdfEditors\OpenShelf.Tools.PdfEditors.csproj" />
+    <ProjectReference Include="..\OpenShelf.Tools.MediaEditors\OpenShelf.Tools.MediaEditors.csproj" />
   </ItemGroup>
 
 </Project>

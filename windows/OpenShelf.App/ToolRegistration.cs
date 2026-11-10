@@ -8,5 +8,7 @@ public static class ToolRegistration
     public static void RegisterAll(ToolsCatalog tools)
     {
         OpenShelf.Tools.VisionEditors.VisionTools.Register(tools);
+        OpenShelf.Tools.PdfEditors.PdfTools.Register(tools);
+        OpenShelf.Tools.MediaEditors.MediaTools.Register(tools);
     }
 }

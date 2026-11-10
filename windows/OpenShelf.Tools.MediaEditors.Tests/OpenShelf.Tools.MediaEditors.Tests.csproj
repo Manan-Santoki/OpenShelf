@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenShelf.Core\OpenShelf.Core.csproj" />
+    <ProjectReference Include="..\OpenShelf.Convert\OpenShelf.Convert.csproj" />
+    <ProjectReference Include="..\OpenShelf.Tools\OpenShelf.Tools.csproj" />
+    <ProjectReference Include="..\OpenShelf.Tools.Media\OpenShelf.Tools.Media.csproj" />
+    <ProjectReference Include="..\OpenShelf.Tools.MediaEditors\OpenShelf.Tools.MediaEditors.csproj" />
+  </ItemGroup>
+
+</Project>

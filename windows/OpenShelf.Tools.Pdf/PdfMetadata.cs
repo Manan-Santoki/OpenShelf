@@ -36,6 +36,7 @@ public sealed record PdfInfo
         get
         {
             var identifying = IsSystemProducer(Fields.Producer) ? Fields with { Producer = "" } : Fields;
+            if (IsSystemProducer(identifying.Creator)) identifying = identifying with { Creator = "" };
             return !identifying.IsEmpty;
         }
     }
