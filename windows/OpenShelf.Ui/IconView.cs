@@ -68,7 +68,9 @@ public sealed class IconView : FrameworkElement
         var thickness = double.IsNaN(StrokeThickness) ? Icons.StrokeFor(Size) : StrokeThickness;
         var scale = size / Icons.Grid;
         var pen = new Pen(Foreground, thickness / scale) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round };
-        if (pen.CanFreeze) pen.Freeze();   // a brush that is being animated (the wheel labels) keeps the pen live
+        // Freezing a pen freezes its brush with it. A brush the caller left unfrozen is one it means to animate
+        // (the wheel labels), so only freeze the pen when the brush is frozen already.
+        if (Foreground is { IsFrozen: true } && pen.CanFreeze) pen.Freeze();
         dc.PushTransform(new ScaleTransform(scale, scale));
         dc.DrawGeometry(null, pen, geometry);
         dc.Pop();
