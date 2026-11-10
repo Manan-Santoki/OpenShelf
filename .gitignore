@@ -5,3 +5,10 @@
 *.xcodeproj
 xcuserdata/
 .claude/
+
+# Windows (.NET)
+windows/**/bin/
+windows/**/obj/
+windows/.artifacts/
+windows/.vs/
+*.user
