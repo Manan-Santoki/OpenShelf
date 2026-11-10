@@ -24,6 +24,8 @@
     <ProjectReference Include="..\OpenShelf.Core\OpenShelf.Core.csproj" />
     <ProjectReference Include="..\OpenShelf.Wheel\OpenShelf.Wheel.csproj" />
     <ProjectReference Include="..\OpenShelf.Shelf\OpenShelf.Shelf.csproj" />
+    <ProjectReference Include="..\OpenShelf.Settings\OpenShelf.Settings.csproj" />
+    <ProjectReference Include="..\OpenShelf.Convert\OpenShelf.Convert.csproj" />
   </ItemGroup>
 
 </Project>

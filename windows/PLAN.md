@@ -8,7 +8,7 @@ for behaviour, constants and copy. C# on .NET 10, WPF, Windows 10 22H2+ and 11.
 
 | | Scope | Status |
 |---|---|---|
-| M0 Spike | Mid-drag detection, Convert and Actions wheels (few real wedges), basic shelf, tray icon, toast, drag test harness | in progress |
+| M0 Spike | Mid-drag detection, Convert and Actions wheels (few real wedges), basic shelf, tray icon, toast, drag test harness | done |
 | M1 Wheels and shelves | All three wheels with paging and keyboard, every Action, full shelves (stack, grid/list, selection, docking, hiding, restore), settings window, global hotkey, Explorer selection | |
 | M2 Convert | Image, PDF, document, Markdown, spreadsheet, media (ffmpeg), archive engines; progress card; output settings; tool installer | |
 | M3 Tools | Image, PDF and media editors; OCR; Remove BG; QR | |
@@ -22,6 +22,9 @@ for behaviour, constants and copy. C# on .NET 10, WPF, Windows 10 22H2+ and 11.
 | `OpenShelf.Wheel` | Drag detection, the wheel window, wheel actions (`IWheelService`) | |
 | `OpenShelf.Shelf` | Shelf windows, tray icon, toasts (`IShelfService`, `ITrayService`, `IToastService`) | |
 | `OpenShelf.App` | Composition root only (`AppHost.cs`), manifest | Orchestrator-owned |
+| `OpenShelf.Ui` | Theme, spring motion, frosted glass shared by every surface | |
+| `OpenShelf.Settings` | Preferences store and the settings window (`IPreferences`, `ISettingsWindow`) | |
+| `OpenShelf.Convert` | Conversion engines, file kinds, the format catalog, external tools. No UI | Headless, tested in `OpenShelf.Convert.Tests` |
 | `OpenShelf.Tests` | xUnit tests for Core | |
 | `OpenShelf.DragHarness` | Console tool that performs a real file drag with synthetic input and checks the result | |
 
@@ -45,3 +48,9 @@ Windows has no global drag pasteboard, so:
 4. If `DragEnter` arrives with a file list, show the wheel in that window. If it arrives without files, hide. If the button comes up first, hide.
 5. `DragOver` highlights the wedge under the pointer; `Drop` on a wedge runs it with the paths taken at `DragEnter`.
 6. The wheel stays until the button is released, wherever the pointer goes.
+
+## Testing rules
+
+- Only ONE thing may drive the real mouse at a time. Unless your brief says you own the mouse, never run the app with the drag harness.
+- UI you cannot click is verified with a small demo executable in your own project folder that puts the window into each state by code, then a screenshot you read back.
+- Engines are verified with headless xUnit tests on real files generated in a temp folder.
