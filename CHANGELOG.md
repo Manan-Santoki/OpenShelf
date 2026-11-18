@@ -6,7 +6,7 @@ tags `v<version>` and publishes a GitHub release with that section as notes.
 
 Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
 
-## [Unreleased]
+## [1.10.0] - 2026-11-17
 
 ### New
 
@@ -17,10 +17,24 @@ Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
   lands in a folder with a folder automation, no dragging needed. On macOS 26
   and later the main ones are in Spotlight too. They run entirely on your Mac,
   like the wheels, and save results next to the originals.
+- **Signed and notarized by Apple.** OpenShelf is now signed with a Developer
+  ID and notarized, so it opens like any other downloaded app: no more
+  "Apple could not verify" warning, Open Anyway or Terminal commands.
+- **Install with Homebrew:** `brew install --cask manan-santoki/tap/openshelf`,
+  or `brew tap manan-santoki/tap` once and then `brew install --cask openshelf`.
+  OpenShelf keeps updating itself as before.
+- **About OpenShelf** in the menu-bar menu shows the version, with links to
+  [openshelf.space](https://openshelf.space) and the source code.
 
-  These are in the code but switched off in release builds until releases
-  are signed with an Apple developer certificate: macOS only runs Shortcuts
-  actions from apps signed that way.
+### Good to know
+
+- **macOS asks for permissions once more.** Because OpenShelf is now signed
+  differently, macOS treats it as a new app for privacy permissions. The first
+  time you use a feature that talks to Finder or to Pages, Numbers or Keynote,
+  click **OK** when macOS asks again. Nothing else changes, and your settings
+  and shelf are kept.
+- Updates now come from a dedicated feed. Nothing to do: this update switches
+  over by itself.
 
 ## [1.9.0] - 2026-11-01
 

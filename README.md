@@ -42,8 +42,9 @@ the file on a wedge and it's done, saved right next to the original.
 - Works system-wide with **no Accessibility permission**
 - No telemetry; the only network access is checking GitHub for updates, which
   you can turn off, and downloading an extra tool when you click Install
-- **Updates itself:** new versions install from the app (Sparkle), signed so
-  only genuine OpenShelf releases are accepted
+- **Signed, notarized and self-updating:** releases are notarized by Apple, and
+  new versions install from the app (Sparkle), signed so only genuine
+  OpenShelf releases are accepted
 - **Extra formats, one click away:** ffmpeg adds MP3, OGG, WebP, MKV, WebM,
   AVI and WMV; LibreOffice adds PowerPoint, Keynote, Pages, Numbers, XLS and
   ODS; Pandoc converts
@@ -55,20 +56,36 @@ See [docs/SPEC.md](docs/SPEC.md) for the full behaviour and roadmap.
 
 ## Install
 
+### Homebrew
+
+```sh
+brew install --cask manan-santoki/tap/openshelf
+```
+
+Or add the tap once and use the short name from then on:
+
+```sh
+brew tap manan-santoki/tap
+brew install --cask openshelf
+```
+
+OpenShelf updates itself, so `brew upgrade` leaves it alone (use
+`brew upgrade --cask --greedy openshelf` to force it). To remove it,
+`brew uninstall --cask openshelf`; add `--zap` to delete its settings too.
+
+### Download
+
 1. [Download the latest **OpenShelf DMG**](https://openshelf.space/download)
    (or pick a version from [Releases](https://github.com/Manan-Santoki/OpenShelf/releases)).
 2. Open it and drag **OpenShelf** onto the **Applications** folder.
-3. Open OpenShelf from Applications. It lives in the menu bar (the wheel icon),
-   and a hands-on tour opens the first time (see below).
+3. Open OpenShelf from Applications and click **Open** when macOS asks, as it
+   does for any app downloaded from the internet. It lives in the menu bar
+   (the wheel icon), and a hands-on tour opens the first time (see below).
 
-**"Apple could not verify OpenShelf…"** The app isn't notarized by Apple yet,
-so macOS asks once on first launch:
-
-- **macOS 15 Sequoia and later:** click **Done**, open **System Settings →
-  Privacy & Security**, scroll down to the message about OpenShelf and click
-  **Open Anyway**, then confirm.
-- **macOS 14 Sonoma:** right-click OpenShelf in Applications → **Open** → **Open**.
-- Or, in Terminal: `xattr -dr com.apple.quarantine /Applications/OpenShelf.app`
+OpenShelf is signed with a Developer ID and notarized by Apple from 1.10.0
+on. Older versions weren't: if macOS says it "could not verify" one of them,
+click **Open Anyway** in **System Settings → Privacy & Security**, or update to
+the latest version.
 
 Requires macOS 14 Sonoma or later. Tested on macOS 27. Runs on Apple silicon
 and on Intel Macs up to macOS 26 (macOS 27 is Apple silicon only). A `.zip` of
@@ -382,11 +399,10 @@ OpenShelf can write to are converted in a temporary folder and handed on;
 Add to Shelf keeps such files in
 `~/Library/Application Support/OpenShelf/From Shortcuts`.
 
-**Not in releases yet.** macOS only runs Shortcuts actions from apps signed
-with an Apple developer certificate, and OpenShelf's releases are ad-hoc
-signed for now, so the actions are left out of them until that changes. A
-build made with Xcode installed includes them (see [Build & run](#build--run)),
-but they only run once it's signed with a Developer ID.
+macOS only runs Shortcuts actions from apps signed with an Apple developer
+certificate. Releases from 1.10.0 on are, so the actions are included. A build
+you make yourself (see [Build & run](#build--run)) is signed ad-hoc unless you
+pass `SIGN_IDENTITY`, so its actions show up in Shortcuts but don't run.
 
 ### Updates
 
@@ -450,6 +466,14 @@ make release  # universal build, zipped for a GitHub release
 make dmg      # drag-to-Applications installer (after make release; needs create-dmg)
 ```
 
+Builds are signed ad-hoc by default. To sign and notarize with a Developer ID
+(as the Release workflow does), store notarization credentials once with
+`xcrun notarytool store-credentials openshelf --apple-id … --team-id …`, then:
+
+```sh
+make release notarize dmg notarize-dmg SIGN_IDENTITY="Developer ID Application: Name (TEAMID)"
+```
+
 `make app` and `make release` also add the App Intents metadata that makes the
 Shortcuts actions appear, using `appintentsmetadataprocessor` from Xcode. With
 only the Command Line Tools it prints a warning and builds the app without
@@ -508,12 +532,32 @@ Releases are automatic and driven by [CHANGELOG.md](CHANGELOG.md):
 The **Release** workflow then tests and builds the universal app on a macOS
 runner, makes the DMG and zip, tags `v1.1.0` and publishes a GitHub release
 with that changelog section as its notes. Versions that are already tagged are
-skipped. The release also carries a signed `appcast.xml`, which is how
-installed copies find the update: Sparkle reads
-`releases/latest/download/appcast.xml` and only installs updates signed with
-the project's EdDSA key (stored as the `SPARKLE_PRIVATE_KEY` repository
-secret; the public key is `SUPublicEDKey` in `Support/Info.plist`). The **CI**
-workflow builds and tests every push and pull request.
+skipped. With the Developer ID secrets set, the app and DMG are signed with
+hardened runtime and notarized by Apple; without them the build falls back to
+ad-hoc signing.
+
+Installed copies find updates through Sparkle, which reads
+`appcast.xml` on the `appcast` branch
+(`raw.githubusercontent.com/Manan-Santoki/OpenShelf/appcast/appcast.xml`) and
+only installs updates signed with the project's EdDSA key (the
+`SPARKLE_PRIVATE_KEY` secret; the public key is `SUPublicEDKey` in
+`Support/Info.plist`). The feed is kept apart from GitHub's "latest release" so
+Windows releases in this repository can't affect it; each release still
+attaches `appcast.xml` for copies from 1.9.0 and earlier. The workflow also
+updates the Homebrew cask in
+[Manan-Santoki/homebrew-tap](https://github.com/Manan-Santoki/homebrew-tap)
+(template: `Casks/openshelf.rb`). The **CI** workflow builds and tests every
+push and pull request.
+
+Repository secrets used by the Release workflow:
+
+| Secret | What it is |
+| --- | --- |
+| `SPARKLE_PRIVATE_KEY` | EdDSA key that signs updates |
+| `DEVELOPER_ID_P12_BASE64` / `DEVELOPER_ID_P12_PASSWORD` | Developer ID Application certificate, exported as .p12 and base64-encoded |
+| `NOTARY_APPLE_ID` / `NOTARY_PASSWORD` / `NOTARY_TEAM_ID` | Apple ID, app-specific password and Team ID used by `notarytool` |
+| `NOTARY_KEY_P8_BASE64` / `NOTARY_KEY_ID` / `NOTARY_ISSUER_ID` | Or instead: an App Store Connect API key (takes precedence) |
+| `HOMEBREW_TAP_DEPLOY_KEY` | Private half of a write deploy key on the Homebrew tap repository |
 
 The website, [openshelf.space](https://openshelf.space), is maintained
 separately and isn't part of this repository. It picks up a release by itself:

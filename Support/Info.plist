@@ -19,9 +19,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.5.0</string>
+	<string>1.10.0</string>
 	<key>CFBundleVersion</key>
-	<string>1.5.0</string>
+	<string>1.10.0</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.utilities</string>
 	<key>LSMinimumSystemVersion</key>
@@ -33,7 +33,7 @@
 	<key>NSHumanReadableCopyright</key>
 	<string>MIT License</string>
 	<key>SUFeedURL</key>
-	<string>https://github.com/Manan-Santoki/OpenShelf/releases/latest/download/appcast.xml</string>
+	<string>https://raw.githubusercontent.com/Manan-Santoki/OpenShelf/appcast/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>5Z3WVdgJlMe30m4BDZdSmYnnhDJP9al2DiH0vUGfckw=</string>
 	<key>SUScheduledCheckInterval</key>

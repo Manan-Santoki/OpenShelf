@@ -61,14 +61,66 @@ jobs:
         if: steps.version.outputs.exists == 'false'
         run: swift test
 
+      # Developer ID signing and notarization. Without these secrets the
+      # release falls back to an ad-hoc signed build, as before.
+      - name: Import the Developer ID certificate
+        id: signing
+        if: steps.version.outputs.exists == 'false'
+        env:
+          P12_BASE64: ${{ secrets.DEVELOPER_ID_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+          NOTARY_KEY_P8_BASE64: ${{ secrets.NOTARY_KEY_P8_BASE64 }}
+          NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
+        run: |
+          if [ -z "$P12_BASE64" ] || { [ -z "$NOTARY_KEY_P8_BASE64" ] && [ -z "$NOTARY_APPLE_ID" ]; }; then
+            echo "::warning::Developer ID secrets aren't set; building an ad-hoc signed, un-notarized release."
+            echo "identity=-" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          password="$(uuidgen)"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          echo "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain"
+          # Prepend the signing keychain to the search list (word splitting intended).
+          # shellcheck disable=SC2046
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/cert.p12"
+          if [ -n "$NOTARY_KEY_P8_BASE64" ]; then
+            echo "$NOTARY_KEY_P8_BASE64" | base64 --decode > "$RUNNER_TEMP/notary.p8"
+            echo "notary_key=$RUNNER_TEMP/notary.p8" >> "$GITHUB_OUTPUT"
+          fi
+          identity="$(security find-identity -v -p codesigning "$keychain" | sed -n 's/.*"\(Developer ID Application:.*\)"/\1/p' | head -n 1)"
+          if [ -z "$identity" ]; then
+            echo "::error::No Developer ID Application identity in the imported certificate"
+            exit 1
+          fi
+          echo "identity=$identity" >> "$GITHUB_OUTPUT"
+
       - name: Build the universal app
         if: steps.version.outputs.exists == 'false'
         env:
-          # The Shortcuts actions stay out of releases until they're signed with
-          # a Developer ID: macOS refuses to run App Intents from an ad-hoc
-          # signed app ("Unable to get teamId"), so they'd show up and fail.
-          SKIP_APPINTENTS: "1"
-        run: make release
+          SIGN_IDENTITY: ${{ steps.signing.outputs.identity }}
+        run: |
+          # macOS refuses to run App Intents from an ad-hoc signed app ("Unable
+          # to get teamId"), so the Shortcuts actions ship only in signed builds.
+          if [ "$SIGN_IDENTITY" = "-" ]; then export SKIP_APPINTENTS=1; fi
+          make release SIGN_IDENTITY="$SIGN_IDENTITY"
+
+      - name: Notarize the app
+        if: steps.version.outputs.exists == 'false' && steps.signing.outputs.identity != '-'
+        env:
+          # An App Store Connect API key if set, otherwise Apple ID + app-specific password.
+          NOTARY_KEY_PATH: ${{ steps.signing.outputs.notary_key }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+          NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
+          NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
+          NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
+        run: make notarize
 
       - name: Build the installer
         if: steps.version.outputs.exists == 'false'
@@ -78,15 +130,30 @@ jobs:
           # fall back to a plain disk image rather than failing the release.
           make dmg || make dmg DMG_FLAGS=--skip-jenkins
 
+      - name: Notarize the installer
+        if: steps.version.outputs.exists == 'false' && steps.signing.outputs.identity != '-'
+        env:
+          SIGN_IDENTITY: ${{ steps.signing.outputs.identity }}
+          # An App Store Connect API key if set, otherwise Apple ID + app-specific password.
+          NOTARY_KEY_PATH: ${{ steps.signing.outputs.notary_key }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+          NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
+          NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
+          NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
+        run: make notarize-dmg SIGN_IDENTITY="$SIGN_IDENTITY"
+
       - name: Write the release notes
         if: steps.version.outputs.exists == 'false'
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          SIGNED: ${{ steps.signing.outputs.identity }}
         run: |
           {
             scripts/changelog.sh notes "$VERSION"
             echo
-            sed "s/VERSION/$VERSION/g" .github/release-footer.md
+            if [ "$SIGNED" = "-" ]; then footer=.github/release-footer-unsigned.md; else footer=.github/release-footer.md; fi
+            sed "s/VERSION/$VERSION/g" "$footer"
           } > release-notes.md
           cat release-notes.md
 
@@ -97,9 +164,13 @@ jobs:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          # Sparkle reads the feed from releases/latest/download/appcast.xml, so
-          # each release carries an appcast describing itself.
+          # The feed lives on the `appcast` branch (SUFeedURL in Info.plist) and
+          # grows by one item per release. Copies from 1.9.0 and earlier read
+          # releases/latest/download/appcast.xml, so the release carries it too.
           mkdir -p updates
+          if git fetch -q origin appcast; then
+            git show FETCH_HEAD:appcast.xml > updates/appcast.xml
+          fi
           cp "build/OpenShelf-$VERSION.zip" updates/
           scripts/changelog.sh notes "$VERSION" > update-notes.md
           gh api -X POST /markdown -f mode=gfm -f text="$(cat update-notes.md)" > "updates/OpenShelf-$VERSION.html"
@@ -123,4 +194,54 @@ jobs:
             updates/appcast.xml \
             --title "OpenShelf $VERSION" \
             --notes-file release-notes.md \
-            --target "$GITHUB_SHA"
+            --target "$GITHUB_SHA" \
+            --latest
+
+      - name: Publish the update feed
+        if: steps.version.outputs.exists == 'false'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git fetch -q origin appcast; then
+            git worktree add feed FETCH_HEAD
+          else
+            git worktree add --orphan -b appcast feed
+          fi
+          cp updates/appcast.xml feed/appcast.xml
+          cd feed
+          git add appcast.xml
+          git commit -m "OpenShelf $VERSION"
+          git push origin HEAD:refs/heads/appcast
+
+      # Keeps `brew install --cask manan-santoki/tap/openshelf` current. Needs
+      # HOMEBREW_TAP_DEPLOY_KEY: the private half of a write deploy key on the
+      # Manan-Santoki/homebrew-tap repository.
+      - name: Update the Homebrew cask
+        if: steps.version.outputs.exists == 'false'
+        env:
+          TAP_DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if [ -z "$TAP_DEPLOY_KEY" ]; then
+            echo "::warning::HOMEBREW_TAP_DEPLOY_KEY isn't set; skipping the Homebrew cask."
+            exit 0
+          fi
+          key="$RUNNER_TEMP/tap-deploy-key"
+          printf '%s\n' "$TAP_DEPLOY_KEY" > "$key"
+          chmod 600 "$key"
+          export GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+          sha="$(shasum -a 256 "build/OpenShelf-$VERSION.dmg" | cut -d' ' -f1)"
+          git clone -q git@github.com:Manan-Santoki/homebrew-tap.git tap
+          mkdir -p tap/Casks
+          sed -e '/^# /d' \
+              -e "s/^  version \".*\"/  version \"$VERSION\"/" \
+              -e "s/^  sha256 \".*\"/  sha256 \"$sha\"/" \
+              Casks/openshelf.rb > tap/Casks/openshelf.rb
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/openshelf.rb
+          git diff --cached --quiet || git commit -m "openshelf $VERSION"
+          git push origin HEAD

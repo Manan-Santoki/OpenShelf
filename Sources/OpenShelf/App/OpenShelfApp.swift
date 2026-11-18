@@ -33,6 +33,7 @@ struct OpenShelfApp: App {
             Button("Settings…") { SettingsWindowController.shared.show() }
                 .keyboardShortcut(",")
             Button("Check for Updates…") { Updater.shared.checkForUpdates() }
+            Button("About OpenShelf") { AboutPanel.show() }
             Divider()
             Button("Quit OpenShelf") { NSApp.terminate(nil) }
                 .keyboardShortcut("q")

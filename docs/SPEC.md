@@ -438,9 +438,9 @@ in the app's process (`openAppWhenRun` is false) and never go online.
   app builds without the actions.
 - **Signing:** macOS 27 only connects App Intents to apps with a team ID
   (linkd logs "Unable to get teamId" and Shortcuts says it couldn't
-  communicate with the app). Ad-hoc signed builds have none, so the Release
-  workflow builds with `SKIP_APPINTENTS=1` until releases are signed with a
-  Developer ID.
+  communicate with the app). Releases are signed with a Developer ID, so they
+  include the actions; if the signing secrets are missing, the Release
+  workflow falls back to an ad-hoc build with `SKIP_APPINTENTS=1`.
 
 ## 8. Roadmap
 
@@ -466,7 +466,9 @@ in the app's process (`openAppWhenRun` is false) and never go online.
 6. ~~Rubber-band selection and type-to-select in expanded shelves.~~ (done, §3)
 7. ~~Shelf persistence across relaunches (with bookmarks).~~ (done, §3)
 8. ~~Batch progress for long-running conversions.~~ (done: the progress card, §2.3)
-9. Notarized builds once a Developer ID is available; then a Homebrew cask.
+9. ~~Notarized builds and a Homebrew cask.~~ (done: Developer ID signing and
+   notarization in the Release workflow, `manan-santoki/tap`; next, submit
+   to the official homebrew-cask catalogue)
 10. Follow AppKit's move to gesture recognizers (TN3212): wheel and shelf
     mouse tracking still uses mouse events and tracking areas, which macOS 27
     supports; port it to `NSGestureRecognizer` when that becomes the better path.

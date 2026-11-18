@@ -29,7 +29,7 @@ struct Background: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("First launch")
                     .font(.system(size: 12, weight: .semibold))
-                Text("If macOS says it can't verify OpenShelf, open System Settings → Privacy & Security, scroll down and click Open Anyway. You only need to do this once.")
+                Text("Open OpenShelf from Applications and click Open if macOS asks. It lives in the menu bar (the wheel icon) and keeps itself up to date.")
                     .font(.system(size: 11))
                     .foregroundStyle(.black.opacity(0.6))
                     .fixedSize(horizontal: false, vertical: true)

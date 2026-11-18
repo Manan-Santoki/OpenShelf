@@ -2,8 +2,8 @@ import AppKit
 import Observation
 import Sparkle
 
-/// In-app updates via Sparkle. The feed is the `appcast.xml` attached to the
-/// latest GitHub release (see `SUFeedURL` in Info.plist), and every update must
+/// In-app updates via Sparkle. The feed is `appcast.xml` on the repository's
+/// `appcast` branch (see `SUFeedURL` in Info.plist), and every update must
 /// be signed with the project's EdDSA key (`SUPublicEDKey`).
 ///
 /// Sparkle asks on the second launch whether to check automatically; the choice

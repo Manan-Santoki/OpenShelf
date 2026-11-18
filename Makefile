@@ -29,7 +29,11 @@ SWIFTC = swiftc -sdk "$(SDK)" -swift-version 6 -parse-as-library -O $(SPARKLE_FL
 DEPENDENCY_INFO := $(BUILD_DIR)/$(APP_NAME)_dependency_info.dat
 LINK_RECORD     = -framework AppIntents -Xlinker -dependency_info -Xlinker $(1)
 
-# Assembles $(APP_BUNDLE) around $(BUILD_DIR)/$(APP_NAME) and ad-hoc signs it.
+# Code signing: ad-hoc by default. Set SIGN_IDENTITY to a "Developer ID
+# Application: …" identity for a hardened, notarizable build (scripts/sign.sh).
+SIGN_IDENTITY ?= -
+
+# Assembles $(APP_BUNDLE) around $(BUILD_DIR)/$(APP_NAME) and signs it.
 # The App Intents metadata (Shortcuts and Spotlight actions) needs Xcode; the
 # script warns and carries on without it otherwise. SKIP_APPINTENTS=1 skips it.
 define bundle_app
@@ -40,10 +44,10 @@ define bundle_app
 	cp Support/AppIcon.icns "$(APP_BUNDLE)/Contents/Resources/AppIcon.icns"
 	ditto "$(SPARKLE_FRAMEWORK)" "$(APP_BUNDLE)/Contents/Frameworks/Sparkle.framework"
 	SDK="$(SDK)" DEPENDENCY_INFO="$(DEPENDENCY_INFO)" EXTRA_SWIFTC_FLAGS="-F $(SPARKLE_DIR)" sh scripts/appintents-metadata.sh "$(APP_BUNDLE)" "$(BUILD_DIR)/appintents" $(SOURCES)
-	codesign --force --deep --sign - "$(APP_BUNDLE)"
+	SIGN_IDENTITY="$(SIGN_IDENTITY)" sh scripts/sign.sh "$(APP_BUNDLE)"
 endef
 
-.PHONY: build app run test clean release dmg sparkle
+.PHONY: build app run test clean release dmg sparkle notarize notarize-dmg
 
 # Builds with swiftc directly so it works even where SwiftPM manifests cannot.
 build: $(BUILD_DIR)/$(APP_NAME)
@@ -62,14 +66,15 @@ $(SPARKLE_FRAMEWORK):
 	tar -xf "$(SPARKLE_DIR)/Sparkle-$(SPARKLE_VERSION).tar.xz" -C $(SPARKLE_DIR)
 	touch $(SPARKLE_FRAMEWORK)
 
-# Wraps the binary in an ad-hoc signed .app bundle with Sparkle embedded.
+# Wraps the binary in a signed .app bundle (ad-hoc unless SIGN_IDENTITY is set) with Sparkle embedded.
 app: build
 	$(bundle_app)
 
 run: app
 	open "$(APP_BUNDLE)"
 
-# Universal (Apple silicon + Intel) app, zipped for a GitHub release.
+# Universal (Apple silicon + Intel) app, zipped for a GitHub release. For a
+# notarized release: make release notarize dmg notarize-dmg SIGN_IDENTITY="Developer ID Application: …"
 release: $(SPARKLE_FRAMEWORK)
 	mkdir -p $(BUILD_DIR)/arm64 $(BUILD_DIR)/x86_64
 	for arch in arm64 x86_64; do \
@@ -98,6 +103,18 @@ dmg:
 		$(DMG_FLAGS) \
 		"$(RELEASE_DMG)" "$(APP_BUNDLE)"
 	@echo "$(RELEASE_DMG)"
+
+# Notarizes the release zip, staples the app and re-zips it, so the zip Sparkle
+# installs carries the ticket too. Run after `make release` with SIGN_IDENTITY.
+notarize:
+	sh scripts/notarize.sh "$(RELEASE_ZIP)" "$(APP_BUNDLE)"
+	rm -f "$(RELEASE_ZIP)"
+	ditto -c -k --sequesterRsrc --keepParent "$(APP_BUNDLE)" "$(RELEASE_ZIP)"
+
+# Signs, notarizes and staples the DMG. Run after `make dmg`.
+notarize-dmg:
+	codesign --force --timestamp --sign "$(SIGN_IDENTITY)" "$(RELEASE_DMG)"
+	sh scripts/notarize.sh "$(RELEASE_DMG)"
 
 test:
 	swift test
