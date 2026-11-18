@@ -4,8 +4,7 @@ cask "openshelf" do
   version "1.9.0"
   sha256 "0000000000000000000000000000000000000000000000000000000000000000"
 
-  url "https://github.com/Manan-Santoki/OpenShelf/releases/download/v#{version}/OpenShelf-#{version}.dmg",
-      verified: "github.com/Manan-Santoki/OpenShelf/"
+  url "https://github.com/Manan-Santoki/OpenShelf/releases/download/v#{version}/OpenShelf-#{version}.dmg"
   name "OpenShelf"
   desc "Menu bar shelf and drag-and-drop file converter"
   homepage "https://openshelf.space/"
@@ -16,7 +15,7 @@ cask "openshelf" do
   end
 
   auto_updates true
-  depends_on macos: ">= :sonoma"
+  depends_on macos: :sonoma
 
   app "OpenShelf.app"
 
