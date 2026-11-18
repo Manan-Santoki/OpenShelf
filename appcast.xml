@@ -3,6 +3,42 @@
     <channel>
         <title>OpenShelf</title>
         <item>
+            <title>1.10.0</title>
+            <pubDate>Wed, 18 Nov 2026 04:39:58 +0000</pubDate>
+            <sparkle:version>1.10.0</sparkle:version>
+            <sparkle:shortVersionString>1.10.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[<h3>New</h3>
+<ul>
+<li><strong>OpenShelf in Shortcuts and Spotlight.</strong> Convert Files, Compress, Extract<br>
+Text (OCR), Remove Background, Combine into PDF, Remove Audio, Read QR Codes<br>
+and Add to Shelf are now actions in the Shortcuts app, so you can chain<br>
+them, add them to a Finder Quick Action, or run them on everything that<br>
+lands in a folder with a folder automation, no dragging needed. On macOS 26<br>
+and later the main ones are in Spotlight too. They run entirely on your Mac,<br>
+like the wheels, and save results next to the originals.</li>
+<li><strong>Signed and notarized by Apple.</strong> OpenShelf is now signed with a Developer<br>
+ID and notarized, so it opens like any other downloaded app: no more<br>
+"Apple could not verify" warning, Open Anyway or Terminal commands.</li>
+<li><strong>Install with Homebrew:</strong> <code class="notranslate">brew install --cask manan-santoki/tap/openshelf</code>,<br>
+or <code class="notranslate">brew tap manan-santoki/tap</code> once and then <code class="notranslate">brew install --cask openshelf</code>.<br>
+OpenShelf keeps updating itself as before.</li>
+<li><strong>About OpenShelf</strong> in the menu-bar menu shows the version, with links to<br>
+<a href="https://openshelf.space" rel="nofollow">openshelf.space</a> and the source code.</li>
+</ul>
+<h3>Good to know</h3>
+<ul>
+<li><strong>macOS asks for permissions once more.</strong> Because OpenShelf is now signed<br>
+differently, macOS treats it as a new app for privacy permissions. The first<br>
+time you use a feature that talks to Finder or to Pages, Numbers or Keynote,<br>
+click <strong>OK</strong> when macOS asks again. Nothing else changes, and your settings<br>
+and shelf are kept.</li>
+<li>Updates now come from a dedicated feed. Nothing to do: this update switches<br>
+over by itself.</li>
+</ul>]]></description>
+            <enclosure url="https://github.com/Manan-Santoki/OpenShelf/releases/download/v1.10.0/OpenShelf-1.10.0.zip" length="7475692" type="application/octet-stream" sparkle:edSignature="O/Z67ZmcS52pLpq5fCZRqJOw3aunS3jbUmwC0z62nQz4+l8WGc5bKZ4m1TjEohNUPdFm5Ch7qL39Gt/zU002Cg=="/>
+        </item>
+        <item>
             <title>1.9.0</title>
             <pubDate>Mon, 02 Nov 2026 02:44:44 +0000</pubDate>
             <sparkle:version>1.9.0</sparkle:version>
