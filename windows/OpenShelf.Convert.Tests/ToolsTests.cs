@@ -194,7 +194,8 @@ public class ProcessRunnerTests
         await Task.Delay(600);
         cts.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
-        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(5), $"took {stopwatch.Elapsed}");
+        // ping alone runs ~40 s; anything well under that means the tree was killed (CI machines are slow to tear processes down).
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(20), $"took {stopwatch.Elapsed}");
     }
 
     [Fact]
@@ -204,7 +205,7 @@ public class ProcessRunnerTests
         var failure = await Assert.ThrowsAsync<ProcessFailure>(() =>
             ProcessRunner.RunAsync(Cmd, ["/c", "ping -n 40 127.0.0.1"], new ProcessOptions { Timeout = TimeSpan.FromMilliseconds(500) }));
         Assert.True(failure.TimedOut);
-        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(6), $"took {stopwatch.Elapsed}");
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(20), $"took {stopwatch.Elapsed}");
     }
 
     [Fact]

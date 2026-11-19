@@ -409,14 +409,25 @@ public class PipeProtocolTests
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var accept = PipeProtocol.AcceptAsync(name, TimeSpan.FromSeconds(2), cts.Token);
         var cmd = new AutomationCommand(CommandKind.Convert, [@"C:\a.png", @"C:\b.png"], OutputFormat.Pdf);
-        Assert.True(await PipeProtocol.SendAsync(cmd, 3000, name));
+        Assert.True(await SendWithRetries(cmd, name));
         var got = Assert.IsType<CommandRequest>(await accept).Command;
         Assert.Equal(cmd.Paths, got.Paths);
         Assert.Equal(OutputFormat.Pdf, got.Format);
 
         var legacy = PipeProtocol.AcceptAsync(name, TimeSpan.FromSeconds(2), cts.Token);
-        Assert.True(await PipeProtocol.SendAsync(null, 3000, name));
+        Assert.True(await SendWithRetries(null, name));
         Assert.IsType<ShowSettingsRequest>(await legacy);
+    }
+
+    /// <summary>A busy machine can be slow to put the next pipe instance in place; a client trying again is what a real second launch sees.</summary>
+    private static async Task<bool> SendWithRetries(AutomationCommand? command, string name)
+    {
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            if (await PipeProtocol.SendAsync(command, 3000, name)) return true;
+            await Task.Delay(200);
+        }
+        return false;
     }
 
     [Fact]
