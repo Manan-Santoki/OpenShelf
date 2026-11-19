@@ -207,5 +207,10 @@ internal sealed class DarkMenu : Window
         return menu;
     }
 
+    /// <summary>Opens a menu the way Windows opens a tray icon's menu: its bottom-left corner at the pointer, flipped to whichever
+    /// side has room, over whatever is there (the taskbar or the hidden-icons panel).</summary>
+    public static DarkMenu OpenAtPointer(IReadOnlyList<MenuEntry> entries, ScreenPoint at) =>
+        Open(entries, at, new NativeRect { Left = at.X, Top = at.Y, Right = at.X + 1, Bottom = at.Y + 1 });
+
     public void Dismiss() => CloseMenu();
 }

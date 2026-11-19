@@ -26,7 +26,7 @@ Fidelity and completeness pass after reports that documents changed when convert
   tools can now carry extra checked files (`ExtraFile`).
 - Remove BG can use ISNet (1024 px, 178 MB) for fine edges: Settings > Output > Images.
 - Read Text offers to install the Windows OCR language when none is present (elevated `Add-WindowsCapability`).
-- The tray menu is placed with `CalculatePopupWindowPosition`, keeping clear of the taskbar and the hidden-icons panel.
+- The tray menu opens at the pointer like a native one (`CalculatePopupWindowPosition`), flipping to the side with room.
 
 Verified for real on the dev machine: Word, Excel and PowerPoint conversions; Typst through Pandoc; whisper.cpp transcription
 through the engine; ISNet cutouts. Not yet run for real: the OCR language install (needs a UAC prompt), the tray menu placement

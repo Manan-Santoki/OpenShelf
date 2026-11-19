@@ -6,20 +6,27 @@ namespace OpenShelf.Shelf.Tests;
 
 public class PopupPlacementTests
 {
-    static bool Overlaps(int x, int y, int w, int h, NativeRect r) => x < r.Right && x + w > r.Left && y < r.Bottom && y + h > r.Top;
+    static NativeRect At(ScreenPoint p) => new() { Left = p.X, Top = p.Y, Right = p.X + 1, Bottom = p.Y + 1 };
 
     [Fact]
-    public void ATrayMenuStaysOffTheHiddenIconsPanel()
+    public void ATrayMenuOpensAtThePointerLikeANativeOne()
     {
         var work = System.Windows.Forms.Screen.PrimaryScreen!.WorkingArea;
-        // A hidden-icons panel just above the taskbar, opened from an icon inside it.
-        var panel = new NativeRect { Left = work.Right - 400, Top = work.Bottom - 260, Right = work.Right - 200, Bottom = work.Bottom - 10 };
-        var anchor = new ScreenPoint(panel.Left + 100, panel.Top + 100);
-        var placed = PopupPlacement.Place(anchor, 300, 200, panel);
-        Assert.NotNull(placed);
-        var (x, y) = placed!.Value;
-        Assert.False(Overlaps(x, y, 300, 200, panel), $"menu at {x},{y} covers the panel");
-        Assert.InRange(x, work.Left, work.Right - 300);
-        Assert.InRange(y, work.Top, work.Bottom - 200);
+        // Over the hidden-icons panel, near the bottom right: the menu's bottom-left corner sits at the pointer.
+        var pointer = new ScreenPoint(work.Right - 500, work.Bottom - 100);
+        var (x, y) = PopupPlacement.Place(pointer, 300, 200, At(pointer))!.Value;
+        Assert.Equal(pointer.X, x);
+        Assert.Equal(pointer.Y - 200, y);
+    }
+
+    [Fact]
+    public void ItFlipsWhenThereIsNoRoom()
+    {
+        var work = System.Windows.Forms.Screen.PrimaryScreen!.WorkingArea;
+        var pointer = new ScreenPoint(work.Right - 50, work.Top + 50);
+        var (x, y) = PopupPlacement.Place(pointer, 300, 200, At(pointer))!.Value;
+        Assert.True(x + 300 <= work.Right + 1, "stays on screen to the right");
+        Assert.True(y >= work.Top, "stays on screen at the top");
+        Assert.True(x <= pointer.X && x + 300 >= pointer.X - 1, "still at the pointer horizontally");
     }
 }

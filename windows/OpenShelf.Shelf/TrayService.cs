@@ -46,7 +46,7 @@ public sealed class TrayService : ITrayService
                 try
                 {
                     if (e.Button == WF.MouseButtons.Left) _shelves.ShowAll();
-                    else if (e.Button == WF.MouseButtons.Right) DarkMenu.Open(BuildMenu(), Native.CursorPosition(), PopupPlacement.TrayArea(_notify!));
+                    else if (e.Button == WF.MouseButtons.Right) DarkMenu.OpenAtPointer(BuildMenu(), Native.CursorPosition());
                 }
                 catch (Exception ex) { Log.Error("Tray click", ex); }
             };
