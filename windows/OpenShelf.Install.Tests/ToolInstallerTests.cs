@@ -177,8 +177,8 @@ public class ToolInstallerTests
     {
         using var env = new Env();
         using var installer = env.Create();
-        Assert.Equal(["ffmpeg", "libreoffice", "pandoc", "calibre"], installer.Tools.Select(t => t.Id));
-        Assert.Equal(["ffmpeg", "LibreOffice", "Pandoc", "calibre"], installer.Tools.Select(t => t.Name));
+        Assert.Equal(["ffmpeg", "libreoffice", "pandoc", "calibre", "typst", "whisper"], installer.Tools.Select(t => t.Id));
+        Assert.Equal(["ffmpeg", "LibreOffice", "Pandoc", "calibre", "Typst", "whisper.cpp"], installer.Tools.Select(t => t.Name));
         Assert.All(installer.Tools, row => { Assert.False(row.Installed); Assert.Null(row.Location); Assert.False(row.CanRemove); });
         Assert.Equal("MP3, OGG, MKV, WebM, AVI, WMV and every audio and video conversion", installer.Tools[0].Description);
     }
@@ -236,6 +236,66 @@ public class ToolInstallerTests
         Assert.True(File.Exists(Path.Combine(env.Root, "pandoc", "pandoc.exe")));
         Assert.True(installer.Tools.Single(t => t.Id == "pandoc").CanRemove);
         Assert.Equal("3.13", installer.RecordFor("pandoc")!.Version);
+    }
+
+    [Fact]
+    public async Task TypstInstallsAndPandocFindsItAsItsTypesetter()
+    {
+        using var env = new Env();
+        var zip = Env.Zip(("typst-x86_64-pc-windows-msvc/typst.exe", "typst"), ("typst-x86_64-pc-windows-msvc/LICENSE", "l"));
+        const string url = "https://github.com/typst/typst/releases/download/v0.15.1/typst-x86_64-pc-windows-msvc.zip";
+        env.Http.Text(ToolSources.TypstLatestApi, Env.ReleaseJson("v0.15.1", "typst-x86_64-pc-windows-msvc.zip", url, Env.Sha(zip)));
+        env.Http.Bytes(url, zip);
+        using var installer = env.Create();
+        await installer.InstallAsync("typst", new Reports(), CancellationToken.None);
+        Assert.True(File.Exists(Path.Combine(env.Root, "typst", "typst.exe")));
+        Assert.Equal("0.15.1", installer.RecordFor("typst")!.Version);
+        File.WriteAllText(Path.Combine(env.External, "pandoc.exe"), "p");
+        var tools = ExternalTools.Detect(new ToolLocations { OwnToolsRoot = env.Root, PathDirectories = [env.External] });
+        Assert.Equal(Path.Combine(env.Root, "typst", "typst.exe"), tools.PdfEngine);
+    }
+
+    private static (byte[] Zip, byte[] Model) ServeWhisper(Env env, bool lieAboutModel = false)
+    {
+        var zip = Env.Zip(("Release/whisper-cli.exe", "cli"), ("Release/whisper.dll", "dll"), ("Release/ggml.dll", "dll"));
+        var model = Encoding.UTF8.GetBytes("a small speech model");
+        const string url = "https://github.com/ggml-org/whisper.cpp/releases/download/v1.9.2/whisper-bin-x64.zip";
+        var releases = $$"""[{"tag_name":"v1.9.5","prerelease":false,"assets":[]},{"tag_name":"b5454","prerelease":true,"assets":[{"name":"whisper-bin-x64.zip","browser_download_url":"https://x/new","digest":"sha256:{{new string('1', 64)}}"}]},{"tag_name":"v1.9.2","prerelease":false,"assets":[{"name":"whisper-bin-x64.zip","size":1,"browser_download_url":"{{url}}","digest":"sha256:{{Env.Sha(zip)}}"}]}]""";
+        env.Http.Text(ToolSources.WhisperReleasesApi, releases);
+        env.Http.Bytes(url, zip);
+        var modelSha = lieAboutModel ? new string('2', 64) : Env.Sha(model);
+        env.Http.Text(ToolSources.WhisperModelsApi, $$$"""[{"path":"ggml-base.bin","size":3,"lfs":{"oid":"{{{new string('3', 64)}}}"}},{"path":"{{{ToolSources.WhisperModel}}}","size":{{{model.Length}}},"lfs":{"oid":"{{{modelSha}}}"}}]""");
+        env.Http.Bytes(ToolSources.WhisperModelBase + ToolSources.WhisperModel, model);
+        return (zip, model);
+    }
+
+    [Fact]
+    public async Task WhisperInstallsTheNewestStableBuildWithItsModel()
+    {
+        using var env = new Env();
+        ServeWhisper(env);
+        using var installer = env.Create();
+        await installer.InstallAsync("whisper", new Reports(), CancellationToken.None);
+        var folder = Path.Combine(env.Root, "whisper");
+        Assert.True(File.Exists(Path.Combine(folder, "whisper-cli.exe")));
+        Assert.True(File.Exists(Path.Combine(folder, "whisper.dll")));
+        Assert.True(File.Exists(Path.Combine(folder, "models", ToolSources.WhisperModel)));
+        Assert.Equal("1.9.2", installer.RecordFor("whisper")!.Version);
+        Assert.True(installer.Tools.Single(t => t.Id == "whisper").Installed);
+        var tools = ExternalTools.Detect(new ToolLocations { OwnToolsRoot = env.Root });
+        Assert.True(tools.CanTranscribe);
+    }
+
+    [Fact]
+    public async Task AWhisperModelThatDoesNotMatchLeavesNothingInstalled()
+    {
+        using var env = new Env();
+        ServeWhisper(env, lieAboutModel: true);
+        using var installer = env.Create();
+        var error = await Assert.ThrowsAsync<ToolInstallException>(() => installer.InstallAsync("whisper", new Reports(), CancellationToken.None));
+        Assert.Equal(InstallFailureKind.Verification, error.Kind);
+        Assert.False(Directory.Exists(Path.Combine(env.Root, "whisper")));
+        Assert.False(installer.Tools.Single(t => t.Id == "whisper").Installed);
     }
 
     [Fact]

@@ -44,6 +44,21 @@ public static class AppHost
         Shelves = shelves;
         Progress = new ProgressService(toasts);
 
+        // Document settings reach the engines directly; tools are looked for again when the Office switch changes.
+        static void ApplyDocumentSettings()
+        {
+            var documents = _store!.GetDocuments();
+            OpenShelf.Convert.Markdown.MarkdownOptions.SmartPunctuation = documents.SmartPunctuation;
+            OpenShelf.Vision.ModelStore.UseHighQuality(_store.GetHighQualityCutouts());
+            if (OfficeInstallation.Enabled != documents.UseMicrosoftOffice)
+            {
+                OfficeInstallation.Enabled = documents.UseMicrosoftOffice;
+                ExternalToolsProvider.Default.Refresh();
+            }
+        }
+        ApplyDocumentSettings();
+        _store.Changed += ApplyDocumentSettings;
+
         // Conversion engines beyond the built-in ones (images, archives, sheets, subtitles).
         MarkdownEngines.Register(EngineRegistry.Default);
         DocumentEngines.Register(EngineRegistry.Default);

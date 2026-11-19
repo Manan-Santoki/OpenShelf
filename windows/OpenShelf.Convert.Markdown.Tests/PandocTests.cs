@@ -63,7 +63,7 @@ public class PandocTests
     public void PandocArguments(OutputFormat format, string writer)
     {
         var args = PandocMarkdownEngine.Arguments(@"C:\Users\me\Notes\hello.md", format, @"C:\out\hello.x", null)!;
-        Assert.Equal(new[] { @"C:\Users\me\Notes\hello.md", "--from", "markdown", "--to", writer }, args.Take(5));
+        Assert.Equal(new[] { @"C:\Users\me\Notes\hello.md", "--from", "markdown-smart", "--to", writer }, args.Take(5));
         Assert.Contains("--standalone", args);
         Assert.Equal(format is OutputFormat.Html or OutputFormat.Epub, args.Contains("pagetitle=hello"));
         Assert.Contains(@"C:\Users\me\Notes", args);

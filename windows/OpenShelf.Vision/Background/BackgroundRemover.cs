@@ -39,24 +39,26 @@ public sealed class Cutout
 /// <summary>What a batch of cutouts did.</summary>
 public sealed record BackgroundRemovalOutcome(IReadOnlyList<string> Saved, IReadOnlyList<string> WithoutSubject, IReadOnlyList<(string Path, string Error)> Failed);
 
-/// <summary>Cuts the subject out of a photo, on this PC, with U²-Netp running in ONNX Runtime (CPU).
-/// The 4.6 MB model is downloaded once (see <see cref="EnsureModelAsync"/>) and kept in <c>%LOCALAPPDATA%\OpenShelf\models</c>.</summary>
+/// <summary>Cuts the subject out of a photo, on this PC, with U²-Netp (fast, 4.6 MB) or ISNet (fine edges, 178 MB) running in ONNX
+/// Runtime (CPU). The model is downloaded once (see <see cref="EnsureModelAsync"/>) and kept in <c>%LOCALAPPDATA%\OpenShelf\models</c>.</summary>
 public sealed class BackgroundRemover
 {
     /// <summary>"Name No Background.png".</summary>
     public const string Suffix = "No Background";
 
-    private const int InputSize = 320;
-    private static readonly float[] Mean = [0.485f, 0.456f, 0.406f];
-    private static readonly float[] Std = [0.229f, 0.224f, 0.225f];
-
     private static readonly object SessionLock = new();
     private static string? _sessionPath;
     private static InferenceSession? _session;
 
-    private readonly ModelStore _store;
+    private readonly ModelStore? _fixedStore;
 
-    public BackgroundRemover(ModelStore? store = null) => _store = store ?? ModelStore.Default;
+    /// <param name="store">The model to use; null follows <see cref="ModelStore.Default"/>, which Settings can switch.</param>
+    public BackgroundRemover(ModelStore? store = null) => _fixedStore = store;
+
+    private ModelStore _store => _fixedStore ?? ModelStore.Default;
+
+    /// <summary>The model this remover uses now.</summary>
+    public ModelDefinition Model => _store.Definition;
 
     /// <summary>Whether the model is on disk, so a cutout needs no download.</summary>
     public bool IsModelAvailable => _store.IsModelAvailable;
@@ -109,9 +111,11 @@ public sealed class BackgroundRemover
 
     private Cutout CutOut(PixelImage image, CancellationToken ct)
     {
+        var model = _store.Definition;
         var session = Session();
-        var small = image.OnWhite().Resize(InputSize, InputSize);
-        var input = Preprocess(small);
+        var size = model.InputSize;
+        var small = image.OnWhite().Resize(size, size);
+        var input = Preprocess(small, size, model.ChannelMean, model.ChannelStd);
         ct.ThrowIfCancellationRequested();
         var name = session.InputMetadata.Keys.First();
         float[] probabilities;
@@ -125,7 +129,7 @@ public sealed class BackgroundRemover
         var coverage = (double)foreground / probabilities.Length;
         if (max < 0.5f || coverage < 0.005) throw new NoSubjectException();
 
-        var mask = Upscale(probabilities, image.Width, image.Height);
+        var mask = Upscale(probabilities, size, image.Width, image.Height);
         var bgra = new byte[image.Bgra.Length];
         Parallel.For(0, image.Height, y =>
         {
@@ -140,7 +144,7 @@ public sealed class BackgroundRemover
         return new Cutout(image.Width, image.Height, bgra, mask, coverage);
     }
 
-    private static DenseTensor<float> Preprocess(PixelImage small)
+    private static DenseTensor<float> Preprocess(PixelImage small, int InputSize, float[] Mean, float[] Std)
     {
         var max = 1;
         for (var i = 0; i < small.Bgra.Length; i += 4)
@@ -157,8 +161,8 @@ public sealed class BackgroundRemover
         return tensor;
     }
 
-    /// <summary>Bilinear upscale of the 320 x 320 probabilities to the picture size, with soft edges (smoothstep from 0.1 to 0.9).</summary>
-    private static byte[] Upscale(float[] probabilities, int width, int height)
+    /// <summary>Bilinear upscale of the model's square probabilities to the picture size, with soft edges (smoothstep from 0.1 to 0.9).</summary>
+    private static byte[] Upscale(float[] probabilities, int InputSize, int width, int height)
     {
         var mask = new byte[width * height];
         var scaleX = (InputSize - 1.0) / Math.Max(width - 1, 1);

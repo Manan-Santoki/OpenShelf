@@ -47,6 +47,24 @@ public class NetworkLinkTests(ITestOutputHelper output)
                 }
             }
 
+        foreach (var tool in ToolSources.All)
+            foreach (var extra in tool.ExtraFiles)
+            {
+                try
+                {
+                    var resolved = await extra.Resolve(http, CancellationToken.None);
+                    using var response = await http.SendAsync(HttpMethod.Head, resolved.Url, CancellationToken.None);
+                    var length = response.Content.Headers.ContentLength;
+                    output.WriteLine($"{tool.Id,-12} {extra.Name,-32} sha256 {resolved.Sha256[..12]}…  {length / 1_000_000} MB\n    {resolved.Url}");
+                    if (length is null or < 1_000_000) problems.Add($"{tool.Id}/{extra.Name}: size {length}");
+                }
+                catch (Exception e)
+                {
+                    output.WriteLine($"{tool.Id,-12} {extra.Name,-32} FAILED: {e.Message}");
+                    problems.Add($"{tool.Id}/{extra.Name}: {e.Message}");
+                }
+            }
+
         Assert.True(problems.Count == 0, string.Join("\n", problems));
     }
 }

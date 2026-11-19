@@ -99,8 +99,8 @@ public sealed class LibreOfficeEngine : IConversionEngine
         _fallback = fallback ?? new DocumentEngine();
     }
 
-    private static readonly string[] WordExtensions = ["docx", "doc", "odt", "rtf"];
-    private static readonly string[] SlideExtensions = ["pptx", "ppt", "odp"];
+    private static readonly string[] WordExtensions = ["docx", "docm", "dotx", "doc", "odt", "rtf"];
+    private static readonly string[] SlideExtensions = ["pptx", "pptm", "ppsx", "ppt", "odp"];
 
     public bool CanConvert(FileKind kind, OutputFormat format) => kind switch
     {
@@ -123,7 +123,7 @@ public sealed class LibreOfficeEngine : IConversionEngine
             FileKind.Document => format == OutputFormat.Pdf && WordExtensions.Contains(ext),
             FileKind.Spreadsheet => ext switch
             {
-                "xls" or "ods" => format is OutputFormat.Xlsx or OutputFormat.Csv or OutputFormat.Pdf or OutputFormat.Ods,
+                "xls" or "xlsm" or "ods" => format is OutputFormat.Xlsx or OutputFormat.Csv or OutputFormat.Pdf or OutputFormat.Ods,
                 "csv" or "tsv" or "xlsx" => format == OutputFormat.Ods,
                 _ => false,
             },

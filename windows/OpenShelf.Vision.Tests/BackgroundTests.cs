@@ -208,3 +208,54 @@ public class BackgroundRemoverTests
         Assert.Equal(ModelDefinition.U2Netp.Sha256, System.Convert.ToHexString(await SHA256.HashDataAsync(stream)), ignoreCase: true);
     }
 }
+
+/// <summary>The high-quality model. Runs when OPENSHELF_ISNET_DIR names a folder holding isnet-general-use.onnx.</summary>
+public class IsNetTests
+{
+    private static BackgroundRemover? Remover()
+    {
+        var folder = Environment.GetEnvironmentVariable("OPENSHELF_ISNET_DIR");
+        if (string.IsNullOrEmpty(folder)) return null;
+        return new BackgroundRemover(new ModelStore(folder, ModelDefinition.IsNet, bundledDirectory: ""));
+    }
+
+    [Fact]
+    public void TheHighQualitySwitchPicksTheModel()
+    {
+        var before = ModelStore.Default;
+        try
+        {
+            ModelStore.UseHighQuality(true);
+            Assert.Equal(ModelDefinition.IsNet, new BackgroundRemover().Model);
+            ModelStore.UseHighQuality(false);
+            Assert.Equal(ModelDefinition.U2Netp, new BackgroundRemover().Model);
+        }
+        finally { ModelStore.Default = before; }
+    }
+
+    [Fact]
+    public async Task CutsOutTheSubjectWithCrispEdges()
+    {
+        if (Remover() is not { } remover) return;
+        using var dir = new TempDir();
+        var path = Generate.SubjectOnPlain(dir.File("Photo.png"));
+        var cutout = await remover.CutOutAsync(path);
+        byte AlphaAt(int x, int y) => cutout.Bgra[(y * 640 + x) * 4 + 3];
+        Assert.True(AlphaAt(320, 240) > 240, "the middle of the subject stays opaque");
+        Assert.True(AlphaAt(8, 8) < 16, "a corner of the plain background becomes transparent");
+        Assert.True(AlphaAt(630, 470) < 16);
+        Assert.InRange(cutout.Coverage, 0.1, 0.6);
+        // Crisp: few pixels are half-transparent.
+        var soft = cutout.Mask.Count(m => m is > 25 and < 230);
+        Assert.True(soft < cutout.Mask.Length * 0.03, $"{soft} soft pixels");
+    }
+
+    [Fact]
+    public async Task APlainPictureHasNoClearSubject()
+    {
+        if (Remover() is not { } remover) return;
+        using var dir = new TempDir();
+        var path = Generate.PlainImage(dir.File("Plain.png"));
+        await Assert.ThrowsAsync<NoSubjectException>(() => remover.RemoveAsync(path));
+    }
+}

@@ -85,7 +85,8 @@ public sealed class PandocMarkdownEngine : IConversionEngine
     public static List<string>? Arguments(string source, OutputFormat format, string output, string? pdfEngine)
     {
         if (Writer(format) is not { } writer) return null;
-        var arguments = new List<string> { Path.GetFullPath(source), "--from", "markdown" };
+        // Pandoc typesets quotes and dashes unless told not to; text stays as typed unless smart punctuation is on.
+        var arguments = new List<string> { Path.GetFullPath(source), "--from", MarkdownOptions.SmartPunctuation ? "markdown" : "markdown-smart" };
         if (writer.Length > 0) arguments.AddRange(["--to", writer]);
         // Pictures next to the document are found wherever Pandoc runs.
         arguments.AddRange(["--output", output, "--resource-path", Path.GetDirectoryName(Path.GetFullPath(source)) ?? "."]);

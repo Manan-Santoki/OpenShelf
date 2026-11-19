@@ -29,8 +29,12 @@ public class ParserTests
         Assert.Contains(new MarkdownInline.Strong(T("bold")), text);
         Assert.Contains(new MarkdownInline.Code("monospace"), text);
         var dashes = _document.Blocks.OfType<B.Paragraph>().Select(p => p.Text.PlainText()).First(t => t.StartsWith("Use 3 dashes"));
-        Assert.Contains("“it’s all in chapters 12–14”", dashes);
-        Assert.Contains("Three dots …", dashes);
+        // Kept as typed unless smart punctuation is asked for.
+        Assert.DoesNotContain("“", dashes);
+        Assert.Contains("Three dots ...", dashes);
+        var smart = MarkdownDocument.Parse(Samples.Pandoc, smartPunctuation: true).Blocks.OfType<B.Paragraph>().Select(p => p.Text.PlainText()).First(t => t.StartsWith("Use 3 dashes"));
+        Assert.Contains("“it’s all in chapters 12–14”", smart);
+        Assert.Contains("Three dots …", smart);
     }
 
     [Fact]
@@ -63,7 +67,7 @@ public class ParserTests
     [Fact]
     public void LinksFootnotesAndEscapes()
     {
-        var text = _document.Blocks.OfType<B.Paragraph>().Select(p => p.Text).First(t => t.PlainText().StartsWith("Here’s a link"));
+        var text = _document.Blocks.OfType<B.Paragraph>().Select(p => p.Text).First(t => t.PlainText().StartsWith("Here's a link"));
         Assert.Contains(new MarkdownInline.Link("http://foo.bar", null, T("a website")), text);
         Assert.Contains(text, i => i is MarkdownInline.Link l && l.Url == "#an-h2-header");
         Assert.Contains(new MarkdownInline.Footnote(1), text);
@@ -79,7 +83,7 @@ public class ParserTests
         Assert.Equal(2, tables.Count);
         Assert.Equal(["size", "material", "color"], tables[0].Header!.Select(c => c.PlainText()));
         Assert.Equal(["10", "hemp canvas", "natural"], tables[0].Rows.Last().Select(c => c.PlainText()));
-        Assert.Equal("Shoes, their sizes, and what they’re made of", tables[0].Caption!.PlainText());
+        Assert.Equal("Shoes, their sizes, and what they're made of", tables[0].Caption!.PlainText());
         Assert.Equal(2, tables[1].Rows.Count);
         Assert.Equal("Sunsets, apples, and other red or reddish things.", tables[1].Rows[0][1].PlainText());
         Assert.Equal(2, tables[1].Widths!.Count);
@@ -208,5 +212,71 @@ public class ParserTests
         Assert.Equal("x₁ + y²", MarkdownMath.Unicode("x_1 + y^2"));
         Assert.Equal("α ≤ β", MarkdownMath.Unicode(@"\alpha \leq \beta"));
         Assert.Equal("sin", MarkdownMath.Unicode(@"\sin"));
+    }
+}
+
+public class InlineHtmlTests
+{
+    private static MarkdownText Inlines(string source) =>
+        MarkdownDocument.Parse(source).Blocks.FirstOrDefault() is MarkdownBlock<MarkdownText>.Paragraph p ? p.Text : new MarkdownText();
+
+    private static MarkdownText T(string text) => MarkdownText.OfString(text);
+
+    [Fact]
+    public void FormattingTagsKeepTheirLook()
+    {
+        var text = Inlines("a <u>under</u> <b>bold</b> <i>it</i> x<sup>2</sup> H<sub>2</sub>O <mark>hi</mark> <kbd>Ctrl</kbd> <s>old</s>");
+        Assert.Contains(new MarkdownInline.Styled(InlineStyle.Underline, T("under")), text);
+        Assert.Contains(new MarkdownInline.Strong(T("bold")), text);
+        Assert.Contains(new MarkdownInline.Emphasis(T("it")), text);
+        Assert.Contains(new MarkdownInline.Styled(InlineStyle.Superscript, T("2")), text);
+        Assert.Contains(new MarkdownInline.Styled(InlineStyle.Subscript, T("2")), text);
+        Assert.Contains(new MarkdownInline.Styled(InlineStyle.Highlight, T("hi")), text);
+        Assert.Contains(new MarkdownInline.Styled(InlineStyle.Keyboard, T("Ctrl")), text);
+        Assert.Contains(new MarkdownInline.Strikethrough(T("old")), text);
+    }
+
+    [Fact]
+    public void MarkdownInsideTagsAndTagsInsideMarkdown()
+    {
+        var text = Inlines("<u>an *important* note</u> and **bold <sup>up</sup>**");
+        var underline = Assert.IsType<MarkdownInline.Styled>(text.First(i => i is MarkdownInline.Styled));
+        Assert.Contains(new MarkdownInline.Emphasis(T("important")), underline.Content);
+        var strong = Assert.IsType<MarkdownInline.Strong>(text.First(i => i is MarkdownInline.Strong));
+        Assert.Contains(new MarkdownInline.Styled(InlineStyle.Superscript, T("up")), strong.Content);
+    }
+
+    [Fact]
+    public void LinksPicturesAndUnknownTags()
+    {
+        var text = Inlines("<a href=\"https://example.com\">site</a> <img src=\"a.png\" alt=\"Logo\"> <span class=\"x\">kept</span> <u>unclosed");
+        Assert.Contains(new MarkdownInline.Link("https://example.com", null, T("site")), text);
+        Assert.Contains(text, i => i is MarkdownInline.Image { Source: "a.png" } image && image.Alt.PlainText() == "Logo");
+        Assert.Contains("kept", text.PlainText());
+        Assert.Contains("unclosed", text.PlainText());
+        Assert.DoesNotContain("<", text.PlainText());
+    }
+
+    [Fact]
+    public void EveryFormatWritesTheStyle()
+    {
+        var document = MarkdownDocument.Parse("<u>under</u> x<sup>2</sup> <mark>hi</mark>");
+        var html = new MarkdownHtml().Body(document);
+        Assert.Contains("<u>under</u>", html);
+        Assert.Contains("<sup>2</sup>", html);
+        Assert.Contains("<mark>hi</mark>", html);
+        var rtf = MarkdownRtf.Render(document, null, PaperSize.A4);
+        Assert.Contains(@"\ul ", rtf);
+        Assert.Contains(@"\super ", rtf);
+        Assert.Contains(@"\highlight6 ", rtf);
+        using var folder = new TempFolder();
+        var path = Path.Combine(folder.Path, "a.docx");
+        MarkdownDocx.Write(document, folder.Path, path);
+        using var zip = System.IO.Compression.ZipFile.OpenRead(path);
+        using var reader = new StreamReader(zip.GetEntry("word/document.xml")!.Open());
+        var xml = reader.ReadToEnd();
+        Assert.Contains("<w:u w:val=\"single\"/>", xml);
+        Assert.Contains("<w:vertAlign w:val=\"superscript\"/>", xml);
+        Assert.Contains("<w:highlight w:val=\"yellow\"/>", xml);
     }
 }

@@ -30,6 +30,9 @@ public sealed class OcrEditor : EditorWindow, IEditorDemo
     private readonly Grid _status = new() { Margin = new Thickness(0, 12, 0, 0) };
     private readonly StackPanel _progressPanel = new() { VerticalAlignment = VerticalAlignment.Top, Visibility = Visibility.Collapsed };
     private Button _settingsButton = null!;
+    private Button _installButton = null!;
+    private readonly string _languageTag = OcrLanguagePack.PreferredTag();
+    private Func<bool> _isAvailable = () => OcrService.IsAvailable;
     private OcrOutput _output = OcrOutput.SearchablePdf;
     private bool _noLanguage;
 
@@ -69,12 +72,17 @@ public sealed class OcrEditor : EditorWindow, IEditorDemo
         _progressPanel.Children.Add(_bar);
         _progressPanel.Children.Add(_detail);
 
-        var settings = _settingsButton = ToolKit.Button("Open Language Settings", (_, _) => OpenLanguageSettings());
-        settings.HorizontalAlignment = HorizontalAlignment.Left;
-        settings.Margin = new Thickness(0, 8, 0, 0);
+        // Windows can add the OCR language itself; the settings page stays as the other way.
+        _installButton = ToolKit.Button($"Install {OcrLanguagePack.DisplayName(_languageTag)}", async (_, _) => await InstallLanguageAsync());
+        _installButton.ToolTip = "Adds Windows' own text recognition for this language. Windows asks for permission first.";
+        var settings = _settingsButton = ToolKit.Button("Language Settings", (_, _) => OpenLanguageSettings());
+        settings.Margin = new Thickness(8, 0, 0, 0);
+        var buttons = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
+        buttons.Children.Add(_installButton);
+        buttons.Children.Add(settings);
         var noticeBody = new StackPanel();
         noticeBody.Children.Add(_notice);
-        noticeBody.Children.Add(settings);
+        noticeBody.Children.Add(buttons);
         var noticeRow = new Grid();
         noticeRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         noticeRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -92,16 +100,44 @@ public sealed class OcrEditor : EditorWindow, IEditorDemo
         stack.Children.Add(_status);
         Canvas = stack;
 
-        if (!(isAvailable ?? (() => OcrService.IsAvailable))())
+        if (isAvailable is not null) _isAvailable = isAvailable;
+        if (!_isAvailable())
         {
             _noLanguage = true;
-            ShowNotice(new OcrNoLanguageException().Message, offerSettings: true);
+            ShowNotice(NoLanguageText, offerSettings: true);
         }
         Refresh();
     }
 
     protected override string PrimaryTitle => "Save";
     protected override bool CanApply => !_noLanguage;
+
+    private string NoLanguageText =>
+        $"Windows has no text recognition language installed yet. Install the one for {OcrLanguagePack.DisplayName(_languageTag)}, or add another in Language Settings.";
+
+    private async Task InstallLanguageAsync()
+    {
+        _installButton.IsEnabled = false;
+        _settingsButton.IsEnabled = false;
+        _notice.Text = $"Installing text recognition for {OcrLanguagePack.DisplayName(_languageTag)}… Windows downloads it, which can take a minute or two.";
+        var result = await OcrLanguagePack.InstallAsync(_languageTag);
+        _installButton.IsEnabled = true;
+        _settingsButton.IsEnabled = true;
+        if (result == OcrPackResult.Installed && _isAvailable())
+        {
+            _noLanguage = false;
+            _noticeCard.Visibility = Visibility.Collapsed;
+            Refresh();
+            return;
+        }
+        _notice.Text = result switch
+        {
+            OcrPackResult.Cancelled => "Nothing was installed. Windows needs your permission to add a recognition language.",
+            OcrPackResult.NotAvailable => $"Windows has no text recognition for {OcrLanguagePack.DisplayName(_languageTag)}. Add another language in Language Settings, with its “Optical character recognition” feature.",
+            OcrPackResult.Installed => "The language was added. Close this window and open Read Text again to use it.",
+            _ => "Windows couldn’t add the language. Check the internet connection, or add it in Language Settings.",
+        };
+    }
 
     private static void OpenLanguageSettings()
     {
@@ -114,6 +150,7 @@ public sealed class OcrEditor : EditorWindow, IEditorDemo
         _notice.Text = message;
         _noticeCard.Visibility = Visibility.Visible;
         _settingsButton.Visibility = offerSettings ? Visibility.Visible : Visibility.Collapsed;
+        _installButton.Visibility = offerSettings ? Visibility.Visible : Visibility.Collapsed;
         _progressPanel.Visibility = Visibility.Collapsed;
     }
 
@@ -149,7 +186,7 @@ public sealed class OcrEditor : EditorWindow, IEditorDemo
         }
         catch (OcrNoLanguageException e)
         {
-            Dispatcher.InvokeAsync(() => { _noLanguage = true; ShowNotice(e.Message, offerSettings: true); Refresh(); });
+            Dispatcher.InvokeAsync(() => { _noLanguage = true; ShowNotice(NoLanguageText, offerSettings: true); Refresh(); });
             throw new SaveException(SaveException.Reason.Failed, e.Message, e);
         }
         catch (OperationCanceledException)

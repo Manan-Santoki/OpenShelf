@@ -14,6 +14,10 @@ public sealed record DownloadSource(string Name, Func<SourceHttp, CancellationTo
 
 public enum PackageKind { Zip, Msi }
 
+/// <summary>A further file a tool needs beside its program (a speech model, say), downloaded and checked the same way and
+/// kept inside the tool's folder at <see cref="RelativePath"/>.</summary>
+public sealed record ExtraFile(string RelativePath, string Name, Func<SourceHttp, CancellationToken, Task<ResolvedDownload>> Resolve);
+
 /// <summary>Everything the installer knows about one optional tool. All the addresses OpenShelf downloads from are in
 /// this file, so a moved or renamed download is a one-line fix here.</summary>
 public sealed record ToolDefinition(
@@ -23,8 +27,11 @@ public sealed record ToolDefinition(
     PackageKind Package,
     IReadOnlyList<DownloadSource> Sources,
     string WingetId,
-    SignaturePolicy Signature)
+    SignaturePolicy Signature,
+    IReadOnlyList<ExtraFile>? Extras = null)
 {
+    public IReadOnlyList<ExtraFile> ExtraFiles => Extras ?? [];
+
     /// <summary>The folder under the tools root (the id).</summary>
     public string Folder => Id;
 }
@@ -43,6 +50,16 @@ public static class ToolSources
     // calibre: GitHub release (digest listed by GitHub) and the vendor's own host for the same file.
     public const string CalibreLatestApi = "https://api.github.com/repos/kovidgoyal/calibre/releases/latest";
     public const string CalibreHost = "https://download.calibre-ebook.com/";
+    // Typst: the typesetter Pandoc makes PDFs with (GitHub lists each asset's digest).
+    public const string TypstLatestApi = "https://api.github.com/repos/typst/typst/releases/latest";
+    // whisper.cpp: recent releases (the newest can have no Windows build yet); the speech model from its Hugging Face repository.
+    public const string WhisperReleasesApi = "https://api.github.com/repos/ggml-org/whisper.cpp/releases?per_page=20";
+    public const string WhisperModelsApi = "https://huggingface.co/api/models/ggerganov/whisper.cpp/tree/main";
+    public const string WhisperModelBase = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/";
+    /// <summary>Multilingual, 190 MB, good accuracy at a speed a laptop CPU manages.</summary>
+    public const string WhisperModel = "ggml-small-q5_1.bin";
+
+    private static bool Arm64 => System.Runtime.InteropServices.RuntimeInformation.OSArchitecture == System.Runtime.InteropServices.Architecture.Arm64;
 
     public static IReadOnlyList<ToolDefinition> All { get; } =
     [
@@ -55,6 +72,11 @@ public static class ToolSources
         new("calibre", "calibre", "E-books: EPUB, MOBI, AZW3 and more.", PackageKind.Msi,
             [new("github.com/kovidgoyal/calibre", (h, ct) => ResolveCalibre(h, false, ct)),
              new("download.calibre-ebook.com", (h, ct) => ResolveCalibre(h, true, ct))], "calibre.calibre", SignaturePolicy.IfSigned),
+        new("typst", "Typst", "Typesetting for Pandoc: well-set PDFs from Markdown, Word and e-books.", PackageKind.Zip,
+            [new("github.com/typst/typst", ResolveTypst)], "Typst.Typst", SignaturePolicy.None),
+        new("whisper", "whisper.cpp", "Speech to text: transcripts and subtitles (TXT, SRT, VTT) from audio and video, on this PC.", PackageKind.Zip,
+            [new("github.com/ggml-org/whisper.cpp", ResolveWhisper)], "", SignaturePolicy.None,
+            [new ExtraFile(Path.Combine("models", WhisperModel), "the speech model", ResolveWhisperModel)]),
     ];
 
     // ---- Resolvers ---------------------------------------------------------------------------------------------
@@ -95,6 +117,48 @@ public static class ToolSources
         if (!vendorHost) return found;
         var version = Regex.Match(found.Url.AbsolutePath, @"calibre-64bit-([\d.]+)\.msi").Groups[1].Value;
         return found with { Url = new Uri($"{CalibreHost}{version}/calibre-64bit-{version}.msi") };
+    }
+
+    public static async Task<ResolvedDownload> ResolveTypst(SourceHttp http, CancellationToken ct)
+    {
+        using var release = await http.GetJsonAsync(new Uri(TypstLatestApi), ct);
+        var wanted = Arm64 ? "typst-aarch64-pc-windows-msvc.zip" : "typst-x86_64-pc-windows-msvc.zip";
+        var asset = FindAsset(release.RootElement, name => name == wanted)
+            ?? throw new SourceUnavailableException("No Typst download for Windows was found.");
+        return FromAsset(asset, "Typst", Tag(release.RootElement));
+    }
+
+    /// <summary>The newest stable whisper.cpp release that has a Windows CPU build (some releases ship none), else the newest of any.</summary>
+    public static async Task<ResolvedDownload> ResolveWhisper(SourceHttp http, CancellationToken ct)
+    {
+        using var releases = await http.GetJsonAsync(new Uri(WhisperReleasesApi), ct);
+        var wanted = Arm64 ? "whisper-bin-win-cpu-arm64.zip" : "whisper-bin-x64.zip";
+        JsonElement? fallback = null;
+        foreach (var release in releases.RootElement.EnumerateArray())
+        {
+            if (release.TryGetProperty("draft", out var draft) && draft.ValueKind == JsonValueKind.True) continue;
+            if (FindAsset(release, name => name == wanted) is not { } asset) continue;
+            var pre = release.TryGetProperty("prerelease", out var p) && p.ValueKind == JsonValueKind.True;
+            if (!pre) return FromAsset(asset, "whisper.cpp", Tag(release));
+            fallback ??= release;
+        }
+        if (fallback is { } newest) return FromAsset(FindAsset(newest, name => name == wanted), "whisper.cpp", Tag(newest));
+        throw new SourceUnavailableException("No whisper.cpp download for Windows was found.");
+    }
+
+    /// <summary>The model file and the SHA-256 Hugging Face keeps for it (its LFS object id).</summary>
+    public static async Task<ResolvedDownload> ResolveWhisperModel(SourceHttp http, CancellationToken ct)
+    {
+        using var tree = await http.GetJsonAsync(new Uri(WhisperModelsApi), ct);
+        foreach (var file in tree.RootElement.EnumerateArray())
+        {
+            if (!file.TryGetProperty("path", out var path) || path.GetString() != WhisperModel) continue;
+            var sha = file.TryGetProperty("lfs", out var lfs) && lfs.TryGetProperty("oid", out var oid) ? oid.GetString() : null;
+            if (sha is null) break;
+            long? size = file.TryGetProperty("size", out var s) && s.TryGetInt64(out var n) ? n : null;
+            return new ResolvedDownload(new Uri(WhisperModelBase + WhisperModel), ParseSha256(sha, "the speech model"), "small-q5_1", size);
+        }
+        throw new ToolInstallException("The checksum for the speech model couldn’t be found, so it wasn’t installed.", InstallFailureKind.Verification);
     }
 
     /// <summary>The newest stable LibreOffice for Windows x86-64 and the checksum file published next to the MSI.</summary>

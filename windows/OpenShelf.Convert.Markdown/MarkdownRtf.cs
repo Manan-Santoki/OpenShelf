@@ -53,7 +53,7 @@ public sealed class MarkdownRtf
         _document = document;
         _out.Append(@"{\rtf1\ansi\ansicpg1252\deff0\uc1");
         _out.Append(@"{\fonttbl{\f0\fswiss\fcharset0 Calibri;}{\f1\fmodern\fcharset0 Consolas;}{\f2\froman\fcharset0 Cambria Math;}}");
-        _out.Append(@"{\colortbl;\red28\green28\blue31;\red204\green204\blue209;\red0\green92\blue191;\red102\green102\blue110;\red242\green242\blue245;}");
+        _out.Append(@"{\colortbl;\red28\green28\blue31;\red204\green204\blue209;\red0\green92\blue191;\red102\green102\blue110;\red242\green242\blue245;\red255\green240\blue120;}");
         _out.Append($@"{{\info{{\title {Esc(document.Title ?? "")}}}}}");
         _out.Append($@"\paperw{PageWidth}\paperh{PageHeight}\margl1440\margr1440\margt1440\margb1440\widowctrl\ftnbj");
         _out.Append('\n');
@@ -276,7 +276,8 @@ public sealed class MarkdownRtf
 
     // MARK: Inline content
 
-    private readonly record struct Format(bool Bold = false, bool Italic = false, bool Strike = false, bool Code = false, bool Link = false);
+    private readonly record struct Format(bool Bold = false, bool Italic = false, bool Strike = false, bool Code = false, bool Link = false,
+        bool Underline = false, bool Highlight = false, int Shift = 0);
 
     private void Inlines(MarkdownText text, Ctx context, Format format)
     {
@@ -290,6 +291,10 @@ public sealed class MarkdownRtf
         if (format.Bold) open.Append(@"\b ");
         if (format.Italic) open.Append(@"\i ");
         if (format.Strike) open.Append(@"\strike ");
+        if (format.Underline) open.Append(@"\ul ");
+        if (format.Highlight) open.Append(@"\highlight6 ");
+        if (format.Shift > 0) open.Append(@"\super ");
+        if (format.Shift < 0) open.Append(@"\sub ");
         if (format.Link) open.Append(@"\cf3\ul ");
         open.Append(extra);
         if (open.Length == 0) _out.Append(Esc(text));
@@ -304,6 +309,16 @@ public sealed class MarkdownRtf
             case MarkdownInline.Emphasis e: Inlines(e.Content, context, format with { Italic = true }); break;
             case MarkdownInline.Strong s: Inlines(s.Content, context, format with { Bold = true }); break;
             case MarkdownInline.Strikethrough s: Inlines(s.Content, context, format with { Strike = true }); break;
+            case MarkdownInline.Styled s:
+                Inlines(s.Content, context, s.Style switch
+                {
+                    InlineStyle.Underline => format with { Underline = true },
+                    InlineStyle.Superscript => format with { Shift = 1 },
+                    InlineStyle.Subscript => format with { Shift = -1 },
+                    InlineStyle.Highlight => format with { Highlight = true },
+                    _ => format with { Code = true },
+                });
+                break;
             case MarkdownInline.Code c: Styled(c.Value, format with { Code = true }); break;
             case MarkdownInline.Math m: Styled(MarkdownMath.Unicode(m.Tex), format with { Italic = true }, @"\f2 "); break;
             case MarkdownInline.Link l:

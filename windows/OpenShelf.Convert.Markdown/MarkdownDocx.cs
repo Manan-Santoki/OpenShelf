@@ -235,6 +235,10 @@ public sealed class MarkdownDocx
         public bool Bold { get; init; }
         public bool Italic { get; init; }
         public bool Strike { get; init; }
+        public bool Underline { get; init; }
+        public bool Highlight { get; init; }
+        /// <summary>"superscript" or "subscript".</summary>
+        public string? VerticalAlign { get; init; }
         public string? Style { get; init; }
         public string? Font { get; init; }
     }
@@ -249,6 +253,14 @@ public sealed class MarkdownDocx
             case MarkdownInline.Emphasis e: return Runs(e.Content, format with { Italic = true });
             case MarkdownInline.Strong s: return Runs(s.Content, format with { Bold = true });
             case MarkdownInline.Strikethrough s: return Runs(s.Content, format with { Strike = true });
+            case MarkdownInline.Styled s: return Runs(s.Content, s.Style switch
+            {
+                InlineStyle.Underline => format with { Underline = true },
+                InlineStyle.Superscript => format with { VerticalAlign = "superscript" },
+                InlineStyle.Subscript => format with { VerticalAlign = "subscript" },
+                InlineStyle.Highlight => format with { Highlight = true },
+                _ => format with { Style = "VerbatimChar" },
+            });
             case MarkdownInline.Code c: return Run(c.Value, format with { Style = "VerbatimChar" });
             case MarkdownInline.Math m: return Run(MarkdownMath.Unicode(m.Tex), format with { Italic = true, Font = "Cambria Math" });
             case MarkdownInline.Link l:
@@ -280,6 +292,9 @@ public sealed class MarkdownDocx
         if (format.Bold) properties.Append("<w:b/><w:bCs/>");
         if (format.Italic) properties.Append("<w:i/><w:iCs/>");
         if (format.Strike) properties.Append("<w:strike/>");
+        if (format.Underline) properties.Append("<w:u w:val=\"single\"/>");
+        if (format.Highlight) properties.Append("<w:highlight w:val=\"yellow\"/>");
+        if (format.VerticalAlign is { } align) properties.Append($"<w:vertAlign w:val=\"{align}\"/>");
         var lines = text.Split('\n').Select(line =>
             string.Join("<w:tab/>", line.Split('\t').Select(piece => $"<w:t xml:space=\"preserve\">{Xml.Escape(piece)}</w:t>")));
         var content = string.Join("<w:br/>", lines);

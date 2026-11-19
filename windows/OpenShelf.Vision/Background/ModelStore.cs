@@ -4,8 +4,27 @@ using System.Security.Cryptography;
 namespace OpenShelf.Vision;
 
 /// <summary>A model file OpenShelf may download: a pinned address and the SHA-256 of the exact bytes expected.</summary>
-public sealed record ModelDefinition(string FileName, Uri Url, string Sha256, long SizeBytes, string Licence)
+/// <param name="InputSize">The square size the network reads.</param>
+/// <param name="Mean">Per-channel (R, G, B) mean subtracted from 0..1 pixel values.</param>
+/// <param name="Std">Per-channel divisor applied after the mean.</param>
+public sealed record ModelDefinition(string FileName, Uri Url, string Sha256, long SizeBytes, string Licence,
+    int InputSize = 320, float[]? Mean = null, float[]? Std = null)
 {
+    public float[] ChannelMean => Mean ?? [0.485f, 0.456f, 0.406f];
+    public float[] ChannelStd => Std ?? [0.229f, 0.224f, 0.225f];
+
+    /// <summary>ISNet, general use (Qin et al., "Highly Accurate Dichotomous Image Segmentation", ECCV 2022), 1024 x 1024, ONNX
+    /// export published with the rembg project's release v0.0.0. Much finer edges (hair, fur, thin objects) than U²-Netp, at
+    /// 178 MB and a few seconds per picture on a CPU. Licences: the model is Apache-2.0 (github.com/xuebinqin/DIS); rembg is MIT.
+    /// GitHub lists no digest for this old release; the SHA-256 is the file's as downloaded on 2026-11-18.</summary>
+    public static ModelDefinition IsNet { get; } = new(
+        "isnet-general-use.onnx",
+        new Uri("https://github.com/danielgatis/rembg/releases/download/v0.0.0/isnet-general-use.onnx"),
+        "60920e99c45464f2ba57bee2ad08c919a52bbf852739e96947fbb4358c0d964a",
+        178_648_008,
+        "Apache-2.0",
+        InputSize: 1024, Mean: [0.5f, 0.5f, 0.5f], Std: [1f, 1f, 1f]);
+
     /// <summary>U²-Netp (Qin et al., "U²-Net: Going Deeper with Nested U-Structure for Salient Object Detection", Pattern Recognition 2020),
     /// the 4.6 MB variant, ONNX export published with the rembg project's release v0.0.0.
     /// Licences: the model is Apache-2.0 (github.com/xuebinqin/U-2-Net); rembg, which hosts the file, is MIT.</summary>
@@ -37,8 +56,15 @@ public sealed class ModelStore
         BundledDirectory = bundledDirectory ?? Path.Combine(AppContext.BaseDirectory, "models");
     }
 
-    /// <summary>The store the app uses.</summary>
-    public static ModelStore Default { get; } = new();
+    /// <summary>The store the app uses: U²-Netp, or ISNet when Settings asks for high-quality cutouts.</summary>
+    public static ModelStore Default { get; set; } = new();
+
+    /// <summary>Points <see cref="Default"/> at the fast or the high-quality model.</summary>
+    public static void UseHighQuality(bool highQuality)
+    {
+        var wanted = highQuality ? ModelDefinition.IsNet : ModelDefinition.U2Netp;
+        if (Default.Definition != wanted) Default = new ModelStore(definition: wanted);
+    }
 
     public ModelDefinition Definition { get; }
 

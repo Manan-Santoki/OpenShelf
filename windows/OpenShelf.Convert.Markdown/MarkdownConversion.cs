@@ -241,6 +241,7 @@ public static class MarkdownPlainText
                 case MarkdownInline.Emphasis e: builder.Append(Inline(e.Content)); break;
                 case MarkdownInline.Strong s: builder.Append(Inline(s.Content)); break;
                 case MarkdownInline.Strikethrough s: builder.Append(Inline(s.Content)); break;
+                case MarkdownInline.Styled s: builder.Append(Inline(s.Content)); break;
                 case MarkdownInline.Link l: builder.Append(Linked(Inline(l.Content), l.Url)); break;
                 case MarkdownInline.Image i:
                 {

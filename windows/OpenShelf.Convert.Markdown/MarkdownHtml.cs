@@ -207,6 +207,15 @@ public sealed class MarkdownHtml
             case MarkdownInline.Emphasis e: return $"<em>{Inlines(e.Content)}</em>";
             case MarkdownInline.Strong s: return $"<strong>{Inlines(s.Content)}</strong>";
             case MarkdownInline.Strikethrough s: return $"<del>{Inlines(s.Content)}</del>";
+            case MarkdownInline.Styled s:
+            {
+                var tag = s.Style switch
+                {
+                    InlineStyle.Underline => "u", InlineStyle.Superscript => "sup", InlineStyle.Subscript => "sub",
+                    InlineStyle.Highlight => "mark", _ => "kbd",
+                };
+                return $"<{tag}>{Inlines(s.Content)}</{tag}>";
+            }
             case MarkdownInline.Code c: return $"<code>{Xml.Escape(c.Value)}</code>";
             case MarkdownInline.Math m: return $"<span class=\"math\">{Xml.Escape(MarkdownMath.Unicode(m.Tex))}</span>";
             case MarkdownInline.Link l:

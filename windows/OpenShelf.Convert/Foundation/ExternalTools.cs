@@ -30,6 +30,12 @@ public sealed record ExternalTools
     public bool CanEncodeHeic { get; init; } = true;
     public bool CanEncodeAvif { get; init; } = true;
 
+    /// <summary>The Microsoft Office apps installed (Word, Excel, PowerPoint). Office lays documents out itself, so it is
+    /// preferred for PDFs of Word, Excel and PowerPoint files.</summary>
+    public IReadOnlyCollection<OfficeApp> MicrosoftOffice { get; init; } = [];
+
+    public bool Has(OfficeApp app) => MicrosoftOffice.Contains(app);
+
     /// <summary>whisper.cpp does nothing without a model, so both are needed.</summary>
     public bool CanTranscribe => Whisper is not null && WhisperModel is not null;
 
@@ -68,6 +74,7 @@ public sealed record ExternalTools
             EbookConvert = locations.FindCalibre(ownOnly: ignored.Contains("calibre")),
             Whisper = whisper,
             WhisperModel = whisper is null ? null : locations.FindWhisperModel(),
+            MicrosoftOffice = ignored.Contains("office") || !OfficeInstallation.Enabled ? [] : OfficeInstallation.All.Where(locations.OfficeInstalled).ToList(),
         };
     }
 }
@@ -99,17 +106,19 @@ public sealed class ToolLocations
     /// <summary>Where whisper.cpp's speech models live.</summary>
     public string? ModelsDirectory { get; init; }
     /// <summary>Tools whose PATH and installed copies are ignored (only OpenShelf's own copies count), to try OpenShelf as
-    /// someone without them sees it: "ffmpeg" (covers ffprobe), "cwebp", "pandoc", "libreoffice", "calibre", "whisper".
+    /// someone without them sees it: "ffmpeg" (covers ffprobe), "cwebp", "pandoc", "libreoffice", "calibre", "whisper", "office" (Microsoft Office).
     /// From the OPENSHELF_IGNORED_TOOLS environment variable, comma separated.</summary>
     public IReadOnlySet<string> IgnoredTools { get; init; } = new HashSet<string>();
+    /// <summary>Whether a Microsoft Office app is installed. Nothing by default; <see cref="Standard"/> reads the registry.</summary>
+    public Func<OfficeApp, bool> OfficeInstalled { get; init; } = _ => false;
     /// <summary>Whether a file exists. Fake it in tests.</summary>
     public Func<string, bool> FileExists { get; init; } = File.Exists;
 
     /// <summary>The real machine.</summary>
-    public static ToolLocations Standard => ForEnvironment(Environment.GetEnvironmentVariable);
+    public static ToolLocations Standard => ForEnvironment(Environment.GetEnvironmentVariable, officeInstalled: OfficeInstallation.IsInstalled);
 
     /// <summary>Locations derived from environment variables read through <paramref name="getEnvironmentVariable"/>.</summary>
-    public static ToolLocations ForEnvironment(Func<string, string?> getEnvironmentVariable, Func<string, bool>? fileExists = null)
+    public static ToolLocations ForEnvironment(Func<string, string?> getEnvironmentVariable, Func<string, bool>? fileExists = null, Func<OfficeApp, bool>? officeInstalled = null)
     {
         string Var(string name) => getEnvironmentVariable(name) ?? "";
         var localAppData = Var("LOCALAPPDATA");
@@ -160,6 +169,7 @@ public sealed class ToolLocations
                 @"C:\texlive\2025\bin\windows", @"C:\texlive\2024\bin\windows"),
             ModelsDirectory = localAppData.Length == 0 ? null : Under(localAppData, "OpenShelf", "models"),
             IgnoredTools = ignored,
+            OfficeInstalled = officeInstalled ?? (_ => false),
             FileExists = fileExists ?? File.Exists,
         };
     }
@@ -178,7 +188,7 @@ public sealed class ToolLocations
     {
         var file = name + ".exe";
         // The folder OpenShelf downloads a tool into is named for the tool; ffprobe lives with ffmpeg.
-        var folder = name == "ffprobe" ? "ffmpeg" : name;
+        var folder = name switch { "ffprobe" => "ffmpeg", "whisper-cli" => "whisper", _ => name };
         var directories = OwnDirectories(folder).ToList();
         if (!ownOnly) directories.AddRange(PathDirectories.Concat(CommandDirectories).Concat(extraDirectories ?? []));
         foreach (var directory in directories)
@@ -214,8 +224,10 @@ public sealed class ToolLocations
     /// <summary>The most capable speech model in <see cref="ModelsDirectory"/> (ggml-*.bin), skipping tiny test models.</summary>
     public string? FindWhisperModel()
     {
-        if (ModelsDirectory is null || !Directory.Exists(ModelsDirectory)) return null;
-        var models = Directory.EnumerateFiles(ModelsDirectory, "ggml-*.bin").ToList();
+        // OpenShelf's own whisper.cpp keeps its model inside its folder; models put in the models folder by hand count too.
+        var folders = new[] { OwnToolsRoot.Length > 0 ? Path.Combine(OwnToolsRoot, "whisper", "models") : null, ModelsDirectory };
+        var models = folders.Where(f => f is not null && Directory.Exists(f))
+            .SelectMany(f => Directory.EnumerateFiles(f!, "ggml-*.bin")).ToList();
         foreach (var preferred in new[] { "large", "medium", "small", "base" })
         {
             var match = models.FirstOrDefault(m => Path.GetFileName(m).Contains(preferred, StringComparison.OrdinalIgnoreCase));

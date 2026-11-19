@@ -10,13 +10,16 @@ public interface IBackgroundEngine
     Task EnsureModelAsync(IProgress<double>? progress, CancellationToken cancel);
     Task<Cutout> CutOutAsync(string path, CancellationToken cancel);
     Task<string> SaveAsync(string path, Cutout cutout, CancellationToken cancel);
+    /// <summary>Size of the one-time model download, for the hint shown while it downloads.</summary>
+    long DownloadBytes => ModelDefinition.U2Netp.SizeBytes;
 }
 
-/// <summary>The segmentation engine from OpenShelf.Vision (U²-Netp on this PC).</summary>
+/// <summary>The segmentation engine from OpenShelf.Vision (U²-Netp, or ISNet when high-quality cutouts are on).</summary>
 public sealed class BackgroundEngine(BackgroundRemover? remover = null) : IBackgroundEngine
 {
     private readonly BackgroundRemover _remover = remover ?? new BackgroundRemover();
     public bool IsModelAvailable => _remover.IsModelAvailable;
+    public long DownloadBytes => _remover.Model.SizeBytes;
     public Task EnsureModelAsync(IProgress<double>? progress, CancellationToken cancel) => _remover.EnsureModelAsync(progress, cancel);
     public Task<Cutout> CutOutAsync(string path, CancellationToken cancel) => _remover.CutOutAsync(path, cancel);
     public Task<string> SaveAsync(string path, Cutout cutout, CancellationToken cancel) => _remover.SaveAsync(path, cutout, cancel);
@@ -52,6 +55,9 @@ public sealed class RemoveBackgroundSession
     public const string FailedText = "The background couldn’t be removed from this image.";
 
     private readonly IBackgroundEngine _engine;
+
+    /// <summary>Size of the model download, in bytes.</summary>
+    public long DownloadBytes => _engine.DownloadBytes;
     private CancellationTokenSource? _looking;
     private int _generation;
 

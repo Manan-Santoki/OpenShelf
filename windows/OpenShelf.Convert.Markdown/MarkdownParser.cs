@@ -60,9 +60,14 @@ public sealed class MarkdownParser
     private readonly List<List<MarkdownBlock<MarkdownText>>> _footnotes = [];
     private readonly HashSet<string> _headingIds = [];
 
-    public static MarkdownDocument Parse(string source)
+    /// <summary>Whether straight quotes, dashes and dots are typeset (see <see cref="MarkdownOptions.SmartPunctuation"/>).</summary>
+    internal bool SmartPunctuation { get; private init; }
+
+    public static MarkdownDocument Parse(string source) => Parse(source, MarkdownOptions.SmartPunctuation);
+
+    public static MarkdownDocument Parse(string source, bool smartPunctuation)
     {
-        var parser = new MarkdownParser();
+        var parser = new MarkdownParser { SmartPunctuation = smartPunctuation };
         var lines = source.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n').Select(ExpandingLeadingTabs).ToList();
         var title = TakeTitle(lines);
         var raw = parser.Blocks(lines);

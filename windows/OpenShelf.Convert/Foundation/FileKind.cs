@@ -46,10 +46,10 @@ public static class FileKinds
         }
         Add(FileKind.Image, "jpg", "jpeg", "jpe", "jfif", "png", "gif", "tif", "tiff", "bmp", "dib", "heic", "heif", "webp", "avif", "svg", "ico", "jp2", "tga", "psd");
         Add(FileKind.Pdf, "pdf");
-        Add(FileKind.Document, "txt", "text", "rtf", "rtfd", "html", "htm", "xhtml", "docx", "doc", "odt", "md", "markdown", "mdown", "mkd", "mkdn", "pages");
+        Add(FileKind.Document, "txt", "text", "rtf", "rtfd", "html", "htm", "xhtml", "docx", "docm", "dotx", "doc", "odt", "md", "markdown", "mdown", "mkd", "mkdn", "pages");
         Add(FileKind.Subtitle, "srt", "vtt");
-        Add(FileKind.Spreadsheet, "csv", "tsv", "xlsx", "xls", "ods", "numbers");
-        Add(FileKind.Presentation, "ppt", "pptx", "odp", "key");
+        Add(FileKind.Spreadsheet, "csv", "tsv", "xlsx", "xlsm", "xls", "ods", "numbers");
+        Add(FileKind.Presentation, "ppt", "pptx", "pptm", "ppsx", "odp", "key");
         Add(FileKind.Audio, "mp3", "m4a", "m4b", "aac", "wav", "aif", "aiff", "aifc", "flac", "caf", "amr");
         Add(FileKind.Video, "mp4", "m4v", "mov", "qt", "3gp", "3g2");
         Add(FileKind.Archive, "zip", "gz", "tgz", "tar", "bz2", "tbz", "tbz2", "xz", "txz", "7z", "rar");

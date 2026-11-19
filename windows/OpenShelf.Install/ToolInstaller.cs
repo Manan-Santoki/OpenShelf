@@ -146,6 +146,9 @@ public sealed class ToolInstaller : IToolInstallerUi, IDisposable
             "pandoc" => _locations.FindCommand("pandoc", ignored),
             "libreoffice" => _locations.FindLibreOffice(ignored),
             "calibre" => _locations.FindCalibre(ignored),
+            "typst" => _locations.FindCommand("typst", ignored),
+            // Transcripts need the program and a model; either alone does nothing.
+            "whisper" => _locations.FindCommand("whisper-cli", ignored) is { } cli && _locations.FindWhisperModel() is not null ? cli : null,
             _ => null,
         };
     }
@@ -197,7 +200,7 @@ public sealed class ToolInstaller : IToolInstallerUi, IDisposable
                 {
                     await InstallFromSourcesAsync(tool, staging, progress, ct);
                 }
-                catch (ToolInstallException e) when (e.Kind == InstallFailureKind.SourcesUnavailable && _options.FindWinget?.Invoke() is { Length: > 0 } winget)
+                catch (ToolInstallException e) when (e.Kind == InstallFailureKind.SourcesUnavailable && tool.WingetId.Length > 0 && _options.FindWinget?.Invoke() is { Length: > 0 } winget)
                 {
                     // winget never starts by itself: the UI is asked, and without an answer of yes the person can choose "Try winget" later.
                     var confirm = _options.ConfirmWinget;
@@ -278,6 +281,26 @@ public sealed class ToolInstaller : IToolInstallerUi, IDisposable
         SetPhase(tool.Id, InstallPhase.Finishing);
         var (folder, mainExe) = Prepare(tool, unpacked, staging);
 
+        // Further files (a speech model) go inside the new folder before it is put in place, so a half-installed tool never shows.
+        var extras = tool.ExtraFiles;
+        for (var index = 0; index < extras.Count; index++)
+        {
+            var extra = extras[index];
+            var start = 0.93 + 0.04 * index / extras.Count;
+            var span = 0.04 / extras.Count;
+            SetPhase(tool.Id, InstallPhase.Downloading);
+            var file = await ResolveExtraAsync(tool, extra, ct);
+            var target = Path.Combine(folder, extra.RelativePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            await DownloadAsync(file, target, value => progress.Report(start + value * span), ct);
+            SetPhase(tool.Id, InstallPhase.Verifying);
+            var hash = await HashAsync(target, ct);
+            if (!string.Equals(hash, file.Sha256, StringComparison.OrdinalIgnoreCase))
+                throw new ToolInstallException($"The download of {extra.Name} for {tool.Name} was damaged or altered, so it was deleted.", InstallFailureKind.Verification,
+                    $"Expected {file.Sha256}, got {hash}.");
+        }
+        SetPhase(tool.Id, InstallPhase.Finishing);
+
         var signature = "Not applicable: the publisher doesn’t sign this program; the SHA-256 was checked.";
         if (tool.Signature != SignaturePolicy.None && mainExe is not null)
         {
@@ -304,6 +327,15 @@ public sealed class ToolInstaller : IToolInstallerUi, IDisposable
         progress.Report(0.97);
         ct.ThrowIfCancellationRequested();
         Swap(tool, folder);
+    }
+
+    private async Task<ResolvedDownload> ResolveExtraAsync(ToolDefinition tool, ExtraFile extra, CancellationToken ct)
+    {
+        try { return await extra.Resolve(_http, ct); }
+        catch (SourceUnavailableException e)
+        {
+            throw new ToolInstallException($"{extra.Name} for {tool.Name} couldn’t be downloaded right now.", InstallFailureKind.SourcesUnavailable, e.Message, e);
+        }
     }
 
     private async Task DownloadAsync(ResolvedDownload resolved, string file, Action<double> report, CancellationToken ct)
@@ -435,6 +467,17 @@ public sealed class ToolInstaller : IToolInstallerUi, IDisposable
             {
                 var exe = FindFile(unpacked, "ebook-convert.exe") ?? Missing("ebook-convert.exe");
                 return (Path.GetDirectoryName(exe)!, exe);
+            }
+            case "typst":
+            {
+                var exe = FindFile(unpacked, "typst.exe") ?? Missing("typst.exe");
+                return (Path.GetDirectoryName(exe)!, null);
+            }
+            case "whisper":
+            {
+                // whisper-cli.exe needs the DLLs beside it (whisper.dll, ggml*.dll), so the whole folder moves.
+                var exe = FindFile(unpacked, "whisper-cli.exe") ?? Missing("whisper-cli.exe");
+                return (Path.GetDirectoryName(exe)!, null);
             }
             default:
                 throw new ToolInstallException($"“{tool.Id}” isn’t a tool OpenShelf can install.", InstallFailureKind.Other);

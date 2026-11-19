@@ -139,7 +139,8 @@ public sealed class RemoveBackgroundEditor : EditorWindow, IEditorDemo
         {
             case CutoutPhase.Downloading:
                 _overlayText.Text = $"Getting the background model… {(int)(_session.DownloadProgress * 100)}%";
-                _overlayHint.Text = "A one-time 4.6 MB download. After this it works offline.";
+                var megabytes = _session.DownloadBytes / 1_000_000.0;
+                _overlayHint.Text = $"A one-time {(megabytes < 10 ? megabytes.ToString("0.#") : megabytes.ToString("0"))} MB download. After this it works offline.";
                 _overlayHint.Visibility = Visibility.Visible;
                 _overlayBar.Indeterminate = false;
                 _overlayBar.Value = _session.DownloadProgress;

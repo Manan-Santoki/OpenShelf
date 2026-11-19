@@ -35,6 +35,7 @@ public class SubtitleTests
     {
         using var temp = new TempFolder();
         var path = temp.Combine("Movie.srt");
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         File.WriteAllBytes(path, Encoding.GetEncoding(1252).GetBytes("1\r\n00:00:01,000 --> 00:00:02,000\r\nCafé\r\n"));
         var output = await Converter.Default.ConvertAsync(new ConversionRequest(path, Vtt));
         Assert.Equal("Movie.vtt", Path.GetFileName(output[0]));

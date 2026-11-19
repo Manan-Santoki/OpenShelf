@@ -493,6 +493,9 @@ internal sealed class OutputPane : Pane
 
         var imageQuality = Drop([("Automatic", (double?)null), .. ImageOutput.QualityChoices.Select(q => ($"{(int)Math.Round(q * 100)}%", (double?)q))],
             () => Current().Image.Quality, v => Edit(o => o with { Image = o.Image with { Quality = v } }), "Image quality");
+        var cutouts = ToggleRow("High-quality background removal",
+            "Remove BG uses a larger model that keeps hair, fur and fine edges. It downloads once (178 MB) and takes a few seconds per picture.",
+            () => preferences.GetHighQualityCutouts(), v => { if (!Syncing) preferences.SetHighQualityCutouts(v); });
         var metadata = ToggleRow("Keep metadata", "Copies camera, date and location from the original into the converted image.",
             () => Current().Image.KeepsMetadata, v => Edit(o => o with { Image = o.Image with { KeepsMetadata = v } }));
 
@@ -500,6 +503,14 @@ internal sealed class OutputPane : Pane
             () => Current().Gif.Width, v => Edit(o => o with { Gif = o.Gif with { Width = v } }), "GIF width", 220);
         var gifRate = Segment([.. GifOutput.FrameRates.Select(r => ($"{r} fps", r))],
             () => Current().Gif.FrameRate, v => Edit(o => o with { Gif = o.Gif with { FrameRate = v } }), "GIF frame rate");
+
+        DocumentSettings Docs() => preferences.GetDocuments();
+        var office = ToggleRow("Convert with Microsoft Office when it's installed",
+            "Word, Excel and PowerPoint make the PDFs of their own files, so fonts, colours, layout, headers and pictures stay exactly as they are.",
+            () => Docs().UseMicrosoftOffice, v => { if (!Syncing) preferences.SetDocuments(Docs() with { UseMicrosoftOffice = v }); });
+        var smart = ToggleRow("Smart punctuation in Markdown",
+            "Turns straight quotes into curly ones and -- and ... into dashes and an ellipsis. Off keeps your text exactly as typed.",
+            () => Docs().SmartPunctuation, v => { if (!Syncing) preferences.SetDocuments(Docs() with { SmartPunctuation = v }); });
 
         var reset = Kit.Button("Reset to Automatic", (_, _) => { preferences.SetOutput(OutputSettings.Automatic); Sync(); });
         OnSync(() => reset.IsEnabled = Current() != OutputSettings.Automatic);
@@ -515,8 +526,9 @@ internal sealed class OutputPane : Pane
         Stack(
             Kit.Section("Video", "Automatic converts as OpenShelf always has. The codec is for MP4, MOV and MKV; HDR videos stay HEVC to keep their colours.", video),
             Kit.Section("Audio", "Applies to MP3, M4A, OGG, Opus and WMA, and the sound in videos.", new Card(new SettingRow("Bitrate", null, audio))),
-            Kit.Section("Images", "Quality applies to JPEG, HEIC, AVIF and WebP.", new Card(new SettingRow("Quality", null, imageQuality), metadata)),
+            Kit.Section("Images", "Quality applies to JPEG, HEIC, AVIF and WebP.", new Card(new SettingRow("Quality", null, imageQuality), metadata, cutouts)),
             Kit.Section("GIFs from videos", null, new Card(new SettingRow("Width", null, gifWidth), new SettingRow("Frame rate", null, gifRate))),
+            Kit.Section("Documents", null, new Card(office, smart)),
             footer);
     }
 }
@@ -542,6 +554,8 @@ internal sealed class ToolsPane : Pane
         new("libreoffice", "LibreOffice", "Office documents, slides and spreadsheets: DOCX, PPTX, XLSX, ODT and more.", false, null, false),
         new("pandoc", "Pandoc", "Markdown, Word, EPUB and OpenDocument text conversions.", false, null, false),
         new("calibre", "calibre", "E-books: EPUB, MOBI, AZW3 and more.", false, null, false),
+        new("typst", "Typst", "Typesetting for Pandoc: well-set PDFs from Markdown, Word and e-books.", false, null, false),
+        new("whisper", "whisper.cpp", "Speech to text: transcripts and subtitles (TXT, SRT, VTT) from audio and video, on this PC.", false, null, false),
     ];
 
     private readonly Card _card = new();

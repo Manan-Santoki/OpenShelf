@@ -178,3 +178,29 @@ public class TranscriptionTests
         }
     }
 }
+
+/// <summary>Transcribes real speech with a real whisper.cpp. Runs when OPENSHELF_WHISPER_DIR names a folder holding
+/// whisper-cli.exe (anywhere below it), a ggml model and speech.wav, and ffmpeg is installed.</summary>
+public class RealTranscriptionTests
+{
+    [Fact]
+    public async Task TranscribesRealSpeech()
+    {
+        var folder = Environment.GetEnvironmentVariable("OPENSHELF_WHISPER_DIR");
+        if (string.IsNullOrEmpty(folder)) return;
+        var cli = Directory.EnumerateFiles(folder, "whisper-cli.exe", SearchOption.AllDirectories).First();
+        var model = Directory.EnumerateFiles(folder, "ggml-*.bin").First();
+        var detected = ExternalTools.Detect(ToolLocations.Standard);
+        Assert.NotNull(detected.Ffmpeg);
+        var tools = detected with { Whisper = cli, WhisperModel = model };
+        using var dir = new TempDir();
+        var source = dir.Combine("speech.wav");
+        File.Copy(Path.Combine(folder, "speech.wav"), source);
+
+        var result = await new TranscriptionEngine().ConvertAsync(new ConversionRequest(source, OutputFormat.Srt) { Tools = tools }, null, default);
+
+        var srt = File.ReadAllText(Assert.Single(result));
+        Assert.Contains("00:00:00", srt);
+        Assert.Contains("speech to text", srt, StringComparison.OrdinalIgnoreCase);
+    }
+}

@@ -20,6 +20,8 @@ public sealed class MarkdownDocument
     }
 
     public static MarkdownDocument Parse(string source) => MarkdownParser.Parse(source);
+
+    public static MarkdownDocument Parse(string source, bool smartPunctuation) => MarkdownParser.Parse(source, smartPunctuation);
 }
 
 /// <summary>Inline content of a block. Compares by value, like the Swift array of enums.</summary>
@@ -49,6 +51,7 @@ public sealed class MarkdownText : List<MarkdownInline>, IEquatable<MarkdownText
                 case MarkdownInline.Emphasis e: builder.Append(e.Content.PlainText()); break;
                 case MarkdownInline.Strong s: builder.Append(s.Content.PlainText()); break;
                 case MarkdownInline.Strikethrough s: builder.Append(s.Content.PlainText()); break;
+                case MarkdownInline.Styled s: builder.Append(s.Content.PlainText()); break;
                 case MarkdownInline.Link l: builder.Append(l.Content.PlainText()); break;
                 case MarkdownInline.Image i: builder.Append(i.Alt.PlainText()); break;
                 case MarkdownInline.Footnote: break;
@@ -69,6 +72,8 @@ public abstract record MarkdownInline
     public sealed record Emphasis(MarkdownText Content) : MarkdownInline;
     public sealed record Strong(MarkdownText Content) : MarkdownInline;
     public sealed record Strikethrough(MarkdownText Content) : MarkdownInline;
+    /// <summary>Formatting written as inline HTML (<c>&lt;u&gt;</c>, <c>&lt;sup&gt;</c>, <c>&lt;mark&gt;</c>, ...).</summary>
+    public sealed record Styled(InlineStyle Style, MarkdownText Content) : MarkdownInline;
     public sealed record Code(string Value) : MarkdownInline;
     /// <summary>Inline math, as TeX source.</summary>
     public sealed record Math(string Tex) : MarkdownInline;
@@ -79,6 +84,9 @@ public abstract record MarkdownInline
     public sealed record LineBreak : MarkdownInline;
     public sealed record SoftBreak : MarkdownInline;
 }
+
+/// <summary>Inline HTML formatting Markdown has no syntax of its own for.</summary>
+public enum InlineStyle { Underline, Superscript, Subscript, Highlight, Keyboard }
 
 public enum MarkdownAlignment { None, Left, Center, Right }
 

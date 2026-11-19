@@ -12,7 +12,7 @@ public sealed class DocumentEngine : IConversionEngine
 
     /// <summary>Extensions read here. Markdown has its own engine, and iWork files their own.</summary>
     public static readonly IReadOnlySet<string> Sources =
-        new HashSet<string> { "txt", "text", "rtf", "rtfd", "docx", "doc", "odt", "html", "htm", "xhtml" };
+        new HashSet<string> { "txt", "text", "rtf", "rtfd", "docx", "docm", "dotx", "doc", "odt", "html", "htm", "xhtml" };
 
     private readonly EdgePrinter _edge;
 
@@ -74,7 +74,7 @@ public sealed class DocumentEngine : IConversionEngine
         {
             return extension switch
             {
-                "docx" => DocxReader.Read(source),
+                "docx" or "docm" or "dotx" => DocxReader.Read(source),
                 "odt" => OdtReader.Read(source),
                 "rtf" or "rtfd" => RtfReader.Read(source),
                 "html" or "htm" or "xhtml" => HtmlReader.Read(source),

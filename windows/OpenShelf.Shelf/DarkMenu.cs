@@ -170,7 +170,8 @@ internal sealed class DarkMenu : Window
     }
 
     /// <summary>Opens a menu with its top-left corner at <paramref name="at"/> (physical pixels), moved to stay on screen.</summary>
-    public static DarkMenu Open(IReadOnlyList<MenuEntry> entries, ScreenPoint at)
+    /// <param name="keepClear">An area the menu must not cover (the taskbar or hidden-icons panel for the tray menu).</param>
+    public static DarkMenu Open(IReadOnlyList<MenuEntry> entries, ScreenPoint at, NativeRect? keepClear = null)
     {
         Current?.CloseMenu();
         var menu = new DarkMenu(entries);
@@ -188,6 +189,7 @@ internal sealed class DarkMenu : Window
             if (ix + iw > work.Right) ix = at.X - iw;
             if (iy + ih > work.Bottom) iy = at.Y - ih;
             (ix, iy) = Native.Clamp(ix, iy, iw, ih, work);
+            if (keepClear is { } clear && PopupPlacement.Place(at, iw, ih, clear) is { } placed) (ix, iy) = placed;
             int x = ix - padPx, y = iy - padPx;
 
             menu.Left = x / scale; menu.Top = y / scale;      // provisional; corrected below once the HWND exists

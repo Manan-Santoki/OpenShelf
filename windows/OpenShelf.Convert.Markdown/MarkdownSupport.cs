@@ -73,6 +73,7 @@ public static class MarkdownImages
                     case MarkdownInline.Emphasis e: Visit(e.Content); break;
                     case MarkdownInline.Strong s: Visit(s.Content); break;
                     case MarkdownInline.Strikethrough s: Visit(s.Content); break;
+                    case MarkdownInline.Styled s: Visit(s.Content); break;
                     case MarkdownInline.Link l: Visit(l.Content); break;
                 }
             }
@@ -169,4 +170,12 @@ internal sealed class PackageZip : IDisposable
         _zip.Dispose();
         _file.Dispose();
     }
+}
+
+/// <summary>How Markdown is read.</summary>
+public static class MarkdownOptions
+{
+    /// <summary>Curl straight quotes and typeset <c>--</c>, <c>---</c> and <c>...</c> as dashes and an ellipsis. Off by default:
+    /// converted documents keep the text exactly as it was typed.</summary>
+    public static bool SmartPunctuation { get; set; }
 }

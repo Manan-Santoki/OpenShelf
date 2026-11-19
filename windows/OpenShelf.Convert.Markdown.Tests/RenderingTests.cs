@@ -46,7 +46,7 @@ public class RenderingTests
             "<h1 id=\"top\">Top</h1>",
             "<em>emphasis</em>, <strong>strong</strong>, <del>gone</del>, <code>code</code>",
             "<a href=\"https://example.com\" title=\"Tip\">link</a>",
-            "“quotes” and 1–2 – 3—4…",
+            "&quot;quotes&quot; and 1--2 -- 3---4...",
             "hard break<br/>after it.",
             "a soft break",
             "<span class=\"math\">x²</span>",

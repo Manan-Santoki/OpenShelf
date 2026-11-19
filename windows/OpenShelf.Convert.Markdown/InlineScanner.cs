@@ -18,9 +18,17 @@ internal sealed class InlineScanner
             public int Original { get; } = count;
         }
 
+        /// <summary>An opening inline HTML tag waiting for its closing tag.</summary>
+        public sealed class Tag(string name, string? href) : Piece
+        {
+            public string Name { get; } = name;
+            public string? Href { get; } = href;
+        }
+
         public MarkdownInline AsInline() => this switch
         {
             Node n => n.Inline,
+            Tag => new MarkdownInline.Text(""),
             Delimiter d => new MarkdownInline.Text(new string(d.Character, d.Count)),
             _ => throw new InvalidOperationException(),
         };
@@ -368,12 +376,68 @@ internal sealed class InlineScanner
         else if ((match = HtmlComment.Match(_source, _position)).Success) _position += match.Length;
         else if ((match = HtmlTag.Match(_source, _position)).Success)
         {
-            // Raw HTML tags are dropped and their text kept; <br> still breaks the line.
-            if (match.Groups[1].Value.Equals("br", StringComparison.OrdinalIgnoreCase)) Append(new MarkdownInline.LineBreak());
+            HtmlInline(match.Value, match.Groups[1].Value.ToLowerInvariant());
             _position += match.Length;
         }
         else Literal();
     }
+
+    private static readonly Regex Attribute = new(@"\b([A-Za-z-]+)\s*=\s*(?:""([^""]*)""|'([^']*)'|([^\s""'>]+))");
+
+    private static string? AttributeOf(string tag, string name)
+    {
+        foreach (Match m in Attribute.Matches(tag))
+            if (m.Groups[1].Value.Equals(name, StringComparison.OrdinalIgnoreCase))
+                return System.Net.WebUtility.HtmlDecode(m.Groups[2].Success ? m.Groups[2].Value : m.Groups[3].Success ? m.Groups[3].Value : m.Groups[4].Value);
+        return null;
+    }
+
+    /// <summary>Formatting tags become the matching inline (bold, italic, underline, superscript, links, pictures...), so text
+    /// formatted with HTML keeps its look. Other tags are dropped and their text kept; <c>&lt;br&gt;</c> breaks the line.</summary>
+    private void HtmlInline(string tag, string name)
+    {
+        var closing = tag.StartsWith("</", StringComparison.Ordinal);
+        var selfClosing = tag.EndsWith("/>", StringComparison.Ordinal);
+        switch (name)
+        {
+            case "br": Append(new MarkdownInline.LineBreak()); return;
+            case "img" when !closing:
+                if (AttributeOf(tag, "src") is { Length: > 0 } src)
+                    Append(new MarkdownInline.Image(src, AttributeOf(tag, "title"), MarkdownText.OfString(AttributeOf(tag, "alt") ?? "")));
+                return;
+        }
+        if (!IsFormattingTag(name) || selfClosing) return;
+        Flush();
+        if (!closing)
+        {
+            _pieces.Add(new Piece.Tag(name, name == "a" ? AttributeOf(tag, "href") : null));
+            return;
+        }
+        var opener = _pieces.FindLastIndex(p => p is Piece.Tag t && t.Name == name);
+        if (opener < 0) return;
+        ProcessEmphasis(opener + 1);
+        var open = (Piece.Tag)_pieces[opener];
+        var inner = Merged(_pieces.Skip(opener + 1).Select(p => p.AsInline()));
+        _pieces.RemoveRange(opener, _pieces.Count - opener);
+        MarkdownInline? wrapped = name switch
+        {
+            "b" or "strong" => new MarkdownInline.Strong(inner),
+            "i" or "em" or "cite" or "dfn" or "var" => new MarkdownInline.Emphasis(inner),
+            "s" or "del" or "strike" => new MarkdownInline.Strikethrough(inner),
+            "u" or "ins" => new MarkdownInline.Styled(InlineStyle.Underline, inner),
+            "sup" => new MarkdownInline.Styled(InlineStyle.Superscript, inner),
+            "sub" => new MarkdownInline.Styled(InlineStyle.Subscript, inner),
+            "mark" => new MarkdownInline.Styled(InlineStyle.Highlight, inner),
+            "kbd" or "samp" or "tt" or "code" => new MarkdownInline.Styled(InlineStyle.Keyboard, inner),
+            "a" when open.Href is { Length: > 0 } href => new MarkdownInline.Link(href, null, inner),
+            _ => null,
+        };
+        if (wrapped is not null) _pieces.Add(new Piece.Node(wrapped));
+        else foreach (var piece in inner) _pieces.Add(new Piece.Node(piece));
+    }
+
+    private static bool IsFormattingTag(string name) => name is "b" or "strong" or "i" or "em" or "cite" or "dfn" or "var" or "s" or "del" or "strike"
+        or "u" or "ins" or "sup" or "sub" or "mark" or "kbd" or "samp" or "tt" or "code" or "a";
 
     private static readonly Regex BareUrlPattern = new(@"\G(?:https?://|www\.)[^\s<]+");
 
@@ -452,6 +516,7 @@ internal sealed class InlineScanner
     /// <summary>Plain text, with straight quotes curled and <c>--</c>, <c>---</c> and <c>...</c> typeset.</summary>
     private void SmartText()
     {
+        if (!_resolver.SmartPunctuation) { Literal(); return; }
         var character = _characters[_position];
         if (character == '-' && Peek(1) == '-')
         {

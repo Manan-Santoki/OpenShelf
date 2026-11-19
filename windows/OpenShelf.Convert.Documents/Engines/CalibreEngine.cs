@@ -98,7 +98,7 @@ public sealed class CalibreEngine : IConversionEngine
 /// <summary>Registers the document, PDF, office, iWork and e-book engines.</summary>
 public static class DocumentEngines
 {
-    /// <summary>Adds the engines to <paramref name="registry"/>. Tool engines (iWork/LibreOffice, calibre, Pandoc) are asked ahead of the
+    /// <summary>Adds the engines to <paramref name="registry"/>. Tool engines (iWork, calibre, Microsoft Office, LibreOffice, Pandoc) are asked ahead of the
     /// built-in ones and fall back to them when the tool fails or is missing.</summary>
     public static void Register(EngineRegistry registry)
     {
@@ -111,6 +111,8 @@ public static class DocumentEngines
         var documents = new DocumentEngine(edge);
         registry.Register(new IWorkEngine(runner), 100);
         registry.Register(new CalibreEngine(runner), 90);
+        // Office lays out its own files exactly; asked before LibreOffice, which takes over when Office fails.
+        registry.Register(new MicrosoftOfficeEngine(registry), 85);
         registry.Register(new LibreOfficeEngine(runner, documents), 80);
         registry.Register(new PandocEngine(runner, documents), 70);
         registry.Register(new PdfEngine(), 0);

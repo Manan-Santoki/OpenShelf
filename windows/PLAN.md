@@ -14,6 +14,24 @@ for behaviour, constants and copy. C# on .NET 10, WPF, Windows 10 22H2+ and 11.
 | M3 Tools | Tools wheel: image editors (Crop, Resize, Compress, Metadata, Edit, Annotate, Add BG, Remove BG, Redact, Read QR, OCR, Combine), PDF tools (Combine, Pages, Split, Compress, Metadata, OCR), media tools (Trim, Speed, Crop, Rotate, Split, Merge, Compress, Mute) | done, partial real-mouse QA |
 | M4 Rest | Tour, watched folders, Explorer right-click entry, command line, installer and updater (Velopack), CI and release workflows, Lucide icons | done, see "Not yet verified" |
 
+## Checkpoint (2026-11-18, 0.1.0-beta.2)
+
+Fidelity and completeness pass after reports that documents changed when converted:
+
+- Microsoft Office engine (`MicrosoftOfficeEngine`): Word, Excel and PowerPoint convert their own files through COM when installed,
+  asked before LibreOffice; falls back to the next engine on failure. Settings > Output > Documents can turn it off.
+- Markdown keeps text as typed (smart punctuation is opt-in, also for Pandoc via `markdown-smart`) and keeps inline HTML
+  formatting (`<u>`, `<sup>`, `<sub>`, `<mark>`, `<kbd>`, `<b>`, `<i>`, `<s>`, `<a>`, `<img>`) in PDF, DOCX, RTF and HTML.
+- Extra Formats installs Typst (Pandoc's PDF typesetter) and whisper.cpp with a verified speech model (`small-q5_1`);
+  tools can now carry extra checked files (`ExtraFile`).
+- Remove BG can use ISNet (1024 px, 178 MB) for fine edges: Settings > Output > Images.
+- Read Text offers to install the Windows OCR language when none is present (elevated `Add-WindowsCapability`).
+- The tray menu is placed with `CalculatePopupWindowPosition`, keeping clear of the taskbar and the hidden-icons panel.
+
+Verified for real on the dev machine: Word, Excel and PowerPoint conversions; Typst through Pandoc; whisper.cpp transcription
+through the engine; ISNet cutouts. Not yet run for real: the OCR language install (needs a UAC prompt), the tray menu placement
+with a real right-click.
+
 ## Checkpoint (2026-11-10, 0.1.0-beta.1)
 
 1,337 unit tests pass across 19 test projects. Real-mouse QA passed for every image editor, the PDF editors,

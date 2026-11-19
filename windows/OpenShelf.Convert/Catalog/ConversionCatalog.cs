@@ -67,15 +67,16 @@ public static class ConversionCatalog
                 break;
             case FileKind.Document:
                 formats.AddRange([OutputFormat.Pdf, OutputFormat.Docx, OutputFormat.Txt, OutputFormat.Md, OutputFormat.Epub, OutputFormat.Html, OutputFormat.Rtf]);
-                // Only Pandoc writes OpenDocument text well.
-                if (tools.Pandoc is not null && PandocReaders.ContainsKey(ext)) formats.Add(OutputFormat.Odt);
+                // Only Pandoc and Word write OpenDocument text well.
+                if ((tools.Pandoc is not null && PandocReaders.ContainsKey(ext)) || (tools.Has(OfficeApp.Word) && OfficeSources.Word.Contains(ext)))
+                    formats.Add(OutputFormat.Odt);
                 break;
             case FileKind.Spreadsheet:
-                formats.AddRange(SpreadsheetFormats(ext, hasOffice));
+                formats.AddRange(SpreadsheetFormats(ext, hasOffice, tools.Has(OfficeApp.Excel) && OfficeSources.Excel.Contains(ext)));
                 break;
             case FileKind.Presentation:
-                // Slides need LibreOffice to render.
-                if (hasOffice) formats.AddRange([OutputFormat.Pdf, OutputFormat.Jpg, OutputFormat.Png]);
+                // Slides need LibreOffice or PowerPoint to render.
+                if (hasOffice || (tools.Has(OfficeApp.PowerPoint) && OfficeSources.PowerPoint.Contains(ext))) formats.AddRange([OutputFormat.Pdf, OutputFormat.Jpg, OutputFormat.Png]);
                 break;
             case FileKind.Audio:
                 // Windows has no built-in transcoder in the engine: ffmpeg decodes and encodes everything.
@@ -112,8 +113,9 @@ public static class ConversionCatalog
         return [.. formats.Take(MaxWedges - 1), OutputFormat.Zip];
     }
 
-    private static IEnumerable<OutputFormat> SpreadsheetFormats(string ext, bool hasOffice)
+    private static IEnumerable<OutputFormat> SpreadsheetFormats(string ext, bool hasLibreOffice, bool hasExcel)
     {
+        var hasOffice = hasLibreOffice || (hasExcel && ext != "csv" && ext != "tsv");
         switch (ext)
         {
             case "csv" or "tsv" or "xlsx":
@@ -122,7 +124,7 @@ public static class ConversionCatalog
                     ? [OutputFormat.Xlsx, OutputFormat.Csv, OutputFormat.Tsv, OutputFormat.Pdf, OutputFormat.Ods]
                     : [OutputFormat.Xlsx, OutputFormat.Csv, OutputFormat.Tsv, OutputFormat.Pdf];
             default:
-                // XLS and ODS can only be opened by LibreOffice.
+                // XLS and ODS can only be opened by LibreOffice or Excel.
                 return hasOffice ? [OutputFormat.Xlsx, OutputFormat.Csv, OutputFormat.Pdf, OutputFormat.Ods] : [];
         }
     }
