@@ -2,9 +2,10 @@ import Carbon.HIToolbox
 import ServiceManagement
 import SwiftUI
 
-/// Settings → General: opening at login, and the guided tour.
+/// Settings → General: opening at login, the menu bar icon, and the guided tour.
 struct GeneralSettingsPane: View {
     @State private var opensAtLogin = SMAppService.mainApp.status == .enabled
+    @Bindable private var preferences = Preferences.shared
 
     var body: some View {
         Form {
@@ -13,8 +14,9 @@ struct GeneralSettingsPane: View {
                     .onChange(of: opensAtLogin) { _, enabled in
                         setOpensAtLogin(enabled)
                     }
+                Toggle("Show in menu bar", isOn: $preferences.showsMenuBarIcon)
             } footer: {
-                Text("Menu bar icon out of sight, behind the notch or in the menu bar's overflow? Open OpenShelf again from Finder or Spotlight to come back here, or press the wheel shortcut twice with no files selected.")
+                Text("Menu bar icon hidden or out of sight, behind the notch or in the menu bar's overflow? Open OpenShelf again from Finder or Spotlight to come back here, or press the wheel shortcut twice with no files selected.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

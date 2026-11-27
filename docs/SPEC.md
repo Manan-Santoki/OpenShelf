@@ -349,8 +349,11 @@ a bookmark per folder, a per-folder on/off switch and an optional action.
 New Shelf · Show Shelves · Close All Shelves · Open Wheel for Selection ·
 Take the Tour… · Settings… · Check for Updates… · Quit.
 
-When the icon can't be reached (behind the notch, or in the macOS 27 menu
-bar's overflow), opening the app again from Finder or Spotlight shows
+Settings → General → Show in menu bar (default on) hides the icon; so does
+⌘-dragging it out of the menu bar, which turns the setting off.
+
+When the icon is hidden or can't be reached (behind the notch, or in the
+macOS 27 menu bar's overflow), opening the app again from Finder or Spotlight shows
 Settings, and so does pressing the wheel shortcut again while "Select files in
 Finder first" is showing (within 2 s; that toast says so). Settings → General
 mentions both.
@@ -360,7 +363,8 @@ mentions both.
 Toolbar tabs, like System apps; the window keeps its width, takes each tab's
 height (scrolling when the screen is shorter) and opens on the tab used last.
 
-- General: open at login; take the tour, or start it over (§6).
+- General: open at login; show in menu bar (default on, §4); take the tour,
+  or start it over (§6).
 - Wheels: trigger keys per wheel (any combination of ⌃ ⌥ ⇧ ⌘, at least one),
   and the shortcut for Finder's selection.
 - Shelves: remove files from a shelf after dragging them out (default off);

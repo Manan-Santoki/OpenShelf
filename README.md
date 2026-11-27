@@ -417,8 +417,10 @@ from the menu bar, or turn automatic checks and installs on or off in Settings.
 Click the OpenShelf wheel in the menu bar → **Settings…** (⌘,). It opens on the
 tab you used last:
 
-- **General:** open OpenShelf at login, and take the tour again or start it
-  over (also in the menu as **Take the Tour…**)
+- **General:** open OpenShelf at login, show or hide the menu bar icon, and
+  take the tour again or start it over (also in the menu as **Take the
+  Tour…**). With the icon hidden, open OpenShelf again from Finder or
+  Spotlight to get back to Settings
 - **Wheels:** the keys that open each wheel while dragging, and the shortcut
   for Finder or shelf selections
 - **Shelves:** remove files from a shelf after dragging them out, restore
