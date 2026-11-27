@@ -3,9 +3,10 @@ import SwiftUI
 @main
 struct OpenShelfApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @Bindable private var preferences = Preferences.shared
 
     var body: some Scene {
-        MenuBarExtra {
+        MenuBarExtra(isInserted: $preferences.showsMenuBarIcon) {
             if let version = Updater.shared.availableVersion {
                 Button {
                     Updater.shared.checkForUpdates()

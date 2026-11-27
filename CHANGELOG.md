@@ -6,6 +6,15 @@ tags `v<version>` and publishes a GitHub release with that section as notes.
 
 Format: one `## [x.y.z] - YYYY-MM-DD` heading per version, newest first.
 
+## [Unreleased]
+
+### New
+
+- **Hide the menu bar icon.** Settings → General → **Show in menu bar** turns
+  OpenShelf's icon off for a tidier menu bar; the wheels, shelves and
+  shortcut keep working. Open OpenShelf again from Finder or Spotlight to get
+  back to Settings and turn it on again.
+
 ## [1.10.0] - 2026-11-17
 
 ### New

@@ -14,6 +14,7 @@ final class Preferences {
         static let addsConversionResultsToShelf = "addsConversionResultsToShelf"
         static let openWheelShortcut = "openWheelShortcut"
         static let output = "outputSettings"
+        static let showsMenuBarIcon = "showsMenuBarIcon"
 
         static func trigger(_ kind: WheelKind) -> String {
             switch kind {
@@ -55,6 +56,12 @@ final class Preferences {
         didSet { defaults.set(Self.encode(openWheelShortcut), forKey: Key.openWheelShortcut) }
     }
 
+    /// Show OpenShelf's icon in the menu bar. With it hidden, Settings is
+    /// reached by opening OpenShelf again from Finder or Spotlight.
+    var showsMenuBarIcon: Bool {
+        didSet { defaults.set(showsMenuBarIcon, forKey: Key.showsMenuBarIcon) }
+    }
+
     /// How the Convert wheel encodes what it writes (Settings → Output).
     var output: OutputSettings {
         didSet { defaults.set(output.stored, forKey: Key.output) }
@@ -75,6 +82,7 @@ final class Preferences {
         addsConversionResultsToShelf = defaults.object(forKey: Key.addsConversionResultsToShelf) as? Bool ?? true
         openWheelShortcut = Self.decode(defaults.string(forKey: Key.openWheelShortcut))
         output = OutputSettings.decode(defaults.string(forKey: Key.output))
+        showsMenuBarIcon = defaults.object(forKey: Key.showsMenuBarIcon) as? Bool ?? true
     }
 
     /// Stored as JSON, or "off" when the shortcut is turned off.
